@@ -1,12 +1,53 @@
-# Repository Manager - Research
+# Repository Manager
 
-This branch contains research documents and project specifications.
+A Rust-based CLI tool for orchestrating agentic development workspaces.
 
-It is intentionally detached from the main codebase history to keep
-research and documentation separate from implementation.
+## Crates
 
-## Contents
+- **repo-fs** - Filesystem abstraction with path normalization and atomic I/O
+- **repo-git** - Git abstraction supporting multiple worktree layouts
 
-- Project specifications
-- Research notes
-- Design documents
+## Layout Modes
+
+The repository manager supports three layout modes:
+
+### Container Layout
+```
+{container}/
+├── .gt/          # Git database
+├── main/         # Main branch worktree
+└── feature-x/    # Feature worktree
+```
+
+### In-Repo Worktrees Layout
+```
+{repo}/
+├── .git/
+├── .worktrees/
+│   └── feature-x/
+└── src/
+```
+
+### Classic Layout
+```
+{repo}/
+├── .git/
+└── src/
+```
+
+## Development
+
+```bash
+# Run tests
+cargo test -- --test-threads=1
+
+# Check compilation
+cargo check
+
+# Build
+cargo build
+```
+
+## License
+
+MIT
