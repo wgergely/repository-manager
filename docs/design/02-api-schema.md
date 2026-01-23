@@ -1,6 +1,6 @@
 # Agentic Repository Orchestrator API Schema
 
-*Research Document: Unified Tool Configuration Management*
+*Design Document: Unified Tool Configuration Management*
 *Date: 2026-01-23*
 
 ## Executive Summary
@@ -1056,15 +1056,16 @@ As noted in the research, no formal standards exist for agentic tool configurati
 
 ## Appendix C: Related Documents
 
-- `00-research-brief.md` - Project overview and goals
-- `01-tool-configurations.md` - Individual tool configuration analysis
-- `02-cross-platform-interop.md` - Interoperability analysis
-- `03-worktree-patterns.md` - Git worktree integration patterns
-- `04-emerging-standards.md` - Standards landscape analysis
+- `../research/_index.md` - Research index and overview
+- `../research/tool-*.md` - Individual tool deep-dives
+- `../research/pattern-interoperability.md` - Interoperability analysis
+- `../research/pattern-git-worktrees.md` - Git worktree integration patterns
+- `../research/standard-*.md` - Standards landscape analysis (AGENTS.md, MCP)
+- `01-architecture-spec.md` - Core architecture specification
 
 ---
 
 *Document created: 2026-01-23*
 *Last updated: 2026-01-23*
+*Location: docs/design/02-api-schema.md*
 *Status: Design specification - ready for implementation*
-*Branch: research-docs*

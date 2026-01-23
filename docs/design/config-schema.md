@@ -45,7 +45,13 @@ slug = "repo-man"
 tools = ["claude", "cursor", "vscode", "kdb"]
 
 # Presets apply a bundle of tools and initial rules
+# Can be a simple list of names (using defaults)
 presets = ["rust", "agentic-core"]
+
+[presets.config]
+# Or detailed configuration for specific presets
+"env:python" = { provider = "uv", version = "3.12" }
+
 
 [sync]
 # Strategy for updating files: 'overwrite', 'merge', 'smart-append'
@@ -237,6 +243,12 @@ pub struct CoreConfig {
 pub struct ActiveConfig {
     pub tools: Vec<String>,
     pub presets: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PresetConfig {
+    #[serde(flatten)]
+    pub overrides: HashMap<String, toml::Value>,
 }
 
 // tools/*.toml
