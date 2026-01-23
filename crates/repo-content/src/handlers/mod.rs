@@ -1,3 +1,5 @@
-//! Format-specific handlers for different file types.
+//! Format handlers
 
-// Handler implementations will be added in subsequent tasks.
+mod plaintext;
+
+pub use plaintext::PlainTextHandler;

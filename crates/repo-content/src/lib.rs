@@ -17,3 +17,4 @@ pub use document::Document;
 pub use edit::{Edit, EditKind};
 pub use error::{Error, Result};
 pub use format::{CommentStyle, Format, FormatHandler};
+pub use handlers::PlainTextHandler;
