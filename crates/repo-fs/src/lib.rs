@@ -2,13 +2,13 @@
 //!
 //! Provides layout-agnostic path resolution and safe I/O operations.
 
-pub mod error;
-pub mod path;
-pub mod io;
 pub mod config;
+pub mod error;
+pub mod io;
 pub mod layout;
+pub mod path;
 
-pub use error::{Error, Result};
-pub use path::NormalizedPath;
-pub use layout::{WorkspaceLayout, LayoutMode};
 pub use config::ConfigStore;
+pub use error::{Error, Result};
+pub use layout::{LayoutMode, WorkspaceLayout};
+pub use path::NormalizedPath;
