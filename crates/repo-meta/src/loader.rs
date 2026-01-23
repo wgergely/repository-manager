@@ -92,7 +92,7 @@ impl DefinitionLoader {
 
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "toml") {
+            if path.extension().is_some_and(|ext| ext == "toml") {
                 let norm_path = NormalizedPath::new(&path);
                 match self.store.load::<T>(&norm_path) {
                     Ok(def) => {

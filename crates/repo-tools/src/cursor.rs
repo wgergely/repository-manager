@@ -5,7 +5,7 @@
 use crate::error::Result;
 use crate::integration::{Rule, SyncContext, ToolIntegration};
 use repo_blocks::upsert_block;
-use repo_fs::{io, NormalizedPath};
+use repo_fs::{NormalizedPath, io};
 
 /// Cursor integration.
 ///
@@ -137,10 +137,7 @@ mod tests {
         assert!(!content.contains("Original content"));
 
         // Should only have one block marker pair
-        assert_eq!(
-            content.matches("<!-- repo:block:my-rule -->").count(),
-            1
-        );
+        assert_eq!(content.matches("<!-- repo:block:my-rule -->").count(), 1);
     }
 
     #[test]

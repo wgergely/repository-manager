@@ -1,7 +1,7 @@
 //! Integration tests for configuration loading
 
-use repo_meta::config::{load_config, get_preset_config, RepositoryMode};
 use repo_fs::NormalizedPath;
+use repo_meta::config::{RepositoryMode, get_preset_config, load_config};
 use std::fs;
 use tempfile::TempDir;
 
@@ -98,7 +98,11 @@ fn test_config_not_found_error() {
     assert!(result.is_err());
     let err = result.unwrap_err();
     let err_str = err.to_string();
-    assert!(err_str.contains("not found"), "Error should mention 'not found': {}", err_str);
+    assert!(
+        err_str.contains("not found"),
+        "Error should mention 'not found': {}",
+        err_str
+    );
 }
 
 #[test]

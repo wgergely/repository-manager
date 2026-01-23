@@ -1,10 +1,10 @@
 //! Integration tests for Python providers
 
 use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
+use repo_presets::PresetStatus;
 use repo_presets::context::Context;
 use repo_presets::provider::PresetProvider;
 use repo_presets::python::UvProvider;
-use repo_presets::PresetStatus;
 use std::collections::HashMap;
 use tempfile::TempDir;
 
@@ -73,7 +73,10 @@ async fn test_context_custom_python_version() {
     };
 
     let mut config = HashMap::new();
-    config.insert("version".to_string(), toml::Value::String("3.11".to_string()));
+    config.insert(
+        "version".to_string(),
+        toml::Value::String("3.11".to_string()),
+    );
 
     let context = Context::new(layout, config);
     assert_eq!(context.python_version(), "3.11");

@@ -151,10 +151,7 @@ old content
     assert!(result.contains("updated content"));
     assert!(!result.contains("old content"));
     // Should still only have one block
-    assert_eq!(
-        result.matches("<!-- repo:block:existing -->").count(),
-        1
-    );
+    assert_eq!(result.matches("<!-- repo:block:existing -->").count(), 1);
 }
 
 #[test]

@@ -85,6 +85,12 @@ fn test_string_types_for_register() {
     // Test with String
     registry.register(String::from("preset2"), String::from("provider2"));
 
-    assert_eq!(registry.get_provider("preset1"), Some(&"provider1".to_string()));
-    assert_eq!(registry.get_provider("preset2"), Some(&"provider2".to_string()));
+    assert_eq!(
+        registry.get_provider("preset1"),
+        Some(&"provider1".to_string())
+    );
+    assert_eq!(
+        registry.get_provider("preset2"),
+        Some(&"provider2".to_string())
+    );
 }

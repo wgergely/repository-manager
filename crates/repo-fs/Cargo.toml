@@ -15,6 +15,7 @@ tempfile = { workspace = true }
 dunce = { workspace = true }
 thiserror = { workspace = true }
 backoff = "0.4.0"
+tracing = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

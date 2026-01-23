@@ -1,9 +1,9 @@
-use criterion::{criterion_group, criterion_main, Criterion};
-use repo_git::{ContainerLayout, LayoutProvider, NamingStrategy};
+use criterion::{Criterion, criterion_group, criterion_main};
+use git2::Repository;
 use repo_fs::NormalizedPath;
+use repo_git::{ContainerLayout, LayoutProvider, NamingStrategy};
 use std::fs;
 use tempfile::tempdir;
-use git2::Repository;
 
 fn benchmark_container_layout_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("container_layout");
@@ -15,10 +15,10 @@ fn benchmark_container_layout_operations(c: &mut Criterion) {
                 let dir = tempdir().unwrap();
                 let root = NormalizedPath::new(dir.path());
                 let git_dir = root.join(".gt");
-                
+
                 // Initialize bare repo
                 let repo = Repository::init_bare(git_dir.to_native()).unwrap();
-                
+
                 // Create initial commit
                 let tree_id = {
                     let mut index = repo.index().unwrap();
@@ -27,16 +27,17 @@ fn benchmark_container_layout_operations(c: &mut Criterion) {
                 {
                     let tree = repo.find_tree(tree_id).unwrap();
                     let sig = repo.signature().unwrap();
-                    repo.commit(Some("HEAD"), &sig, &sig, "Initial commit", &tree, &[]).unwrap();
+                    repo.commit(Some("HEAD"), &sig, &sig, "Initial commit", &tree, &[])
+                        .unwrap();
                 }
 
                 // Initialize layout
                 let layout = ContainerLayout::new(root.clone(), NamingStrategy::Slug).unwrap();
-                
+
                 // Create 'main' worktree manually as baseline
                 let main_path = root.join("main");
                 fs::create_dir_all(main_path.to_native()).unwrap();
-                
+
                 (layout, repo, dir)
             },
             |(layout, _repo, _dir)| {

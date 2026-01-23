@@ -5,7 +5,7 @@
 use crate::error::Result;
 use crate::integration::{Rule, SyncContext, ToolIntegration};
 use repo_blocks::upsert_block;
-use repo_fs::{io, NormalizedPath};
+use repo_fs::{NormalizedPath, io};
 
 /// Claude integration.
 ///

@@ -137,9 +137,11 @@ Content with <html> tags & special chars "quotes" 'apostrophes'
 
     let blocks = parse_blocks(content);
     assert_eq!(blocks.len(), 1);
-    assert!(blocks[0]
-        .content
-        .contains("<html> tags & special chars \"quotes\" 'apostrophes'"));
+    assert!(
+        blocks[0]
+            .content
+            .contains("<html> tags & special chars \"quotes\" 'apostrophes'")
+    );
 }
 
 #[test]

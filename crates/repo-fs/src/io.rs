@@ -40,11 +40,7 @@ impl Default for RobustnessConfig {
 /// Uses exponential backoff for:
 /// - Acquiring locks (simulating timeout via try_lock loop)
 /// - Transient I/O errors (e.g. network blips)
-pub fn write_atomic(
-    path: &NormalizedPath,
-    content: &[u8],
-    config: RobustnessConfig,
-) -> Result<()> {
+pub fn write_atomic(path: &NormalizedPath, content: &[u8], config: RobustnessConfig) -> Result<()> {
     let native_path = path.to_native();
 
     // Ensure parent directory exists
@@ -62,7 +58,7 @@ pub fn write_atomic(
         std::process::id()
     );
     let temp_path = native_path.with_file_name(&temp_name);
-    
+
     // Define the operation to perform with retry support
     let op = || -> std::result::Result<(), backoff::Error<Error>> {
         // Write to temp file
@@ -76,7 +72,7 @@ pub fn write_atomic(
         // Acquire exclusive lock with timeout simulation
         // fs2::lock_exclusive blocks, so we use try_lock_exclusive in a loop if we wanted strict timeout
         // But for backoff retry, we can just try_lock and if it fails, return transient error.
-        
+
         // Note: try_lock_exclusive returns Error if it would block (on some platforms) or if locked.
         // fs2 documentation says: "Returns an error if the lock could not be acquired"
         temp_file.try_lock_exclusive().map_err(|_| {
@@ -104,7 +100,7 @@ pub fn write_atomic(
         // Atomic rename
         fs::rename(&temp_path, &native_path)
             .map_err(|e| backoff::Error::transient(Error::io(&native_path, e)))?;
-            
+
         Ok(())
     };
 

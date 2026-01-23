@@ -54,7 +54,8 @@ impl Registry {
     /// * `preset_id` - The preset identifier (e.g., "env:python")
     /// * `provider_name` - The provider name (e.g., "uv")
     pub fn register(&mut self, preset_id: impl Into<String>, provider_name: impl Into<String>) {
-        self.providers.insert(preset_id.into(), provider_name.into());
+        self.providers
+            .insert(preset_id.into(), provider_name.into());
     }
 
     /// Get the provider name for a preset ID.

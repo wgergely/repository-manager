@@ -9,6 +9,7 @@ description = "Git abstraction for Repository Manager"
 repo-fs = { path = "../repo-fs" }
 git2 = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

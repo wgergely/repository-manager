@@ -8,5 +8,5 @@ pub mod parser;
 pub mod writer;
 
 pub use error::{Error, Result};
-pub use parser::{parse_blocks, find_block, has_block, Block};
-pub use writer::{insert_block, update_block, remove_block, upsert_block};
+pub use parser::{Block, find_block, has_block, parse_blocks};
+pub use writer::{insert_block, remove_block, update_block, upsert_block};

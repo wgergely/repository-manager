@@ -1,6 +1,6 @@
 //! ToolIntegration trait for syncing to external tools
 
-use crate::Result;
+use crate::error::Result;
 use repo_fs::NormalizedPath;
 
 /// Rule to be synced to tools
@@ -19,7 +19,10 @@ pub struct SyncContext {
 
 impl SyncContext {
     pub fn new(root: NormalizedPath) -> Self {
-        Self { root, python_path: None }
+        Self {
+            root,
+            python_path: None,
+        }
     }
 
     pub fn with_python(mut self, path: NormalizedPath) -> Self {

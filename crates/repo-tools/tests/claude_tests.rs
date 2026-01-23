@@ -1,7 +1,7 @@
 //! Integration tests for Claude integration.
 
 use repo_fs::NormalizedPath;
-use repo_tools::{Rule, SyncContext, ToolIntegration, ClaudeIntegration};
+use repo_tools::{ClaudeIntegration, Rule, SyncContext, ToolIntegration};
 use std::fs;
 use tempfile::TempDir;
 
@@ -122,8 +122,18 @@ fn test_claude_updates_existing_block() {
     assert!(!content.contains("Version 1.0"));
 
     // Should only have one block (not duplicated)
-    assert_eq!(content.matches("<!-- repo:block:dynamic-context -->").count(), 1);
-    assert_eq!(content.matches("<!-- /repo:block:dynamic-context -->").count(), 1);
+    assert_eq!(
+        content
+            .matches("<!-- repo:block:dynamic-context -->")
+            .count(),
+        1
+    );
+    assert_eq!(
+        content
+            .matches("<!-- /repo:block:dynamic-context -->")
+            .count(),
+        1
+    );
 }
 
 #[test]
@@ -172,7 +182,11 @@ fn test_claude_empty_rules() {
     let root = NormalizedPath::new(temp_dir.path());
 
     // Create existing file
-    fs::write(temp_dir.path().join("CLAUDE.md"), "# Existing Documentation").unwrap();
+    fs::write(
+        temp_dir.path().join("CLAUDE.md"),
+        "# Existing Documentation",
+    )
+    .unwrap();
 
     let context = SyncContext::new(root);
     let rules: Vec<Rule> = vec![];
@@ -204,7 +218,8 @@ fn test_claude_markdown_content_in_rules() {
 fn example() {
     println!("Hello");
 }
-```"#.to_string(),
+```"#
+            .to_string(),
     }];
 
     let integration = ClaudeIntegration::new();

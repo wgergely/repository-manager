@@ -7,9 +7,9 @@
 use crate::error::Result;
 use crate::integration::{Rule, SyncContext, ToolIntegration};
 use repo_blocks::upsert_block;
-use repo_fs::{io, NormalizedPath};
+use repo_fs::{NormalizedPath, io};
 use repo_meta::schema::{ConfigType, ToolDefinition};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Generic tool integration driven by ToolDefinition schema.
 ///

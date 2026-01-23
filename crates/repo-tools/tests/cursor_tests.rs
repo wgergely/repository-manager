@@ -1,7 +1,7 @@
 //! Integration tests for Cursor integration.
 
 use repo_fs::NormalizedPath;
-use repo_tools::{Rule, SyncContext, ToolIntegration, CursorIntegration};
+use repo_tools::{CursorIntegration, Rule, SyncContext, ToolIntegration};
 use std::fs;
 use tempfile::TempDir;
 

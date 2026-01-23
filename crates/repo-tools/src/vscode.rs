@@ -5,8 +5,8 @@
 
 use crate::error::Result;
 use crate::integration::{Rule, SyncContext, ToolIntegration};
-use repo_fs::{io, NormalizedPath};
-use serde_json::{json, Value};
+use repo_fs::{NormalizedPath, io};
+use serde_json::{Value, json};
 
 /// VSCode integration.
 ///

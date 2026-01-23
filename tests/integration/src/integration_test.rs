@@ -3,9 +3,11 @@
 //! This test exercises the complete flow: config loading -> preset check -> tool sync.
 
 use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
-use repo_meta::{load_config, Registry};
+use repo_meta::{Registry, load_config};
 use repo_presets::{Context, PresetProvider, PresetStatus, UvProvider};
-use repo_tools::{ClaudeIntegration, CursorIntegration, Rule, SyncContext, ToolIntegration, VSCodeIntegration};
+use repo_tools::{
+    ClaudeIntegration, CursorIntegration, Rule, SyncContext, ToolIntegration, VSCodeIntegration,
+};
 use std::collections::HashMap;
 use std::fs;
 use tempfile::TempDir;
@@ -192,10 +194,7 @@ version = "3.11"
     let config = load_config(&root).unwrap();
 
     // Verify core config
-    assert_eq!(
-        config.core.mode,
-        repo_meta::RepositoryMode::Worktrees
-    );
+    assert_eq!(config.core.mode, repo_meta::RepositoryMode::Worktrees);
 
     // Verify sync config
     assert_eq!(config.sync.strategy, "manual");

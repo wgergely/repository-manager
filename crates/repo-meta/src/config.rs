@@ -106,7 +106,9 @@ pub struct RepositoryConfig {
 /// println!("Mode: {:?}", config.core.mode);
 /// ```
 pub fn load_config(root: &NormalizedPath) -> Result<RepositoryConfig> {
-    let config_path = root.join(RepoPath::RepositoryConfig.as_str()).join("config.toml");
+    let config_path = root
+        .join(RepoPath::RepositoryConfig.as_str())
+        .join("config.toml");
 
     if !config_path.exists() {
         return Err(Error::ConfigNotFound {
@@ -147,7 +149,10 @@ pub fn load_config(root: &NormalizedPath) -> Result<RepositoryConfig> {
 ///     println!("Python config: {:?}", python_config);
 /// }
 /// ```
-pub fn get_preset_config<'a>(config: &'a RepositoryConfig, preset_id: &str) -> Option<&'a toml::Value> {
+pub fn get_preset_config<'a>(
+    config: &'a RepositoryConfig,
+    preset_id: &str,
+) -> Option<&'a toml::Value> {
     config.presets_config.get(preset_id)
 }
 

@@ -45,7 +45,7 @@ impl ContainerLayout {
         if self.repo_cache.get().is_none() {
             let repo = Repository::open(self.git_dir.to_native())?;
             // We ignore the error because if it fails, it means another thread set it?
-            // But OnceCell for single thread shouldn't race. 
+            // But OnceCell for single thread shouldn't race.
             // set returns Result<(), T>. If Err, it returns the value back.
             let _ = self.repo_cache.set(repo);
         }

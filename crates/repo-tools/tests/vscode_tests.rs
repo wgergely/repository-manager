@@ -161,12 +161,10 @@ fn test_vscode_rules_are_ignored() {
     let python_path = NormalizedPath::new("/python");
 
     let context = SyncContext::new(root).with_python(python_path);
-    let rules = vec![
-        Rule {
-            id: "ignored-rule".to_string(),
-            content: "This should be ignored".to_string(),
-        },
-    ];
+    let rules = vec![Rule {
+        id: "ignored-rule".to_string(),
+        content: "This should be ignored".to_string(),
+    }];
 
     let integration = VSCodeIntegration::new();
     integration.sync(&context, &rules).unwrap();

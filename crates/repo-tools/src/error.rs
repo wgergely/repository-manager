@@ -10,7 +10,7 @@ pub enum Error {
     Fs(#[from] repo_fs::Error),
 
     #[error("Block error: {0}")]
-    Block(#[from] repo_blocks::Error),
+    Block(#[from] repo_blocks::error::Error),
 
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),

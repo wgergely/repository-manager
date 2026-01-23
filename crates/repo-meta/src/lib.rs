@@ -35,8 +35,8 @@ pub mod registry;
 pub mod schema;
 
 pub use config::{
-    get_preset_config, load_config, ActiveConfig, CoreConfig, RepositoryConfig, RepositoryMode,
-    SyncConfig,
+    ActiveConfig, CoreConfig, RepositoryConfig, RepositoryMode, SyncConfig, get_preset_config,
+    load_config,
 };
 pub use error::{Error, Result};
 pub use loader::DefinitionLoader;

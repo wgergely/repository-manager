@@ -160,7 +160,11 @@ fn test_generic_integration_preserves_existing_json() {
         "editor.fontSize": 14,
         "existingKey": "existingValue"
     });
-    fs::write(&config_path, serde_json::to_string_pretty(&existing).unwrap()).unwrap();
+    fs::write(
+        &config_path,
+        serde_json::to_string_pretty(&existing).unwrap(),
+    )
+    .unwrap();
 
     let definition = ToolDefinition {
         meta: ToolMeta {
@@ -384,10 +388,7 @@ fn test_config_paths_with_additional() {
         integration: ToolIntegrationConfig {
             config_path: ".tool/config.json".to_string(),
             config_type: ConfigType::Json,
-            additional_paths: vec![
-                ".tool/rules/".to_string(),
-                ".tool/presets/".to_string(),
-            ],
+            additional_paths: vec![".tool/rules/".to_string(), ".tool/presets/".to_string()],
         },
         capabilities: ToolCapabilities::default(),
         schema_keys: None,

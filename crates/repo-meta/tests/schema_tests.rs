@@ -1,8 +1,8 @@
 //! Tests for schema definitions and the DefinitionLoader
 
 use repo_fs::NormalizedPath;
-use repo_meta::schema::{ConfigType, PresetDefinition, RuleDefinition, Severity, ToolDefinition};
 use repo_meta::DefinitionLoader;
+use repo_meta::schema::{ConfigType, PresetDefinition, RuleDefinition, Severity, ToolDefinition};
 use std::fs;
 use tempfile::TempDir;
 
@@ -57,7 +57,10 @@ mcp_key = "mcpServers"
 
     let def: ToolDefinition = toml::from_str(toml).unwrap();
     assert_eq!(def.meta.slug, "cursor");
-    assert_eq!(def.meta.description, Some("AI-first code editor".to_string()));
+    assert_eq!(
+        def.meta.description,
+        Some("AI-first code editor".to_string())
+    );
     assert_eq!(def.integration.config_type, ConfigType::Text);
     assert_eq!(def.integration.additional_paths, vec![".cursor/rules/"]);
     assert!(def.capabilities.supports_custom_instructions);
@@ -65,7 +68,10 @@ mcp_key = "mcpServers"
     assert!(def.capabilities.supports_rules_directory);
 
     let schema_keys = def.schema_keys.unwrap();
-    assert_eq!(schema_keys.instruction_key, Some("global_instructions".to_string()));
+    assert_eq!(
+        schema_keys.instruction_key,
+        Some("global_instructions".to_string())
+    );
     assert_eq!(schema_keys.mcp_key, Some("mcpServers".to_string()));
 }
 
@@ -318,7 +324,9 @@ python_path_key = "python.defaultInterpreterPath"
     .unwrap();
 
     let loader = DefinitionLoader::new();
-    let tools = loader.load_tools(&NormalizedPath::new(temp.path())).unwrap();
+    let tools = loader
+        .load_tools(&NormalizedPath::new(temp.path()))
+        .unwrap();
 
     assert_eq!(tools.len(), 2);
     assert!(tools.contains_key("cursor"));
@@ -366,7 +374,9 @@ instruction = "Never commit API keys."
     .unwrap();
 
     let loader = DefinitionLoader::new();
-    let rules = loader.load_rules(&NormalizedPath::new(temp.path())).unwrap();
+    let rules = loader
+        .load_rules(&NormalizedPath::new(temp.path()))
+        .unwrap();
 
     assert_eq!(rules.len(), 2);
     assert!(rules.contains_key("python-snake-case"));
@@ -435,7 +445,9 @@ type = "text"
     fs::write(tools_dir.join("backup.toml.bak"), "invalid").unwrap();
 
     let loader = DefinitionLoader::new();
-    let tools = loader.load_tools(&NormalizedPath::new(temp.path())).unwrap();
+    let tools = loader
+        .load_tools(&NormalizedPath::new(temp.path()))
+        .unwrap();
 
     assert_eq!(tools.len(), 1);
     assert!(tools.contains_key("cursor"));
@@ -474,7 +486,9 @@ name = "Invalid"
     .unwrap();
 
     let loader = DefinitionLoader::new();
-    let tools = loader.load_tools(&NormalizedPath::new(temp.path())).unwrap();
+    let tools = loader
+        .load_tools(&NormalizedPath::new(temp.path()))
+        .unwrap();
 
     // Should still load the valid one
     assert_eq!(tools.len(), 1);
@@ -488,10 +502,14 @@ fn test_loader_returns_empty_for_nonexistent_directory() {
 
     let loader = DefinitionLoader::new();
 
-    let tools = loader.load_tools(&NormalizedPath::new(temp.path())).unwrap();
+    let tools = loader
+        .load_tools(&NormalizedPath::new(temp.path()))
+        .unwrap();
     assert!(tools.is_empty());
 
-    let rules = loader.load_rules(&NormalizedPath::new(temp.path())).unwrap();
+    let rules = loader
+        .load_rules(&NormalizedPath::new(temp.path()))
+        .unwrap();
     assert!(rules.is_empty());
 
     let presets = loader
