@@ -14,13 +14,33 @@ pub struct NormalizedPath {
 }
 
 impl NormalizedPath {
-    /// Create a new NormalizedPath from any path-like input.
-    ///
-    /// Converts backslashes to forward slashes for internal storage.
     pub fn new(path: impl AsRef<Path>) -> Self {
         let path_str = path.as_ref().to_string_lossy();
+
+        // Optimization: Fast path for already-clean paths
+        // Check for backslashes (Windows) or . / .. / empty components (Cleaning)
+        let mut needs_work = false;
+        if path_str.contains('\\') {
+            needs_work = true;
+        } else {
+            for component in path_str.split('/') {
+                if component.is_empty() || component == "." || component == ".." {
+                    needs_work = true;
+                    break;
+                }
+            }
+        }
+
+        if !needs_work {
+            return Self {
+                inner: path_str.into_owned(),
+            };
+        }
+
         let normalized = path_str.replace('\\', "/");
-        Self { inner: normalized }
+        Self {
+            inner: Self::clean(&normalized),
+        }
     }
 
     /// Get the internal normalized string representation.
@@ -41,7 +61,67 @@ impl NormalizedPath {
         } else {
             format!("{}/{}", self.inner, segment_normalized)
         };
-        Self { inner: joined }
+        // We still need to clean joined result because "a/b" + "../c" -> Needs resolution
+        Self {
+            inner: Self::clean(&joined),
+        }
+    }
+
+    /// Clean the path by resolving . and .. components
+    fn clean(path: &str) -> String {
+        // Optimization: check if we actually need to do anything
+        // calling split matches internal logic
+        let mut needs_cleaning = false;
+        for component in path.split('/') {
+            if component.is_empty() || component == "." || component == ".." {
+                needs_cleaning = true;
+                break;
+            }
+        }
+
+        if !needs_cleaning {
+            return path.to_owned();
+        }
+
+        let mut out = Vec::new();
+        // Check for UNC-like double slash (but not triple)
+        let is_network = path.starts_with("//") && !path.starts_with("///");
+        let is_absolute = path.starts_with('/') || is_network;
+
+        for component in path.split('/') {
+            match component {
+                "" | "." => continue,
+                ".." => {
+                    if !out.is_empty() {
+                        out.pop();
+                    } else if !is_absolute {
+                        // If relative, we drop leading .. (sandbox behavior)
+                    }
+                }
+                c => out.push(c),
+            }
+        }
+
+        // Re-construct
+        let mut res = String::with_capacity(path.len());
+        if is_network {
+            res.push_str("//");
+        } else if is_absolute {
+            res.push('/');
+        }
+
+        for (i, component) in out.iter().enumerate() {
+            if i > 0 {
+                res.push('/');
+            }
+            res.push_str(component);
+        }
+
+        if res.is_empty() && !is_absolute {
+            res.push('.');
+        }
+
+        res
     }
 
     /// Get the parent directory.
