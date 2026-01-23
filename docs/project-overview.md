@@ -50,4 +50,4 @@ The system is built as a suite of modular Rust crates, emphasizing performance, 
 * `repo-git`: High-level Git and Worktree abstractions.
 * `repo-tools`: Integration logic for third-party tools (VSCode, Claude, etc.).
 
-> **Next Steps**: See the [Design Documentation](design/_index.md) for detailed architectural specifications.
+> **Next Steps**: See the [Design Documentation](design/_index.md) and [Research Documentation](research/_index.md) for background context.

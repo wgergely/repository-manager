@@ -114,23 +114,10 @@ Unlike Claude Code's directory-based skills:
 
 ### Syntax Difference
 
-Claude Desktop uses `mcpServers` (different from VS Code's `mcp.servers`):
-
-```json
-// Claude Desktop / Cursor format
-{
-  "mcpServers": {
-    "server-name": { ... }
-  }
-}
-
-// VS Code format
-{
-  "mcp": {
-    "servers": { ... }
-  }
-}
-```
+| Product | Key Path |
+|---------|----------|
+| Claude Desktop, Cursor | `mcpServers` |
+| VS Code | `mcp.servers` |
 
 ### Node.js Requirements
 

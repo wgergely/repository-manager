@@ -42,7 +42,7 @@ AGENTS.md provides the best path to universal rules:
 ### Sync Strategy
 
 ```
-.agentic/rules/common.md    (source of truth)
+.repository/rules/common.md    (source of truth)
         |
    [repo-manager sync]
         |
@@ -87,7 +87,7 @@ AGENTS.md  CLAUDE.md  .cursorrules  copilot-instructions.md  .windsurfrules
 
 Claude Code pattern that could be universal:
 ```markdown
-# .agentic/memory.md
+# .repository/memory.md
 
 ## Architecture Decisions
 - Using event sourcing for audit trail
@@ -103,7 +103,7 @@ Claude Code pattern that could be universal:
 **2. Structured Memory Format**
 
 ```yaml
-# .agentic/memory.yaml
+# .repository/memory.yaml
 decisions:
   - date: 2026-01-15
     topic: Database choice
@@ -116,7 +116,7 @@ context:
   ci_cd: GitHub Actions
 ```
 
-**3. Memory Sync Service**
+**3. Memory Sync Service (Hypothetical - not implemented)**
 
 Hypothetical service that syncs context across tools (doesn't exist yet).
 
@@ -140,7 +140,7 @@ MCP provides tool/resource portability:
 ### Shared MCP Configuration
 
 ```yaml
-# .agentic/mcp/servers.yaml
+# .repository/mcp/servers.yaml
 servers:
   filesystem:
     command: npx
@@ -170,10 +170,10 @@ Generated to tool-specific formats:
 | Copilot | Extensions (beta) | GitHub Marketplace |
 | Continue | JSON commands | `config.json` |
 
-### Potential Abstraction
+### Potential Abstraction (Proposed Format - Not Implemented)
 
 ```yaml
-# .agentic/skills/deploy.yaml
+# .repository/skills/deploy.yaml
 name: deploy
 description: Deploy application to environment
 
@@ -243,22 +243,22 @@ Periodic comparison of AI outputs across tools using the same rules.
 ## Implementation Priority for repo-manager
 
 ### Phase 1: Rules Sync (High Value)
-- Read from `.agentic/rules/`
+- Read from `.repository/rules/`
 - Generate AGENTS.md, CLAUDE.md, .cursorrules, etc.
 - Watch for changes, re-sync
 
 ### Phase 2: MCP Config Sync (High Value)
-- Read from `.agentic/mcp/`
+- Read from `.repository/mcp/`
 - Generate tool-specific MCP configs
 - Validate server availability
 
 ### Phase 3: Memory Format (Medium Value)
-- Define `.agentic/memory.yaml` format
+- Define `.repository/memory.yaml` format
 - Generate Claude Code memory.md
 - (Others as they support explicit memory)
 
 ### Phase 4: Skills Abstraction (Lower Value)
-- Define `.agentic/skills/` format
+- Define `.repository/skills/` format
 - Generate Claude Code skills
 - (Limited value due to tool diversity)
 

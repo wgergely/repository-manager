@@ -18,43 +18,15 @@ Modern, type-safe configuration with layering support.
 ## figment Example
 
 ```rust
-use figment::{Figment, providers::{Format, Toml, Json, Env, Serialized}};
-use serde::{Deserialize, Serialize};
+use figment::{Figment, providers::{Format, Toml, Env, Serialized}};
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Config {
-    global: GlobalConfig,
-    tools: ToolsConfig,
-    worktrees: WorktreeConfig,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct GlobalConfig {
-    container_dir: PathBuf,
-    default_branch: String,
-    auto_sync: bool,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct ToolsConfig {
-    claude: Option<ClaudeConfig>,
-    cursor: Option<CursorConfig>,
-    windsurf: Option<WindsurfConfig>,
-}
-
-// Hierarchical loading
+// Pattern: Hierarchical config loading with layered overrides
 fn load_config() -> Result<Config, figment::Error> {
     Figment::new()
-        // 1. Default values
-        .merge(Serialized::defaults(Config::default()))
-        // 2. System-wide
-        .merge(Toml::file("/etc/repo-manager/config.toml"))
-        // 3. User config
-        .merge(Toml::file(dirs::config_dir().unwrap().join("repo-manager/config.toml")))
-        // 4. Project config
-        .merge(Toml::file(".repo-manager.toml"))
-        // 5. Environment (REPO_MANAGER_*)
-        .merge(Env::prefixed("REPO_MANAGER_").split("_"))
+        .merge(Serialized::defaults(Config::default()))   // Defaults
+        .merge(Toml::file("~/.config/repo-manager/config.toml"))  // User
+        .merge(Toml::file(".repository/config.toml"))     // Project
+        .merge(Env::prefixed("REPO_MANAGER_").split("_")) // Environment
         .extract()
 }
 ```

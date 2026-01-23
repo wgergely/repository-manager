@@ -174,25 +174,7 @@ Via JetBrains IDE settings and `.idea/` directory.
 
 ## OpenAI Codex
 
-**Type**: API + Editor Integration
-**Focus**: General AI coding
-
-### Overview
-
-| Attribute | Value |
-|-----------|-------|
-| **Company** | OpenAI |
-| **AGENTS.md** | Native (primary format) |
-| **MCP Support** | Native |
-
-### Configuration
-
-AGENTS.md is the primary configuration format.
-
-### Unique Features
-- First-party AGENTS.md support
-- MCP adoption (March 2025)
-- API-first approach
+See dedicated document: [tool-openai-codex.md](tool-openai-codex.md)
 
 ---
 
@@ -222,13 +204,23 @@ AGENTS.md is the primary configuration format.
 | Tool | Type | AGENTS.md | MCP | Primary Use |
 |------|------|-----------|-----|-------------|
 | Aider | CLI | Native | No | Terminal pair programming |
-| Continue | Extension | Partial | Partial | Customizable assistant |
-| Cody | Extension | No | Partial | Enterprise code search |
-| JetBrains AI | Plugin | No | Partial | JetBrains integration |
+| Continue | Extension | Not confirmed | Partial | Customizable assistant |
+| Cody | Extension | Not confirmed | Partial | Enterprise code search |
+| JetBrains AI | Plugin | Not confirmed | Partial | JetBrains integration |
 | Tabnine | Extension | No | No | Privacy-first completions |
 | Factory AI | Agent | Native | Partial | Full automation |
-| OpenAI Codex | API | Native | Native | API-first coding |
+| OpenAI Codex | CLI | Native | Native | See [tool-openai-codex.md](tool-openai-codex.md) |
 | Google Jules | Agent | Native | Partial | Async background coding |
+
+## Sources
+
+- [Aider Documentation](https://aider.chat)
+- [Continue.dev Documentation](https://docs.continue.dev)
+- [Cody Documentation](https://sourcegraph.com/docs/cody)
+- [JetBrains AI Assistant](https://www.jetbrains.com/ai)
+- [Tabnine Documentation](https://docs.tabnine.com)
+- [Factory AI](https://www.factory.ai)
+- [Google Jules](https://developers.google.com/jules)
 
 ---
 

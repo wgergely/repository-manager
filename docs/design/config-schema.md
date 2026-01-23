@@ -105,7 +105,7 @@ supports_mcp = false
 
 ## 3. Rule Definitions (`rules/*.toml`)
 
-Rules capture specific behaviors, constraints, or stylistic preferences. They are abstract enough to be transpiled to different tools.
+Rules capture specific behaviors, constraints, or stylistic preferences. They are abstract enough to be unrolled to different tools.
 
 **Example: `rules/code-style-python.toml`**
 
@@ -155,11 +155,7 @@ include = [
 
 ## 5. The Sync Process ("Unroll")
 
-The critical feature is the `repo sync` command, which translates the above definitions into actual config files.
-
-### Tracking Logic
-
-To allow "unrolling" (generating files) without destroying user changes, the system needs a strategy.
+The `repo sync` command generates config files while preserving user changes through managed strategies.
 
 **Text Files (e.g., `.cursorrules`)**:
 We use "Managed Blocks". The CLI only edits content between specific markers.
@@ -181,12 +177,7 @@ Always be concise.
 ```
 
 **JSON Files (e.g., `.claude/config.json`)**:
-We perform a structured merge.
-
-1. Read existing JSON.
-2. Locate the keys managed by the registry (e.g., `global_instructions`).
-3. specific keys can be "owned" by the manager.
-4. Ideally, we append our generated instructions to the existing string, or replace a specific labeled section if the format allows.
+For JSON, we perform structured merges on manager-owned keys, appending or replacing labeled sections.
 
 ### State Tracking (`state.lock`)
 
@@ -196,7 +187,7 @@ To robustly handle `remove-rule` operations, we must know what we previously wro
 ```toml
 # .repository/state.lock
 [sync_status]
-last_run = "2024-01-23T12:00:00Z"
+last_run = "2026-01-23T12:00:00Z"
 
 [installed_files]
 ".cursorrules" = "hash_of_managed_block"

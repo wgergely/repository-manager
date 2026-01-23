@@ -15,13 +15,12 @@ AI-native IDE with Cascade agentic system and flow-based coding.
 
 ## Cascade Architecture
 
-Cascade is not a single model but an orchestration system combining:
+Multi-model orchestration system:
+- Fast autocomplete model
+- Reasoning model
+- Code generation model
 
-- **Fast autocomplete model** - Low latency suggestions
-- **Reasoning model** - Multi-step planning
-- **Code generation model** - Implementation
-
-Claims 60% less latency than competitors via proprietary optimizations.
+Note: Vendor claims 60% latency improvement (unverified).
 
 ## Configuration Files
 
@@ -160,6 +159,10 @@ Context-aware, multi-line completions going beyond single-line suggestions.
 ~/.codeium/
 └── .codeiumignore             # Global ignore rules
 ```
+
+## Sources
+
+- [Windsurf Documentation](https://codeium.com/windsurf)
 
 ---
 

@@ -29,6 +29,7 @@ This research covers:
 | [tool-cursor.md](tool-cursor.md) | Anysphere's AI-first VS Code fork |
 | [tool-windsurf.md](tool-windsurf.md) | Codeium's Cascade-powered IDE (VS Code fork) |
 | [tool-antigravity.md](tool-antigravity.md) | Google's agent-first IDE (VS Code fork) |
+| [tool-openai-codex.md](tool-openai-codex.md) | OpenAI's CLI agent (AGENTS.md originator) |
 | [tool-copilot.md](tool-copilot.md) | GitHub Copilot and Copilot Workspace |
 | [tool-gemini-code-assist.md](tool-gemini-code-assist.md) | Google's AI coding assistant |
 | [tool-amazon-q.md](tool-amazon-q.md) | AWS's AI developer tool |
@@ -83,8 +84,8 @@ This research covers:
 
 ## Related Design Documents
 
-- [../design/01-architecture-spec.md](../design/01-architecture-spec.md) - Preset meta-system architecture
-- [../design/02-api-schema.md](../design/02-api-schema.md) - CLI commands and configuration schema
+- [../design/architecture-presets.md](../design/architecture-presets.md) - Preset meta-system architecture
+- [../design/spec-api-schema.md](../design/spec-api-schema.md) - CLI commands and configuration schema
 
 ---
 

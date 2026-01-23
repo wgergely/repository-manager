@@ -35,25 +35,11 @@ CLAUDE.md (root)                     (no equivalent - rules in .agent/)
 
 Both use Markdown files in a `rules/` subdirectory.
 
-### Claude Code Rule
-```markdown
-# .claude/rules/coding-standards.md
+### Rules Comparison
 
-## TypeScript Guidelines
-- Use strict mode
-- Avoid `any` type
-- Prefer functional components
-```
-
-### Antigravity Rule
-```markdown
-# .agent/rules/coding-standards.md
-
-## TypeScript Guidelines
-- Use strict mode
-- Avoid `any` type
-- Prefer functional components
-```
+Content is **identical**; only paths differ:
+- Claude Code: `.claude/rules/coding-standards.md`
+- Antigravity: `.agent/rules/coding-standards.md`
 
 **Implication**: Rules are directly portable between the two systems with only path changes.
 
@@ -198,7 +184,7 @@ Project rules are merged, not hierarchical
 ### Proposed repo-manager Mapping
 
 ```yaml
-# .agentic/config.yaml
+# .repository/config.yaml
 providers:
   claude:
     enabled: true
@@ -217,7 +203,7 @@ providers:
 Given the overlap, a universal source could work:
 
 ```
-.agentic/
+.repository/
 ├── rules/
 │   └── coding-standards.md    # Pure markdown, no frontmatter
 ├── skills/

@@ -146,18 +146,6 @@ Types: feat, fix, docs, style, refactor, test, chore
 4. **MCP First-Class**: Deepest MCP integration
 5. **CLI Native**: Terminal-first, not IDE-bound
 
-## Configuration Discovery
-
-```
-1. CLI starts in directory
-2. Walk up directory tree
-3. Collect all CLAUDE.md files
-4. Load ~/.claude/CLAUDE.md
-5. Merge: child > parent > user > system
-6. Load MCP servers from settings
-7. Initialize tools and skills
-```
-
 ## Limitations
 
 - No GUI (CLI only)
@@ -184,6 +172,10 @@ Types: feat, fix, docs, style, refactor, test, chore
 ├── settings.json              # Global settings
 └── memory.md                  # Global memory
 ```
+
+## Sources
+
+- [Claude Code Documentation](https://docs.anthropic.com/en/docs/claude-code)
 
 ---
 

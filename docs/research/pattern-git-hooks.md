@@ -88,32 +88,10 @@ pre-commit:
 
 ### Formatter Configs
 
-**Prettier** (`.prettierrc`):
-```json
-{
-  "semi": true,
-  "singleQuote": true,
-  "tabWidth": 2,
-  "printWidth": 100
-}
-```
-
-**Ruff** (`pyproject.toml`):
-```toml
-[tool.ruff]
-line-length = 100
-target-version = "py311"
-
-[tool.ruff.format]
-quote-style = "double"
-```
-
-**rustfmt** (`rustfmt.toml`):
-```toml
-max_width = 100
-hard_tabs = false
-tab_spaces = 4
-```
+Default configs available at each tool's documentation:
+- Prettier: [prettier.io/docs/configuration](https://prettier.io/docs/en/configuration.html)
+- Ruff: [docs.astral.sh/ruff/configuration](https://docs.astral.sh/ruff/configuration/)
+- rustfmt: [rust-lang.github.io/rustfmt](https://rust-lang.github.io/rustfmt/)
 
 ## Linters by Language
 

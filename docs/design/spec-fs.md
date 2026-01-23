@@ -4,7 +4,7 @@
 
 ## 1. Overview
 
-The File Management subsystem genericizes file system operations to support the dual-mode nature of the Repository Manager (Standard vs. Worktrees). It ensures that higher-level logic does not need to know the physical layout of the repository to find configuration files or write artifacts.
+Abstracts filesystem operations for Standard/Worktree dual-mode. Higher-level logic remains layout-agnostic.
 
 ## 2. Core Responsibilities
 
@@ -47,7 +47,7 @@ To avoid confusion between "Git Root" and "Worktree Root":
 
 * **Container Root**: The top-level directory holding `.repository` (and `.git` in worktrees mode).
 * **Context Root**: The directory where code lives.
-  * *Normal Mode*: Context Root == Container Root.
+  * *Standard Mode*: Context Root == Container Root.
   * *Worktree Mode*: Context Root == `Container Root / {branch_name}`.
 
 The FS subsystem forces all other crates to request paths relative to one of these two roots.

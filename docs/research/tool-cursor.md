@@ -87,25 +87,15 @@ You are an expert TypeScript developer working on a Next.js 14 application.
 
 ### Composer Mode
 
-Multi-file editing interface for planned changes:
-- AI plans and executes changes across multiple files
-- Visual diff preview
-- Accept/reject per-file
+Multi-file editing with visual diff preview; accept/reject per-file.
 
 ### @-Mentions System
 
-Rich context references:
-- `@file` - Reference specific files
-- `@folder` - Reference directories
-- `@codebase` - Semantic search across repository
-- `@web` - Web search for documentation
-- `@docs` - Documentation lookup
+Context references: `@file`, `@folder`, `@codebase`, `@web`, `@docs`.
 
 ### RAG/Embeddings
 
-- Automatic codebase indexing via vector embeddings
-- Semantic code search across entire repository
-- Indexes on project open
+Automatic codebase indexing via vector embeddings for semantic search.
 
 ## Context Management
 
@@ -170,6 +160,10 @@ Rich context references:
 ~/.cursor/
 └── rules                      # Global rules
 ```
+
+## Sources
+
+- [Cursor Documentation](https://docs.cursor.com)
 
 ---
 
