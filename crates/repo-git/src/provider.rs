@@ -1,35 +1,50 @@
-//! Layout provider trait and types
-//!
-//! This module will be implemented in Task 2.3.
+//! Layout provider trait for git operations
 
-use std::path::PathBuf;
-
+use repo_fs::NormalizedPath;
 use crate::Result;
 
 /// Information about a worktree.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct WorktreeInfo {
-    /// Name of the worktree (usually the branch name).
+    /// Worktree name (matches branch name or slug)
     pub name: String,
-    /// Path to the worktree directory.
-    pub path: PathBuf,
-    /// Branch checked out in the worktree.
-    pub branch: Option<String>,
-    /// Whether this is the main worktree.
+
+    /// Filesystem path to the worktree
+    pub path: NormalizedPath,
+
+    /// Branch checked out in this worktree
+    pub branch: String,
+
+    /// Whether this is the main/primary worktree
     pub is_main: bool,
 }
 
-/// Trait for different worktree layout strategies.
-pub trait LayoutProvider: Send + Sync {
-    /// List all worktrees managed by this layout.
+/// Trait for layout-agnostic git operations.
+///
+/// Implementations handle the specifics of each layout mode
+/// (Container, InRepoWorktrees, Classic).
+pub trait LayoutProvider {
+    /// Path to the git database (.gt or .git)
+    fn git_database(&self) -> &NormalizedPath;
+
+    /// Path to the main branch worktree
+    fn main_worktree(&self) -> &NormalizedPath;
+
+    /// Compute path for a feature worktree by name
+    fn feature_worktree(&self, name: &str) -> NormalizedPath;
+
+    /// List all worktrees in this layout
     fn list_worktrees(&self) -> Result<Vec<WorktreeInfo>>;
 
-    /// Create a new worktree for the given branch.
-    fn create_worktree(&self, branch: &str) -> Result<WorktreeInfo>;
+    /// Create a new feature worktree
+    ///
+    /// - `name`: Branch/worktree name
+    /// - `base`: Optional base branch (defaults to current HEAD)
+    fn create_feature(&self, name: &str, base: Option<&str>) -> Result<NormalizedPath>;
 
-    /// Remove a worktree by name.
-    fn remove_worktree(&self, name: &str) -> Result<()>;
+    /// Remove a feature worktree
+    fn remove_feature(&self, name: &str) -> Result<()>;
 
-    /// Get information about a specific worktree.
-    fn get_worktree(&self, name: &str) -> Result<Option<WorktreeInfo>>;
+    /// Get the current branch name
+    fn current_branch(&self) -> Result<String>;
 }
