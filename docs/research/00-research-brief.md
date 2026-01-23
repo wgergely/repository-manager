@@ -138,14 +138,38 @@ Exploration of a hybrid model using submodules or separate repositories for shar
 |---|----------|--------|
 | 00 | Research Brief | Complete |
 | 01 | Tool Configurations | Complete |
-| 02 | Cross-Platform Interop | In Progress |
+| 02 | Cross-Platform Interop | **Complete** |
 | 03 | Worktree Patterns | Complete |
-| 04 | Emerging Standards | In Progress |
+| 04 | Emerging Standards | **Complete** |
 | 05 | Rust CLI Ecosystem | Drafted |
 | 06 | Tool Support Matrix | Drafted (Needs Verification) |
 | 07 | Git Hooks Ecosystem | Drafted |
 | 08 | Orchestrator API Schema | Drafted |
 | 09 | Agentic IDE Landscape | Complete |
+
+## Key Findings Summary
+
+### Universal Standards Emerging (January 2026)
+
+Two major standards have achieved real vendor adoption:
+
+1. **AGENTS.md** - Universal rules format
+   - Backed by: Google, OpenAI, Cursor, GitHub
+   - Governance: Agentic AI Foundation (Linux Foundation)
+   - Adoption: 20,000+ repositories on GitHub
+   - Support: Codex, Jules, Cursor, Copilot, Aider, Zed, Factory
+
+2. **MCP (Model Context Protocol)** - Tool integration protocol
+   - Adoption: OpenAI, Google DeepMind, Claude, Cursor, Windsurf, Zed, Amazon Q
+   - Ecosystem: 100+ servers, SDKs for Python/TypeScript/Rust/Go
+   - Current version: 2025-11-25 (Tasks, OAuth improvements, extensions)
+
+### Architecture Implications for repo-manager
+
+- Should support **AGENTS.md** as a first-class citizen (read/write/sync)
+- Should integrate with **MCP** for tool/resource capabilities
+- Provider sync should generate tool-specific configs from universal sources
+- Memory/context portability remains unsolved - potential differentiation opportunity
 
 ---
 

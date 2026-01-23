@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Skill(superpowers:dispatching-parallel-agents)"
+      "Skill(superpowers:dispatching-parallel-agents)",
+      "Bash(wc:*)",
+      "Bash(for:*)",
+      "Bash(done)"
     ]
   }
 }
