@@ -8,3 +8,10 @@ pub mod integration;
 pub mod vscode;
 pub mod cursor;
 pub mod claude;
+pub mod logging;
+
+pub use error::{Error, Result};
+pub use integration::{Rule, SyncContext, ToolIntegration};
+pub use vscode::VSCodeIntegration;
+pub use cursor::CursorIntegration;
+pub use claude::ClaudeIntegration;
