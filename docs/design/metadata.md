@@ -1,31 +1,23 @@
 # System Crystallization & Correlation
 
-This document defines how the various subsystems of the Repository Manager interact to form a cohesive whole.
+This document serves as the high-level map correlating the various design documents.
 
-## Architecture Map
+> **Status**: Early Design Phase. Architecture is evolving.
 
-```mermaid
-graph TD
-    CLI[CLI Crate] --> Tools[Tools Subsystem]
-    CLI --> Presets[Presets Subsystem]
-    CLI --> Git[Git Management]
-    
-    Tools --> Metadata[Metadata System]
-    Presets --> Metadata
-    
-    Tools --> FileMgmt[File Management]
-    Presets --> FileMgmt
-    Metadata --> FileMgmt
-    
-    RepoMgmt[Repository Management] --> Metadata
-    RepoMgmt --> FileMgmt
-```
+## Subsystem Index
 
-## Subsystem Roles
+* **[CLI](cli/spec.md)**: Top-level command line tool implementation.
+* **[Tools](tools/spec.md)**: Definition and registration of external tools (coding agents, IDEs).
+* **[Presets](presets/spec.md)**: Capability provider system (venvs, gitignores, configs).
+* **[Repository Management](repository-management/architecture.md)**: Core logic for repository structure.
+  * *[Context Research](repository-management/skill-context-management-2026.md)*: Analysis of agentic context patterns.
+* **[Metadata System](metadata-system/spec.md)**: The `.repository` directory structure and registry.
+* **[File Management](file-management/spec.md)**: Robust I/O utilities.
+* **[Git Management](git-management/spec.md)**: Worktree and remote sync management.
 
-1. **[CLI](cli/spec.md)**: The user-facing entry point. It orchestrates the other subsystems based on user commands.
-2. **[Tools](tools/spec.md)**: Defines the universe of "Things that can run". It registers capabilities (Coding Agents, IDEs) into the Metadata System.
-3. **[Presets](presets/spec.md)**: The "Doers". They provide capabilities (venv, gitignore) and modify the repository state accordingly.
-4. **[Metadata System](metadata-system/spec.md)**: The central registry in `.repository` that tracks what Tools and Presets are active.
-5. **[File Management](file-management/spec.md)**: The robust foundation layer. Handles all disk I/O with error recovery, serving as the utility belt for Tools and Presets.
-6. **[Git Management](git-management/spec.md)**: Handles syncing and worktrees, often changing the physical layout which the File Management system operates on.
+## Correlation Goals
+
+* **Presets** provide the capabilities.
+* **Tools** consume the environment configured by Presets.
+* **Metadata System** connects them by registering which tools and presets are active in a repository.
+* **CLI** is the conductor that orchestrates these interactions.
