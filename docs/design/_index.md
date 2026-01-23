@@ -22,6 +22,7 @@ Details on how the repository is configured, how configuration is cascaded, and 
 Detailed specifications for individual subsystems and modules.
 
 - **[CLI Specification](spec-cli.md)**: profound command-line interface design and argument structure.
+- **[API Schema](spec-api-schema.md)**: Unified tool configuration management and TypeScript entity definitions.
 - **[Metadata System](spec-metadata.md)**: The structure and responsibilities of the `.repository` directory.
 - **[Git Management](spec-git.md)**: Abstraction layer for Git operations in both standard and worktree modes.
 - **[File Management](spec-fs.md)**: I/O utilities for robust file handling across modes.
