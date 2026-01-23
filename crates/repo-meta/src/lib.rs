@@ -7,5 +7,6 @@ pub mod config;
 pub mod error;
 pub mod registry;
 
+pub use config::{load_config, RepositoryConfig, ActiveConfig, CoreConfig, SyncConfig, RepositoryMode};
 pub use error::{Error, Result};
 pub use registry::Registry;
