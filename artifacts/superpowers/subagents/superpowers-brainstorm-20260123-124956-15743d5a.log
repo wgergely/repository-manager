@@ -1,0 +1,139 @@
+=== SUBAGENT EXECUTION LOG ===
+Skill: superpowers-brainstorm
+ID: 15743d5a
+Timestamp: 20260123-124956
+Task: Research and document configuration interfaces for managing Claude (claude.json, CLAUDE.md), Gemini, and Cursor (.cursorrules). Identify how a CLI tool can programmatically read/write these to enforce rules.
+
+=== PROMPT ===
+You are a specialized subagent focused on: superpowers-brainstorm
+
+IMPORTANT: You have ISOLATED CONTEXT. Do not assume knowledge from other conversations.
+
+Task:
+Research and document configuration interfaces for managing Claude (claude.json, CLAUDE.md), Gemini, and Cursor (.cursorrules). Identify how a CLI tool can programmatically read/write these to enforce rules.
+
+Skill Instructions:
+---
+name: superpowers-brainstorm
+description: Produces a structured brainstorm: goals, constraints, risks, options, recommendation, and acceptance criteria. Use before non-trivial implementation or design changes.
+---
+
+# Brainstorm Skill
+
+## When to use this skill
+- before implementing non-trivial features
+- before refactors with unclear scope
+- before debugging complex issues
+- before designing an automation workflow
+
+## Brainstorm template (use this exact structure)
+### Goal
+- (1–2 sentences)
+
+### Constraints
+- (tech stack, time, compatibility, performance, “must not change”, etc.)
+
+### Known context
+- (what exists today; relevant files/components; current behavior)
+
+### Risks
+- (security, data loss, regressions, surprising side effects)
+
+### Options (2–4)
+For each option include:
+- Summary
+- Pros / cons
+- Complexity / risk
+
+### Recommendation
+- Pick one option and explain why
+
+### Acceptance criteria
+- Bullet list of verifiable outcomes
+
+
+Requirements:
+1. Follow the skill instructions exactly
+2. Complete the task fully
+3. Output ONLY the final result at the end
+4. Do not include meta-commentary or thinking process in final output
+5. Write any artifacts to artifacts/superpowers/subagent-15743d5a/
+
+When complete, output:
+---SUBAGENT-RESULT-START---
+[Your final result here]
+---SUBAGENT-RESULT-END---
+
+
+=== EXECUTION ===
+
+=== STDOUT ===
+---SUBAGENT-RESULT-START---
+### Goal
+Research and document configuration interfaces for managing Claude (`.claude/settings.json`, `CLAUDE.md`), Gemini (`.gemini/settings.json`), and Cursor (`.cursorrules`). Identify how a CLI tool can programmatically read and write these files to enforce project-specific rules and settings.
+
+### Constraints
+- The solution must be implementable within a CLI tool (e.g., in Python or Node.js).
+- Must handle JSON and Markdown file formats.
+- Must be able to target user, project, and system-level configurations where applicable.
+
+### Known context
+- **Claude:** Uses a hierarchy of `.json` files. Project-specific settings are in `.claude/settings.json`. The purpose of a `CLAUDE.md` file is not a standard, but it can be inferred as a project-specific instruction file for an AI, similar to Cursor's approach.
+- **Gemini CLI:** Also uses a hierarchy of `settings.json` files, with `.gemini/settings.json` for project-level scope. Configuration is layered (system > user > project).
+- **Cursor:** Uses `.cursorrules` files, which are Markdown (`.md` or `.mdc`), to provide context and instructions to the AI. These are typically stored in a `.cursor/rules` directory at the project root.
+- **Programmatic Access:** No official SDKs or specific APIs for managing these configuration files were found; direct file system read/write appears to be the standard method of interaction.
+
+### Risks
+- **File Corruption:** Incorrectly writing to a JSON file (e.g., invalid syntax, removing necessary keys) can break the associated tool.
+- **Data Loss:** Writing to files without care can destroy existing user configurations, comments, and formatting.
+- **Unintended Behavior:** Forcing rules via configuration may lead to unexpected or degraded AI performance if the rules are poorly defined or conflict with user intent.
+- **Security:** If the CLI tool allows writing arbitrary content to rule files (like `.cursorrules`), a malicious user could inject commands that the AI might be prompted to execute, leading to a potential security vulnerability.
+
+### Options (2â€“4)
+
+#### Option 1: Direct File I/O with Standard Libraries
+- **Summary:** Use standard language libraries (e.g., Python's `json` and `pathlib` modules) to directly read, modify, and write to the configuration files. The CLI would have specific logic for handling JSON (`settings.json`) and Markdown (`.cursorrules`).
+- **Pros / cons:**
+    - **Pro:** Simple, no external dependencies required.
+    - **Pro:** Gives full, granular control over file content.
+    - **Con:** Higher risk of file corruption if writing logic is not robust.
+    - **Con:** Manipulating specific rules within a Markdown file can be complex (e.g., replacing a section vs. appending).
+- **Complexity / risk:** Medium. The primary risk is data loss/corruption, which can be mitigated by creating backups before writing and by reading/modifying/writing entire JSON objects to ensure validity.
+
+#### Option 2: Abstracted Schema-Driven Management
+- **Summary:** Define a generic, intermediate schema (e.g., in YAML) that represents a superset of configurable rules. The CLI tool would read tool-specific files, convert them to this internal format, allow manipulation, and then serialize them back to the original formats.
+- **Pros / cons:**
+    - **Pro:** Provides a unified interface for managing rules across different AI tools.
+    - **Pro:** Easily extensible to support new tools in the future.
+    - **Con:** Significantly higher implementation complexity; requires building and maintaining parsers and serializers for each format.
+    - **Con:** May lose tool-specific nuances or formatting during the abstraction/conversion process (lowest common denominator problem).
+- **Complexity / risk:** High. The core challenge is designing a robust schema and translation layers. High risk of information loss if not perfectly implemented.
+
+### Recommendation
+I recommend **Option 1: Direct File I/O with Standard Libraries**.
+
+This approach is the most pragmatic and directly addresses the core task with the lowest implementation overhead. While it lacks the elegance of a fully abstracted system, it avoids significant upfront complexity and the risk of information loss during format conversion. The risks associated with direct I/O can be effectively managed.
+
+To mitigate risks, the implementation should:
+1.  **Always back up a file before modifying it.**
+2.  For JSON, **read the entire file into an object, modify the object in memory, and then serialize the entire object back to the file.** This ensures the output is always valid JSON.
+3.  For Markdown-based rules (`.cursorrules`, `CLAUDE.md`), begin by supporting simple append operations. More complex "find and replace" logic can be added later and should be handled with caution.
+
+This strategy provides immediate value and creates a solid foundation that could evolve into a more complex, schema-driven system in the future if required.
+
+### Acceptance criteria
+- A CLI tool can successfully read a key from `.claude/settings.json` and `.gemini/settings.json`.
+- A CLI tool can successfully write or update a key-value pair in `.claude/settings.json` and `.gemini/settings.json` without corrupting the file.
+- A CLI tool can append a new rule (text) to a `.cursorrules` Markdown file.
+- A CLI tool can create these configuration files if they do not already exist at the project level.
+- All file write operations must include a backup mechanism to prevent data loss on failure.
+---SUBAGENT-RESULT-END---
+
+=== STDERR ===
+YOLO mode is enabled. All tool calls will be automatically approved.
+Loaded cached credentials.
+YOLO mode is enabled. All tool calls will be automatically approved.
+[ERROR] [IDEClient] Failed to connect to IDE companion extension. Please ensure the extension is running. To install the extension, run /ide install.
+
+=== EXIT CODE: 0 ===
+=== DURATION: 81.02s ===
