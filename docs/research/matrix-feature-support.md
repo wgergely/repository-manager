@@ -7,9 +7,11 @@ Comprehensive feature comparison across major agentic coding tools.
 | Tool | Format | File Name(s) | Hierarchical | AGENTS.md |
 |------|--------|--------------|--------------|-----------|
 | **Claude Code** | Markdown | `CLAUDE.md`, `.claude/rules/` | Yes | Compatible |
+| **Claude Desktop** | JSON | `claude_desktop_config.json` | No | N/A |
 | **Cursor** | Markdown | `.cursorrules`, `.cursor/rules` | Limited | Native |
-| **Copilot** | Markdown | `copilot-instructions.md` | Partial | Native |
 | **Windsurf** | Markdown | `.windsurfrules`, `.windsurf/rules/` | Limited | Supported |
+| **Antigravity** | Markdown | `.agent/rules/`, `SKILL.md` | Yes | Supported |
+| **Copilot** | Markdown | `copilot-instructions.md` | Partial | Native |
 | **Zed** | JSON | `.zed/settings.json` | Yes | Native |
 | **Gemini** | JSON | `.gemini/settings.json` | Yes | Native |
 | **Amazon Q** | JSON | `.amazonq/` | Unknown | Unknown |
@@ -21,8 +23,10 @@ Comprehensive feature comparison across major agentic coding tools.
 | Tool | Support Level | Configuration | Notes |
 |------|---------------|---------------|-------|
 | **Claude Code** | Full Native | `.claude/settings.json` | First-class citizen |
+| **Claude Desktop** | Full Native | `claude_desktop_config.json` | Desktop Extensions (.mcpb) |
 | **Cursor** | Full Native | Cursor settings | 40 tool limit |
 | **Windsurf** | Full Native | Windsurf settings | Native support |
+| **Antigravity** | Native | Via Gemini integration | Native support |
 | **Zed** | Full Native | `.zed/settings.json` | Native support |
 | **Amazon Q** | Native | IDE settings | MCP in IDE |
 | **OpenAI (Codex)** | Native | - | Adopted March 2025 |
@@ -49,8 +53,10 @@ Comprehensive feature comparison across major agentic coding tools.
 | Tool | Mode | Preview | Undo |
 |------|------|---------|------|
 | **Claude Code** | Sequential + Parallel | Yes | Git-based |
+| **Claude Desktop** | Via bundled CLI | Yes | Git-based |
 | **Cursor** | Composer | Yes | IDE undo |
 | **Windsurf** | Cascade | Yes | IDE undo |
+| **Antigravity** | Agent Manager | Yes | IDE undo |
 | **Copilot** | Workspace | Yes | IDE undo |
 | **Zed** | Multi-buffer | Yes | IDE undo |
 | **Aider** | Native | No | Git revert |
@@ -85,6 +91,7 @@ Comprehensive feature comparison across major agentic coding tools.
 |------|-----------|-----|----------|
 | **Cursor** | 2K completions | $20/mo | $40/user/mo |
 | **Windsurf** | Limited | $15/mo | $19/user/mo |
+| **Antigravity** | Preview (limited) | ~$20/mo | ~$40-60/user/mo |
 | **Copilot** | - | $10/mo | $19/user/mo |
 | **Zed** | Core only | $20/mo | - |
 | **Aider** | Free (OSS) | - | - |

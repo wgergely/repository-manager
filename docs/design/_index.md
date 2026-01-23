@@ -28,6 +28,7 @@ Detailed specifications for individual subsystems and modules.
 - **[File Management](spec-fs.md)**: I/O utilities for robust file handling across modes.
 - **[Presets Specification](spec-presets.md)**: Interfaces and logic for the capabilities system.
 - **[Tools Specification](spec-tools.md)**: Integration logic for external tools (VSCode, Claude, etc.).
+- **[MCP Server Specification](spec-mcp-server.md)**: Design for the Rust-based MCP server exposing repository management tools.
 
 ## 4. Reference & Research
 

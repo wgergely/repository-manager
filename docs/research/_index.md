@@ -25,8 +25,10 @@ This research covers:
 | Document | Description |
 |----------|-------------|
 | [tool-claude-code.md](tool-claude-code.md) | Anthropic's CLI agentic coding tool |
+| [tool-claude-desktop.md](tool-claude-desktop.md) | Anthropic's desktop app with MCP support |
 | [tool-cursor.md](tool-cursor.md) | Anysphere's AI-first VS Code fork |
-| [tool-windsurf.md](tool-windsurf.md) | Codeium's Cascade-powered IDE |
+| [tool-windsurf.md](tool-windsurf.md) | Codeium's Cascade-powered IDE (VS Code fork) |
+| [tool-antigravity.md](tool-antigravity.md) | Google's agent-first IDE (VS Code fork) |
 | [tool-copilot.md](tool-copilot.md) | GitHub Copilot and Copilot Workspace |
 | [tool-gemini-code-assist.md](tool-gemini-code-assist.md) | Google's AI coding assistant |
 | [tool-amazon-q.md](tool-amazon-q.md) | AWS's AI developer tool |
@@ -40,6 +42,7 @@ This research covers:
 | [pattern-git-worktrees.md](pattern-git-worktrees.md) | Worktree-based development with shared config |
 | [pattern-git-hooks.md](pattern-git-hooks.md) | Pre-commit frameworks and AI integration |
 | [pattern-interoperability.md](pattern-interoperability.md) | Cross-tool rules, memory, and skill sharing |
+| [pattern-claude-antigravity-comparison.md](pattern-claude-antigravity-comparison.md) | Direct comparison of Claude Code and Antigravity configs |
 
 ### Comparison Matrices
 

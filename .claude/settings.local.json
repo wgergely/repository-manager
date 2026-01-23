@@ -4,7 +4,8 @@
       "Skill(superpowers:dispatching-parallel-agents)",
       "Bash(wc:*)",
       "Bash(for:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "WebSearch"
     ]
   }
 }

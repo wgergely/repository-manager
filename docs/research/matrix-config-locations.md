@@ -7,8 +7,10 @@ Quick reference for where each tool stores configuration.
 | Tool | Primary Config | MCP Config | User Config |
 |------|---------------|------------|-------------|
 | **Claude Code** | `CLAUDE.md` | `.claude/settings.json` | `~/.claude/` |
+| **Claude Desktop** | `claude_desktop_config.json` | Same file | App Support/Roaming |
 | **Cursor** | `.cursorrules` | Cursor settings | `~/.cursor/` |
 | **Windsurf** | `.windsurfrules` | Windsurf settings | `~/.windsurf/` |
+| **Antigravity** | `.agent/rules/` | Via Gemini | VS Code settings |
 | **Copilot** | `.github/copilot-instructions.md` | N/A | GitHub settings |
 | **Zed** | `.zed/settings.json` | `.zed/settings.json` | `~/.config/zed/` |
 | **Gemini** | `.gemini/settings.json` | N/A | `~/.gemini/` |
@@ -35,6 +37,22 @@ Quick reference for where each tool stores configuration.
 └── memory.md                  # Global memory
 ```
 
+## Claude Desktop
+
+```
+# macOS
+~/Library/Application Support/Claude/
+└── claude_desktop_config.json    # MCP servers, settings
+
+# Windows
+%APPDATA%\Claude\
+└── claude_desktop_config.json    # MCP servers, settings
+
+# Desktop Extensions
+extension.mcpb/
+└── manifest.json                 # Extension definition
+```
+
 ## Cursor
 
 ```
@@ -56,6 +74,26 @@ Quick reference for where each tool stores configuration.
 ├── settings.json              # IDE settings
 └── cascade.json               # Cascade config
 ./.codeiumignore               # Files to ignore
+```
+
+## Google Antigravity
+
+```
+./.agent/
+├── rules/                     # Always-on rules
+│   └── *.md
+├── skills/                    # On-demand skills
+│   └── skill-name/
+│       ├── SKILL.md          # Required skill definition
+│       └── scripts/          # Supporting scripts
+└── workflows/                 # User-triggered macros
+    └── *.md
+
+./.vscode/                     # VS Code compatibility
+├── settings.json
+└── extensions.json
+
+~/.gemini/antigravity/skills/  # Global skills
 ```
 
 ## GitHub Copilot
