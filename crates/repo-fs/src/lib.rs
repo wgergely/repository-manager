@@ -12,5 +12,6 @@ pub mod path;
 pub use config::ConfigStore;
 pub use constants::RepoPath;
 pub use error::{Error, Result};
+pub use io::RobustnessConfig;
 pub use layout::{LayoutMode, WorkspaceLayout};
 pub use path::NormalizedPath;

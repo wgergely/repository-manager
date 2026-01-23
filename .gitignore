@@ -4,3 +4,9 @@
 
 # Rust
 target/
+
+# Temporary Output
+*_output.txt
+test_results.txt
+check_output.txt
+*.log

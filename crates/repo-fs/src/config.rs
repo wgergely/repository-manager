@@ -7,13 +7,24 @@ use serde::{Serialize, de::DeserializeOwned};
 ///
 /// Automatically detects format from file extension and handles
 /// serialization/deserialization transparently.
+/// Format-agnostic configuration store.
+///
+/// Automatically detects format from file extension and handles
+/// serialization/deserialization transparently.
 #[derive(Debug, Default)]
-pub struct ConfigStore;
+pub struct ConfigStore {
+    robustness: io::RobustnessConfig,
+}
 
 impl ConfigStore {
-    /// Create a new ConfigStore.
+    /// Create a new ConfigStore with default robustness settings.
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+
+    /// Create a new ConfigStore with custom robustness settings.
+    pub fn with_robustness(robustness: io::RobustnessConfig) -> Self {
+        Self { robustness }
     }
 
     /// Load configuration from a file.
@@ -78,6 +89,6 @@ impl ConfigStore {
             }
         };
 
-        io::write_text(path, &content)
+        io::write_atomic(path, content.as_bytes(), self.robustness)
     }
 }

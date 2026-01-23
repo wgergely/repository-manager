@@ -14,6 +14,24 @@ import uuid
 import os
 from pathlib import Path
 from typing import Any, Optional
+import sys
+
+def configure_encoding():
+    """Ensure stdout/stderr use UTF-8 encoding, avoiding charmap errors on Windows."""
+    if sys.stdout.encoding != 'utf-8':
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+        except AttributeError:
+            # Python < 3.7
+            pass
+    
+    if sys.stderr.encoding != 'utf-8':
+        try:
+            sys.stderr.reconfigure(encoding='utf-8')
+        except AttributeError:
+            pass
+
+configure_encoding()
 
 
 def find_repo_root(start: Path) -> Path:
@@ -169,14 +187,21 @@ When complete, output:
             log.flush()
 
             # Ensure we pass the prompt via stdin
+            
+            # Handle .ps1 on Windows if picked up over .cmd
+            final_cmd = cmd
+            if os.name == 'nt' and str(cmd[0]).endswith('.ps1'):
+                final_cmd = ["powershell", "-ExecutionPolicy", "Bypass", "-File"] + cmd
+
             result = subprocess.run(
-                cmd,
+                final_cmd,
                 input=prompt,
                 capture_output=True,
                 text=True,
+                encoding='utf-8', # Force UTF-8 for emoji support
                 cwd=repo_root,
                 timeout=600,  # 10 minute timeout
-                shell=False if os.name == 'nt' else False, # Don't need shell=True if we have full path to executable usually
+                shell=False, 
             )
 
             duration_s = time.time() - start_time

@@ -7,7 +7,7 @@ fn test_write_atomic_creates_file() {
     let temp = TempDir::new().unwrap();
     let path = NormalizedPath::new(temp.path().join("test.txt"));
 
-    io::write_atomic(&path, b"hello world").unwrap();
+    io::write_atomic(&path, b"hello world", io::RobustnessConfig::default()).unwrap();
 
     let content = fs::read_to_string(path.to_native()).unwrap();
     assert_eq!(content, "hello world");
@@ -20,7 +20,7 @@ fn test_write_atomic_overwrites_existing() {
     fs::write(&file_path, "original").unwrap();
 
     let path = NormalizedPath::new(&file_path);
-    io::write_atomic(&path, b"updated").unwrap();
+    io::write_atomic(&path, b"updated", io::RobustnessConfig::default()).unwrap();
 
     let content = fs::read_to_string(&file_path).unwrap();
     assert_eq!(content, "updated");
@@ -35,7 +35,7 @@ fn test_write_atomic_no_partial_writes() {
     let path = NormalizedPath::new(&file_path);
 
     // Even if this were to fail mid-write, we shouldn't see partial content
-    io::write_atomic(&path, b"new content").unwrap();
+    io::write_atomic(&path, b"new content", io::RobustnessConfig::default()).unwrap();
 
     let content = fs::read_to_string(&file_path).unwrap();
     // Should be either "original content" or "new content", never partial
