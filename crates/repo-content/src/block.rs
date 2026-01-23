@@ -1,27 +1,79 @@
-//! Managed block types for content with semantic boundaries.
+//! Managed block types and operations
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::ops::Range;
+use uuid::Uuid;
 
-/// Location of a block within a document.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BlockLocation {
-    /// Starting line (0-indexed).
-    pub start_line: usize,
-    /// Ending line (exclusive, 0-indexed).
-    pub end_line: usize,
-    /// Starting byte offset.
-    pub start_byte: usize,
-    /// Ending byte offset.
-    pub end_byte: usize,
-}
-
-/// A managed block of content with semantic meaning.
+/// A managed block with UUID marker
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ManagedBlock {
-    /// Unique identifier for this block.
-    pub id: String,
-    /// Location within the document.
-    pub location: BlockLocation,
-    /// The content of this block.
+    /// Unique identifier for this block
+    pub uuid: Uuid,
+    /// Content within the block (excluding markers)
     pub content: String,
+    /// Byte range in original source (including markers)
+    pub span: Range<usize>,
+    checksum: String,
+}
+
+impl ManagedBlock {
+    /// Create a new managed block
+    pub fn new(uuid: Uuid, content: impl Into<String>, span: Range<usize>) -> Self {
+        let content = content.into();
+        let checksum = Self::compute_checksum(&content);
+        Self {
+            uuid,
+            content,
+            span,
+            checksum,
+        }
+    }
+
+    /// Get the checksum
+    pub fn checksum(&self) -> &str {
+        &self.checksum
+    }
+
+    /// Check if content has drifted from stored checksum
+    pub fn has_drifted(&self) -> bool {
+        Self::compute_checksum(&self.content) != self.checksum
+    }
+
+    /// Verify content matches a given checksum
+    pub fn verify_checksum(&self, expected: &str) -> bool {
+        self.checksum == expected
+    }
+
+    /// Update content and recalculate checksum
+    pub fn update_content(&mut self, content: impl Into<String>) {
+        self.content = content.into();
+        self.checksum = Self::compute_checksum(&self.content);
+    }
+
+    fn compute_checksum(content: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(content.as_bytes());
+        let result = hasher.finalize();
+        format!("{:x}", result)
+    }
+}
+
+/// Where to insert a block in a document
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BlockLocation {
+    /// Append to end of document
+    End,
+    /// After specific section/key
+    After(String),
+    /// Before specific section/key
+    Before(String),
+    /// At specific byte offset
+    Offset(usize),
+}
+
+impl Default for BlockLocation {
+    fn default() -> Self {
+        Self::End
+    }
 }
