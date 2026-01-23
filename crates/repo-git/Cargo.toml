@@ -1,0 +1,18 @@
+[package]
+name = "repo-git"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Git abstraction for Repository Manager"
+
+[dependencies]
+repo-fs = { path = "../repo-fs" }
+git2 = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+rstest = { workspace = true }
+pretty_assertions = { workspace = true }
+assert_fs = { workspace = true }
+predicates = { workspace = true }

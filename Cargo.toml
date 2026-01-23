@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/user/repository-manager"
+
+[workspace.dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# File operations
+fs2 = "0.4"
+tempfile = "3.14"
+dunce = "1.0"
+
+# Git
+git2 = "0.20"
+
+# Error handling
+thiserror = "2.0"
+
+# Testing
+rstest = "0.23"
+pretty_assertions = "1.4"
+assert_fs = "1.1"
+predicates = "3.1"
