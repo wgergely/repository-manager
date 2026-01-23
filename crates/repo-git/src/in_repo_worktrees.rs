@@ -1,12 +1,12 @@
 //! In-repo worktrees layout implementation
 
-use git2::{BranchType, Repository, WorktreeAddOptions, WorktreePruneOptions};
-use repo_fs::NormalizedPath;
 use crate::{
     Error, Result,
-    naming::{branch_to_directory, NamingStrategy},
+    naming::{NamingStrategy, branch_to_directory},
     provider::{LayoutProvider, WorktreeInfo},
 };
+use git2::{BranchType, Repository, WorktreeAddOptions, WorktreePruneOptions};
+use repo_fs::NormalizedPath;
 
 /// In-repo worktrees layout with `.worktrees/` directory.
 ///
@@ -81,7 +81,8 @@ impl LayoutProvider for InRepoWorktreesLayout {
             let wt_path = wt.path();
 
             let wt_repo = Repository::open(wt_path)?;
-            let branch = wt_repo.head()
+            let branch = wt_repo
+                .head()
                 .ok()
                 .and_then(|h| h.shorthand().map(String::from))
                 .unwrap_or_else(|| "HEAD".into());
@@ -117,8 +118,11 @@ impl LayoutProvider for InRepoWorktreesLayout {
         // Get the commit to base the new branch on
         let base_commit = match base {
             Some(base_name) => {
-                let branch = repo.find_branch(base_name, BranchType::Local)
-                    .map_err(|_| Error::BranchNotFound { name: base_name.to_string() })?;
+                let branch = repo
+                    .find_branch(base_name, BranchType::Local)
+                    .map_err(|_| Error::BranchNotFound {
+                        name: base_name.to_string(),
+                    })?;
                 branch.get().peel_to_commit()?
             }
             None => {
@@ -135,11 +139,7 @@ impl LayoutProvider for InRepoWorktreesLayout {
         let mut opts = WorktreeAddOptions::new();
         opts.reference(Some(&new_branch_ref));
 
-        repo.worktree(
-            &dir_name,
-            worktree_path.to_native().as_path(),
-            Some(&opts),
-        )?;
+        repo.worktree(&dir_name, worktree_path.to_native().as_path(), Some(&opts))?;
 
         Ok(worktree_path)
     }
@@ -148,12 +148,15 @@ impl LayoutProvider for InRepoWorktreesLayout {
         let repo = self.open_repo()?;
         let dir_name = branch_to_directory(name, self.naming);
 
-        let wt = repo.find_worktree(&dir_name)
-            .map_err(|_| Error::WorktreeNotFound { name: name.to_string() })?;
+        let wt = repo
+            .find_worktree(&dir_name)
+            .map_err(|_| Error::WorktreeNotFound {
+                name: name.to_string(),
+            })?;
 
         // Configure prune options to remove valid worktrees and their directories
         let mut prune_opts = WorktreePruneOptions::new();
-        prune_opts.valid(true);       // Allow pruning valid (existing) worktrees
+        prune_opts.valid(true); // Allow pruning valid (existing) worktrees
         prune_opts.working_tree(true); // Also remove the working tree directory
 
         // Prune the worktree (removes directory and git references)

@@ -1,9 +1,9 @@
+use repo_fs::NormalizedPath;
+use repo_git::NamingStrategy;
 use repo_git::container::ContainerLayout;
 use repo_git::provider::LayoutProvider;
-use repo_git::NamingStrategy;
-use repo_fs::NormalizedPath;
-use std::process::Command;
 use std::fs;
+use std::process::Command;
 use tempfile::TempDir;
 
 fn setup_container_repo() -> (TempDir, ContainerLayout) {
@@ -42,10 +42,7 @@ fn setup_container_repo() -> (TempDir, ContainerLayout) {
         .output()
         .unwrap();
 
-    let layout = ContainerLayout::new(
-        NormalizedPath::new(root),
-        NamingStrategy::Slug,
-    ).unwrap();
+    let layout = ContainerLayout::new(NormalizedPath::new(root), NamingStrategy::Slug).unwrap();
 
     (temp, layout)
 }

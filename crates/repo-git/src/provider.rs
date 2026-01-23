@@ -1,7 +1,7 @@
 //! Layout provider trait for git operations
 
-use repo_fs::NormalizedPath;
 use crate::Result;
+use repo_fs::NormalizedPath;
 
 /// Information about a worktree.
 #[derive(Debug, Clone)]

@@ -21,3 +21,8 @@ rstest = { workspace = true }
 pretty_assertions = { workspace = true }
 assert_fs = { workspace = true }
 predicates = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "fs_benchmarks"
+harness = false

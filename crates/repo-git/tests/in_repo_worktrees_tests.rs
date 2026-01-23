@@ -1,9 +1,9 @@
+use repo_fs::NormalizedPath;
+use repo_git::NamingStrategy;
 use repo_git::in_repo_worktrees::InRepoWorktreesLayout;
 use repo_git::provider::LayoutProvider;
-use repo_git::NamingStrategy;
-use repo_fs::NormalizedPath;
-use std::process::Command;
 use std::fs;
+use std::process::Command;
 use tempfile::TempDir;
 
 fn setup_in_repo_worktrees() -> (TempDir, InRepoWorktreesLayout) {
@@ -33,10 +33,8 @@ fn setup_in_repo_worktrees() -> (TempDir, InRepoWorktreesLayout) {
     // Create .worktrees directory
     fs::create_dir(root.join(".worktrees")).unwrap();
 
-    let layout = InRepoWorktreesLayout::new(
-        NormalizedPath::new(root),
-        NamingStrategy::Slug,
-    ).unwrap();
+    let layout =
+        InRepoWorktreesLayout::new(NormalizedPath::new(root), NamingStrategy::Slug).unwrap();
 
     (temp, layout)
 }

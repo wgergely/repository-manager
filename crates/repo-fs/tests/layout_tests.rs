@@ -5,7 +5,10 @@ use tempfile::TempDir;
 #[test]
 fn test_layout_mode_display() {
     assert_eq!(format!("{}", LayoutMode::Container), "Container");
-    assert_eq!(format!("{}", LayoutMode::InRepoWorktrees), "InRepoWorktrees");
+    assert_eq!(
+        format!("{}", LayoutMode::InRepoWorktrees),
+        "InRepoWorktrees"
+    );
     assert_eq!(format!("{}", LayoutMode::Classic), "Classic");
 }
 

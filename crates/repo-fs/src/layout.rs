@@ -1,7 +1,7 @@
 //! Workspace layout detection and management
 
+use crate::{Error, NormalizedPath, RepoPath, Result};
 use std::path::Path;
-use crate::{Error, NormalizedPath, Result};
 
 /// The detected or configured layout mode for a workspace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,7 +44,7 @@ impl WorkspaceLayout {
     ///
     /// Walks up the directory tree looking for layout signals.
     pub fn detect(start_dir: impl AsRef<Path>) -> Result<Self> {
-        let start = start_dir.as_ref().canonicalize()
+        let start = dunce::canonicalize(start_dir.as_ref())
             .map_err(|e| Error::io(start_dir.as_ref(), e))?;
 
         let mut current = Some(start.as_path());
@@ -61,10 +61,10 @@ impl WorkspaceLayout {
 
     /// Attempt to detect layout at a specific directory.
     fn detect_at(dir: &Path) -> Result<Option<Self>> {
-        let has_gt = dir.join(".gt").is_dir();
-        let has_git = dir.join(".git").exists(); // Can be file or dir
-        let has_main = dir.join("main").is_dir();
-        let has_worktrees = dir.join(".worktrees").is_dir();
+        let has_gt = dir.join(RepoPath::GtDir).is_dir();
+        let has_git = dir.join(RepoPath::GitDir).exists(); // Can be file or dir
+        let has_main = dir.join(RepoPath::MainWorktree).is_dir();
+        let has_worktrees = dir.join(RepoPath::WorktreesDir).is_dir();
 
         let mode = if has_gt && has_main {
             // Container layout: .gt/ + main/
@@ -89,33 +89,42 @@ impl WorkspaceLayout {
     /// Get the path to the git database.
     pub fn git_database(&self) -> NormalizedPath {
         match self.mode {
-            LayoutMode::Container => self.root.join(".gt"),
-            LayoutMode::InRepoWorktrees | LayoutMode::Classic => self.root.join(".git"),
+            LayoutMode::Container => self.root.join(RepoPath::GtDir.as_str()),
+            LayoutMode::InRepoWorktrees | LayoutMode::Classic => {
+                self.root.join(RepoPath::GitDir.as_str())
+            }
         }
     }
 
     /// Get the path to the .repository config directory.
     pub fn config_dir(&self) -> NormalizedPath {
-        self.root.join(".repository")
+        self.root.join(RepoPath::RepositoryConfig.as_str())
     }
 
     /// Validate that the filesystem matches the expected layout.
     pub fn validate(&self) -> Result<()> {
         match self.mode {
             LayoutMode::Container => {
-                if !self.root.join(".gt").exists() {
+                // Fix: Check for directory existence, not just file existence
+                if !self.root.join(RepoPath::GtDir.as_str()).is_dir() {
                     return Err(Error::LayoutValidation {
-                        message: "Git database missing. Expected .gt/ directory.".into(),
+                        message: format!(
+                            "Git database missing. Expected {}/ directory.",
+                            RepoPath::GtDir
+                        ),
                     });
                 }
-                if !self.root.join("main").exists() {
+                if !self.root.join(RepoPath::MainWorktree.as_str()).is_dir() {
                     return Err(Error::LayoutValidation {
-                        message: "Primary worktree missing. Expected main/ directory.".into(),
+                        message: format!(
+                            "Primary worktree missing. Expected {}/ directory.",
+                            RepoPath::MainWorktree
+                        ),
                     });
                 }
             }
             LayoutMode::InRepoWorktrees | LayoutMode::Classic => {
-                if !self.root.join(".git").exists() {
+                if !self.root.join(RepoPath::GitDir.as_str()).exists() {
                     return Err(Error::LayoutValidation {
                         message: "Not a git repository.".into(),
                     });

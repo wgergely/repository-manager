@@ -13,8 +13,12 @@ struct TestConfig {
 fn test_load_toml() {
     let temp = TempDir::new().unwrap();
     let file_path = temp.path().join("config.toml");
-    fs::write(&file_path, r#"name = "test"
-count = 42"#).unwrap();
+    fs::write(
+        &file_path,
+        r#"name = "test"
+count = 42"#,
+    )
+    .unwrap();
 
     let store = ConfigStore::new();
     let path = NormalizedPath::new(&file_path);
@@ -58,7 +62,10 @@ fn test_save_toml() {
     let file_path = temp.path().join("config.toml");
     let path = NormalizedPath::new(&file_path);
 
-    let config = TestConfig { name: "test".into(), count: 42 };
+    let config = TestConfig {
+        name: "test".into(),
+        count: 42,
+    };
     let store = ConfigStore::new();
     store.save(&path, &config).unwrap();
 
@@ -73,7 +80,10 @@ fn test_save_json() {
     let file_path = temp.path().join("config.json");
     let path = NormalizedPath::new(&file_path);
 
-    let config = TestConfig { name: "test".into(), count: 42 };
+    let config = TestConfig {
+        name: "test".into(),
+        count: 42,
+    };
     let store = ConfigStore::new();
     store.save(&path, &config).unwrap();
 
@@ -101,7 +111,10 @@ fn test_roundtrip_toml() {
     let file_path = temp.path().join("config.toml");
     let path = NormalizedPath::new(&file_path);
 
-    let original = TestConfig { name: "roundtrip".into(), count: 123 };
+    let original = TestConfig {
+        name: "roundtrip".into(),
+        count: 123,
+    };
     let store = ConfigStore::new();
 
     store.save(&path, &original).unwrap();

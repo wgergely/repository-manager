@@ -1,7 +1,7 @@
 //! Format-agnostic configuration loading and saving
 
-use serde::{de::DeserializeOwned, Serialize};
-use crate::{io, Error, NormalizedPath, Result};
+use crate::{Error, NormalizedPath, Result, io};
+use serde::{Serialize, de::DeserializeOwned};
 
 /// Format-agnostic configuration store.
 ///
@@ -71,9 +71,11 @@ impl ConfigStore {
                 format: "YAML".into(),
                 message: e.to_string(),
             })?,
-            _ => return Err(Error::UnsupportedFormat {
-                extension: extension.to_string(),
-            }),
+            _ => {
+                return Err(Error::UnsupportedFormat {
+                    extension: extension.to_string(),
+                });
+            }
         };
 
         io::write_text(path, &content)

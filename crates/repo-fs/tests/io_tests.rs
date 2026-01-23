@@ -1,4 +1,4 @@
-use repo_fs::{io, NormalizedPath};
+use repo_fs::{NormalizedPath, io};
 use std::fs;
 use tempfile::TempDir;
 
