@@ -1,19 +1,127 @@
-//! Workspace layout detection and abstraction
-//!
-//! Handles different repository layouts (classic, container, in-repo worktrees).
+//! Workspace layout detection and management
 
-// TODO: Implement in Task 1.3
+use std::path::Path;
+use crate::{Error, NormalizedPath, Result};
 
-/// Workspace layout abstraction.
-pub struct WorkspaceLayout;
-
-/// Layout mode enumeration.
+/// The detected or configured layout mode for a workspace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LayoutMode {
-    /// Classic single repository layout
-    Classic,
-    /// Container layout with multiple worktrees
+    /// Container layout with `.gt/` database and sibling worktrees
     Container,
-    /// In-repo worktrees layout
+    /// In-repo worktrees with `.worktrees/` folder
     InRepoWorktrees,
+    /// Classic single-checkout git repository
+    Classic,
+}
+
+impl std::fmt::Display for LayoutMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Container => write!(f, "Container"),
+            Self::InRepoWorktrees => write!(f, "InRepoWorktrees"),
+            Self::Classic => write!(f, "Classic"),
+        }
+    }
+}
+
+/// Workspace layout information.
+///
+/// Source of truth for "where am I?" resolution.
+#[derive(Debug, Clone)]
+pub struct WorkspaceLayout {
+    /// Container or repo root (where .repository lives)
+    pub root: NormalizedPath,
+
+    /// Active working directory (may equal root in some modes)
+    pub active_context: NormalizedPath,
+
+    /// Detected or configured layout mode
+    pub mode: LayoutMode,
+}
+
+impl WorkspaceLayout {
+    /// Detect the workspace layout starting from the given directory.
+    ///
+    /// Walks up the directory tree looking for layout signals.
+    pub fn detect(start_dir: impl AsRef<Path>) -> Result<Self> {
+        let start = start_dir.as_ref().canonicalize()
+            .map_err(|e| Error::io(start_dir.as_ref(), e))?;
+
+        let mut current = Some(start.as_path());
+
+        while let Some(dir) = current {
+            if let Some(layout) = Self::detect_at(dir)? {
+                return Ok(layout);
+            }
+            current = dir.parent();
+        }
+
+        Err(Error::LayoutDetectionFailed)
+    }
+
+    /// Attempt to detect layout at a specific directory.
+    fn detect_at(dir: &Path) -> Result<Option<Self>> {
+        let has_gt = dir.join(".gt").is_dir();
+        let has_git = dir.join(".git").exists(); // Can be file or dir
+        let has_main = dir.join("main").is_dir();
+        let has_worktrees = dir.join(".worktrees").is_dir();
+
+        let mode = if has_gt && has_main {
+            // Container layout: .gt/ + main/
+            Some(LayoutMode::Container)
+        } else if has_git && has_worktrees {
+            // In-repo worktrees: .git + .worktrees/
+            Some(LayoutMode::InRepoWorktrees)
+        } else if has_git {
+            // Classic: just .git
+            Some(LayoutMode::Classic)
+        } else {
+            None
+        };
+
+        Ok(mode.map(|mode| Self {
+            root: NormalizedPath::new(dir),
+            active_context: NormalizedPath::new(dir),
+            mode,
+        }))
+    }
+
+    /// Get the path to the git database.
+    pub fn git_database(&self) -> NormalizedPath {
+        match self.mode {
+            LayoutMode::Container => self.root.join(".gt"),
+            LayoutMode::InRepoWorktrees | LayoutMode::Classic => self.root.join(".git"),
+        }
+    }
+
+    /// Get the path to the .repository config directory.
+    pub fn config_dir(&self) -> NormalizedPath {
+        self.root.join(".repository")
+    }
+
+    /// Validate that the filesystem matches the expected layout.
+    pub fn validate(&self) -> Result<()> {
+        match self.mode {
+            LayoutMode::Container => {
+                if !self.root.join(".gt").exists() {
+                    return Err(Error::LayoutValidation {
+                        message: "Git database missing. Expected .gt/ directory.".into(),
+                    });
+                }
+                if !self.root.join("main").exists() {
+                    return Err(Error::LayoutValidation {
+                        message: "Primary worktree missing. Expected main/ directory.".into(),
+                    });
+                }
+            }
+            LayoutMode::InRepoWorktrees | LayoutMode::Classic => {
+                if !self.root.join(".git").exists() {
+                    return Err(Error::LayoutValidation {
+                        message: "Not a git repository.".into(),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
 }
