@@ -45,7 +45,7 @@ serde_yaml = "0.9"
 
 # File operations
 fs2 = "0.4"
-tempfile = "3.10"
+tempfile = "3.14"
 dunce = "1.0"
 
 # Git
@@ -55,7 +55,10 @@ git2 = "0.20"
 thiserror = "2.0"
 
 # Testing
-tempfile = "3.10"
+rstest = "0.23"
+pretty_assertions = "1.4"
+assert_fs = "1.1"
+predicates = "3.1"
 ```
 
 **Step 2: Create crates directory structure**
@@ -89,6 +92,10 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+rstest = { workspace = true }
+pretty_assertions = { workspace = true }
+assert_fs = { workspace = true }
+predicates = { workspace = true }
 ```
 
 **Step 4: Create repo-fs lib.rs stub**
@@ -129,6 +136,10 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+rstest = { workspace = true }
+pretty_assertions = { workspace = true }
+assert_fs = { workspace = true }
+predicates = { workspace = true }
 ```
 
 **Step 6: Create repo-git lib.rs stub**
