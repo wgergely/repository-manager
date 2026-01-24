@@ -1,5 +1,3 @@
-# design/01-architecture-spec.md
-
 ## 1. System Overview: The Preset Meta-System
 
 The **Repository Manager** is designed as a modular orchestration layer. At its core lies the **Preset Meta-System**, an architectural pattern that decouples the *definition* of a capability (a "Preset") from its *implementation* (a "Provider").
@@ -44,11 +42,11 @@ A **Preset** is a declarative request for a capability. It is the "API Contract"
 - **State**: It exists in one of three states:
     1. **Declared**: Listed in the repository configuration.
     2. **Resolved**: Matched to a capable Provider.
-    3. **Realized**: Successfully installed/applied to the system.
+    3. **Projection**: Successfully installed/applied to the system.
 
 ### 2.2 The Provider (The "How")
 
-A **Provider** is the logic engine responsible for realization. It encapsulates the domain-specific complexity.
+A **Provider** is the logic engine responsible for projection. It encapsulates the domain-specific complexity.
 
 - **Responsibility**:
   - Translates high-level config (e.g., "I need Python 3.12") into low-level actions (e.g., "Run `uv venv`").

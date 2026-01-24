@@ -8,7 +8,7 @@ When using git worktrees, agentic tools (Claude Code, Cursor, etc.) treat each w
 
 ```
 container/
-├── .agentic/           # Shared config - NOT FOUND by tools
+├── .repository/           # Shared config - NOT FOUND by tools
 ├── main/               # Worktree
 │   └── .git            # File pointing to ../git
 ├── feature-a/          # Worktree
@@ -82,7 +82,7 @@ def find_config(start_dir):
 ```
 container/
 ├── .git/                    # Centralized database (bare-like)
-├── .agentic/                # Shared configuration
+├── .repository/                # Shared configuration
 │   ├── claude/rules/
 │   ├── cursor/.cursorrules
 │   └── shared/coding-standards.md
@@ -102,8 +102,8 @@ container/
 ```bash
 # In each worktree, symlink to shared config
 cd feature-x
-ln -s ../.agentic/.claude .claude
-ln -s ../.agentic/.cursorrules .cursorrules
+ln -s ../.repository/.claude .claude
+ln -s ../.repository/.cursorrules .cursorrules
 ```
 
 **Pros**: Works with all tools, transparent
@@ -131,7 +131,7 @@ Shared config as a separate repository:
 
 ```
 project/
-├── .agentic/              # git submodule
+├── .repository/              # git submodule
 │   └── (shared configs)
 ├── src/
 └── .git/
@@ -146,18 +146,18 @@ For repo-manager, **Pattern A + B** (Centralized + Symlinks):
 
 ```
 container/
-├── .agentic/                    # Source of truth
+├── .repository/                    # Source of truth
 │   ├── rules/common.md
 │   ├── claude/settings.json
 │   ├── cursor/.cursorrules
 │   └── sync.yaml                # Defines what syncs where
 ├── main/
-│   ├── .claude -> ../.agentic/claude
-│   ├── .cursorrules -> ../.agentic/cursor/.cursorrules
+│   ├── .claude -> ../.repository/claude
+│   ├── .cursorrules -> ../.repository/cursor/.cursorrules
 │   └── (source)
 └── feature-x/
-    ├── .claude -> ../.agentic/claude
-    ├── .cursorrules -> ../.agentic/cursor/.cursorrules
+    ├── .claude -> ../.repository/claude
+    ├── .cursorrules -> ../.repository/cursor/.cursorrules
     └── (source)
 ```
 
@@ -167,34 +167,18 @@ container/
 3. Keep symlinks in sync when config changes
 4. Handle Windows junction points
 
-## Automation Script
+## Automation
 
-```bash
-#!/bin/bash
-# repo-manager worktree add <branch> <path>
-
-BRANCH=$1
-PATH=$2
-CONTAINER=$(dirname $(git rev-parse --git-common-dir))
-
-# Create worktree
-git worktree add "$PATH" "$BRANCH"
-
-# Create symlinks to shared config
-cd "$PATH"
-ln -sf "../.agentic/.claude" ".claude"
-ln -sf "../.agentic/.cursorrules" ".cursorrules"
-ln -sf "../.agentic/CLAUDE.md" "CLAUDE.md"
-
-echo "Worktree created with agentic config linked"
-```
+Key automation steps:
+1. `git worktree add "$PATH" "$BRANCH"`
+2. Create symlinks: `.claude`, `.cursorrules`, `CLAUDE.md` pointing to container's `.repository/`
 
 ## Platform Considerations
 
 ### Windows
 
 - Symlinks require admin or Developer Mode
-- Use junctions for directories: `mklink /J .claude ..\.agentic\.claude`
+- Use junctions for directories: `mklink /J .claude ..\.repository\.claude`
 - Consider hard links for files
 
 ### WSL
@@ -220,22 +204,6 @@ echo "Worktree created with agentic config linked"
 ### Windsurf
 - Follows symlinks for `.windsurf/`
 - Cascade memory is per-workspace (not synced)
-
-## Quick Commands
-
-```bash
-# Create worktree
-git worktree add ../feature-x feature-x
-
-# List worktrees
-git worktree list
-
-# Remove worktree
-git worktree remove ../feature-x
-
-# Repair broken links
-git worktree repair
-```
 
 ---
 

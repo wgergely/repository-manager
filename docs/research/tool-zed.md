@@ -167,6 +167,10 @@ Native MCP client support:
 └── settings.json              # User settings
 ```
 
+## Sources
+
+- [Zed Documentation](https://zed.dev/docs)
+
 ---
 
 *Last updated: 2026-01-23*

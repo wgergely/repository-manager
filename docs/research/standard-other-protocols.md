@@ -36,35 +36,12 @@ Mirrors OpenAI's function calling with extensions:
 - Grounding with Google Search
 - Code execution environments
 
-## Microsoft Semantic Kernel
+## Microsoft Semantic Kernel & LangChain
 
-Open-source SDK for agent orchestration:
-
-```csharp
-[KernelFunction, Description("Get weather for location")]
-public async Task<string> GetWeather(string location) { }
-```
-
-Features:
-- Plugin abstraction layer
-- Cross-model compatibility
-- Configuration via dependency injection
-
-## LangChain Tools
-
-Decorator-based tool definition:
-
-```python
-@tool
-def search_database(query: str) -> str:
-    """Search the database for relevant information."""
-    pass
-```
-
-Features:
-- LCEL (LangChain Expression Language)
-- Provider-agnostic design
-- Large ecosystem
+| Technology | Pattern | Config |
+|------------|---------|--------|
+| Semantic Kernel | C# attributes | DI injection |
+| LangChain | Python decorators | LCEL |
 
 ## LSP (Language Server Protocol) Influence
 

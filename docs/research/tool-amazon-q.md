@@ -148,6 +148,10 @@ Configured through IDE settings (VS Code, JetBrains):
 # Plus: AWS profile configuration
 ```
 
+## Sources
+
+- [Amazon Q Documentation](https://docs.aws.amazon.com/amazonq)
+
 ---
 
 *Last updated: 2026-01-23*

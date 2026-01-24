@@ -80,7 +80,7 @@ The server exposes read-only resources to allow agents to inspect the repository
 | Resource URI | Description | content-type |
 | :--- | :--- | :--- |
 | `repo://config` | The contents of `.repository/config.toml` | `application/toml` |
-| `repo://state` | The computed state from `.repository/state.lock` | `application/toml` |
+| `repo://state` | The computed state from `.repository/ledger.toml` | `application/toml` |
 | `repo://rules` | A aggregated view of all active rules | `text/markdown` |
 
 ## Rust Implementation Plan

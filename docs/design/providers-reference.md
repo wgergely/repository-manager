@@ -1,8 +1,8 @@
-# design/03-provider-ecosystem.md
+# Provider Ecosystem Reference
 
 ## 1. Provider Design: The Python Ecosystem
 
-The Python ecosystem serves as the reference implementation for the Provider Architecture. It demonstrates the complexity of abstracting two fundamentally different engines: `uv` (file-based, standards-compliant) and `conda` (environment-based, binary-heavy).
+The Python ecosystem demonstrates Provider Architecture through `uv` and `conda` abstraction.
 
 ### 1.1 The "Python Environment" Abstract Provider
 
@@ -14,14 +14,14 @@ This provider implements the lifecycle for `env:python`.
 2. **Creation**: Initialize the virtual environment.
 3. **Synchronization**: Ensure dependencies (`pyproject.toml` or `environment.yml`) are synced.
 
-#### Strategy A: The `uv` Adapter
+#### Strategy A: The `uv` Provider
 
 - **Philosophy**: "Speed & Standards".
 - **Mechanism**: Wraps `uv venv` and `uv sync`.
 - **State Tracking**: Relies on `uv.lock` as the source of truth.
 - **Agent View**: Exposes standard `VIRTUAL_ENV` paths.
 
-#### Strategy B: The `conda` Adapter
+#### Strategy B: The `conda` Provider
 
 - **Philosophy**: "Scientific Isolation".
 - **Mechanism**: Wraps `micromamba` or `conda env create`.

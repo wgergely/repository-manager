@@ -11,7 +11,8 @@ Comprehensive feature comparison across major agentic coding tools.
 | **Cursor** | Markdown | `.cursorrules`, `.cursor/rules` | Limited | Native |
 | **Windsurf** | Markdown | `.windsurfrules`, `.windsurf/rules/` | Limited | Supported |
 | **Antigravity** | Markdown | `.agent/rules/`, `SKILL.md` | Yes | Supported |
-| **Copilot** | Markdown | `copilot-instructions.md` | Partial | Native |
+| **OpenAI Codex** | Markdown | `AGENTS.md`, `.codex/skills/` | Yes | **Native (originator)** |
+| **Copilot** | Markdown | `.github/copilot-instructions.md` | Partial | Native |
 | **Zed** | JSON | `.zed/settings.json` | Yes | Native |
 | **Gemini** | JSON | `.gemini/settings.json` | Yes | Native |
 | **Amazon Q** | JSON | `.amazonq/` | Unknown | Unknown |
@@ -29,7 +30,7 @@ Comprehensive feature comparison across major agentic coding tools.
 | **Antigravity** | Native | Via Gemini integration | Native support |
 | **Zed** | Full Native | `.zed/settings.json` | Native support |
 | **Amazon Q** | Native | IDE settings | MCP in IDE |
-| **OpenAI (Codex)** | Native | - | Adopted March 2025 |
+| **OpenAI Codex** | Native | `~/.codex/config.toml` | AGENTS.md originator |
 | **Google (Gemini)** | Native | - | DeepMind adoption |
 | **Copilot** | Limited | - | Experimental |
 | **Continue** | Partial | Context providers | Similar concept |
@@ -40,11 +41,12 @@ Comprehensive feature comparison across major agentic coding tools.
 | Tool | Type | Format | Exportable |
 |------|------|--------|------------|
 | **Claude Code** | Explicit files | Markdown | Yes |
+| **Claude Desktop** | Project knowledge | Markdown | Yes |
 | **Cursor** | Codebase index | Proprietary | No |
 | **Windsurf** | Cascade memory | Proprietary | No |
 | **Copilot** | Session only | N/A | N/A |
 | **Zed** | Editor state | Internal | No |
-| **OpenAI** | Thread-based | API | Via API |
+| **OpenAI Codex** | File-based | AGENTS.md | Yes |
 | **Continue** | Config-based | JSON | Partial |
 | **Aider** | Git-based | Commits | Yes (git) |
 
@@ -66,6 +68,7 @@ Comprehensive feature comparison across major agentic coding tools.
 | Tool | Execution | Sandboxing | Timeout |
 |------|-----------|------------|---------|
 | **Claude Code** | Direct | Configurable | Yes |
+| **Claude Desktop** | Via MCP | N/A | N/A |
 | **Cursor** | IDE terminal | None | No |
 | **Windsurf** | Cascade | Configurable | Yes |
 | **Copilot** | Via Workspace | GitHub sandbox | Yes |
@@ -77,6 +80,7 @@ Comprehensive feature comparison across major agentic coding tools.
 | Tool | API Type | SDK |
 |------|----------|-----|
 | **Claude Code** | CLI + MCP | TypeScript |
+| **Claude Desktop** | MCP | N/A |
 | **Cursor** | N/A | N/A |
 | **Windsurf** | N/A | N/A |
 | **Copilot** | GitHub API | REST |

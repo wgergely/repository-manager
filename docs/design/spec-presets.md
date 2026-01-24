@@ -4,7 +4,7 @@
 
 ## 1. Overview
 
-The Presets subsystem is the execution engine of the Repository Manager. While the `repo-meta` crate *reads* the configuration, `repo-presets` *enacts* it. It manages the lifecycle of "Capabilities" (Providers).
+Execution engine: `repo-presets` enacts configuration that `repo-meta` reads. Manages capability/provider lifecycle.
 
 ## 2. Typology
 

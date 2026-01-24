@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document defines the Command Line Interface (CLI) for the Repository Manager tool. The CLI acts as the primary entry point for users to configure their workspace, manage tools, and perform high-level version control operations.
+CLI specification for Repository Manager. Primary entry point for workspace configuration, tool management, and version control.
 
 ## Command Structure
 
@@ -74,7 +74,7 @@ Abstracted Git operations that respect the active Mode.
 ```bash
 repo branch add <BRANCH_NAME> [BASE]
 # Worktree Mode: Creates new folder {worktrees}/{branch_name}, inits worktree.
-# Normal Mode: git checkout -b {branch_name}
+# Standard Mode: git checkout -b {branch_name}
 
 repo branch remove <BRANCH_NAME>
 # Safe cleanup of branch and associated worktree folder (if applicable).

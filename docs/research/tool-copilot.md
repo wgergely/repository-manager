@@ -145,6 +145,10 @@ Two types:
 # Plus: Organization settings for org-wide instructions
 ```
 
+## Sources
+
+- [GitHub Copilot Documentation](https://docs.github.com/copilot)
+
 ---
 
 *Last updated: 2026-01-23*

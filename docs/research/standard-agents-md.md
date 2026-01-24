@@ -104,37 +104,6 @@ Successful AGENTS.md files cover six core areas:
 - Don't modify files in `vendor/`
 ```
 
-## Complete Example
-
-```markdown
-# AGENTS.md
-
-## Build & Test
-- `npm install` to install dependencies
-- `npm test` to run tests
-- `npm run lint` to check code style
-
-## Project Structure
-- `src/` - Source code
-- `tests/` - Test files (mirror src/ structure)
-- `docs/` - Documentation
-
-## Code Style
-- TypeScript strict mode
-- Prefer functional patterns
-- Use named exports
-- Follow Prettier defaults
-
-## Git Workflow
-- Branch from `main`
-- Conventional commits (feat:, fix:, docs:)
-- PRs require one approval
-
-## Boundaries
-- Never modify package-lock.json manually
-- Don't change CI/CD configuration without asking
-```
-
 ## Significance for repo-manager
 
 AGENTS.md should be treated as a **first-class citizen**:
@@ -147,7 +116,7 @@ AGENTS.md should be treated as a **first-class citizen**:
 ### Integration Strategy
 
 ```
-.agentic/rules/common.md  (source of truth)
+.repository/rules/common.md  (source of truth)
         |
         v
   [repo-manager sync]

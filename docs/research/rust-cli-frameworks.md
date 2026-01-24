@@ -74,25 +74,12 @@ fn generate_completions(shell: Shell) {
 For setup wizards:
 
 ```rust
-use dialoguer::{theme::ColorfulTheme, Select, Input, Confirm, MultiSelect};
-use indicatif::{ProgressBar, ProgressStyle};
+use dialoguer::{theme::ColorfulTheme, MultiSelect, Input};
 
-fn setup_wizard() -> Result<Config> {
-    let theme = ColorfulTheme::default();
-
-    let tools = vec!["Claude Code", "Cursor", "Windsurf", "Copilot"];
-    let selections = MultiSelect::with_theme(&theme)
-        .with_prompt("Select agentic tools to configure")
-        .items(&tools)
-        .interact()?;
-
-    let project_name: String = Input::with_theme(&theme)
-        .with_prompt("Project name")
-        .default("my-project".into())
-        .interact_text()?;
-
-    Ok(Config { /* ... */ })
-}
+// Pattern: MultiSelect for tool selection, Input for text prompts
+let selections = MultiSelect::with_theme(&ColorfulTheme::default())
+    .with_prompt("Select tools").items(&["Claude", "Cursor"]).interact()?;
+let name: String = Input::new().with_prompt("Project name").interact_text()?;
 ```
 
 Progress bars:
@@ -120,7 +107,7 @@ fn clone_repository(url: &str) -> Result<()> {
 
 ```toml
 [dependencies]
-clap = { version = "4.5", features = ["derive", "env", "string"] }
+clap = { version = "4.5", features = ["derive", "env", "string"] }  # or 4.6+
 clap_complete = "4.5"
 dialoguer = { version = "0.11", features = ["fuzzy-select"] }
 indicatif = "0.17"

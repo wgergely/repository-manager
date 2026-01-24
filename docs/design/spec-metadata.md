@@ -13,7 +13,7 @@ The subsystem owns the definition of the `.repository` folder:
 ```text
 .repository/
 ├── config.toml       # The Root Manifest
-├── state.lock        # The State Ledger
+├── ledger.toml       # The State Ledger
 ├── tools/            # Tool Definitions
 ├── rules/            # Rule Definitions
 └── presets/          # Preset Definitions

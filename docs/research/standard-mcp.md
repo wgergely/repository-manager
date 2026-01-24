@@ -135,46 +135,15 @@ Official support for industry-specific extensions:
 }
 ```
 
-## MCP Capabilities
+## MCP Primitives
 
-### Resources (Read-only data)
+| Primitive | Purpose | Key Fields |
+|-----------|---------|------------|
+| Resources | Read-only data | uri, name, mimeType |
+| Tools | Callable functions | name, description, inputSchema |
+| Prompts | Reusable templates | name, description, arguments |
 
-```json
-{
-  "uri": "file:///path/to/document.md",
-  "name": "Project Documentation",
-  "mimeType": "text/markdown"
-}
-```
-
-### Tools (Function-like actions)
-
-```json
-{
-  "name": "search_codebase",
-  "description": "Search for code patterns",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "pattern": { "type": "string" },
-      "file_type": { "type": "string" }
-    },
-    "required": ["pattern"]
-  }
-}
-```
-
-### Prompts (Reusable templates)
-
-```json
-{
-  "name": "code_review",
-  "description": "Review code for issues",
-  "arguments": [
-    { "name": "code", "required": true }
-  ]
-}
-```
+See [MCP Spec](https://modelcontextprotocol.io/specification/2025-11-25) for full schemas.
 
 ## Common MCP Servers
 
@@ -214,7 +183,7 @@ MCP integration should provide:
 ### Integration Strategy
 
 ```
-.agentic/mcp/servers.yaml  (source of truth)
+.repository/mcp/servers.yaml  (source of truth)
         |
         v
   [repo-manager sync]

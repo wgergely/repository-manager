@@ -17,17 +17,17 @@ The schema tracks the **Intent** (high-level rule) and its **Projections** (low-
 ```toml
 [meta]
 version = "1.0"
-updated_at = "2024-01-23T14:30:00Z"
+updated_at = "2026-01-23T14:30:00Z"
 
 # Array of active capabilities/rules
 [[intents]]
 # 1. Identity & Definition
 id = "rule:python/style/snake-case"  # Canonical ID of the rule definition
 uuid = "550e8400-e29b-41d4-a716-446655440000" # Unique Instance ID for this specific application
-timestamp = "2024-01-23T14:30:00Z"
+timestamp = "2026-01-23T14:30:00Z"
 
 # 2. Configuration used (Snapshot)
-# We store the args used to generate the content, so we can re-generate or validte
+# We store the args used to generate the content, so we can re-generate or validate
 args = { severity = "error", exceptions = ["constants"] }
 
 # 3. Projections (The Look-up Table for Unrolling)
@@ -61,7 +61,7 @@ args = { severity = "error", exceptions = ["constants"] }
 
 ## Embedding Strategies
 
-To ensure we can reliably "Unroll" (remove) content, we use different embedding strategies based on the target file format.
+Different embedding strategies enable reliable content unrolling per file format.
 
 ### 1. The Marker Strategy (Text/Markdown/Code)
 

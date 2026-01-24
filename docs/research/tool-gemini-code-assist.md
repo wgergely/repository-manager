@@ -144,6 +144,10 @@ Run `npm test` for unit tests.
 └── settings.json              # User configuration
 ```
 
+## Sources
+
+- [Gemini Code Assist Documentation](https://cloud.google.com/gemini/docs/codeassist)
+
 ---
 
 *Last updated: 2026-01-23*

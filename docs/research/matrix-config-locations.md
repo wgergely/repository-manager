@@ -11,11 +11,12 @@ Quick reference for where each tool stores configuration.
 | **Cursor** | `.cursorrules` | Cursor settings | `~/.cursor/` |
 | **Windsurf** | `.windsurfrules` | Windsurf settings | `~/.windsurf/` |
 | **Antigravity** | `.agent/rules/` | Via Gemini | VS Code settings |
+| **OpenAI Codex** | `AGENTS.md` | `~/.codex/config.toml` | `~/.codex/` |
 | **Copilot** | `.github/copilot-instructions.md` | N/A | GitHub settings |
 | **Zed** | `.zed/settings.json` | `.zed/settings.json` | `~/.config/zed/` |
 | **Gemini** | `.gemini/settings.json` | N/A | `~/.gemini/` |
 | **Amazon Q** | `.amazonq/` | IDE settings | AWS profile |
-| **Continue** | `.continuerc.json` | `config.json` | `~/.continue/` |
+| **Continue** | `.continuerc.json` (project) | `config.json` | `~/.continue/config.json` (global) |
 | **Aider** | `.aider.conf.yml` | N/A | `~/.aider.conf.yml` |
 
 ## Claude Code
@@ -94,6 +95,23 @@ extension.mcpb/
 └── extensions.json
 
 ~/.gemini/antigravity/skills/  # Global skills
+```
+
+## OpenAI Codex
+
+```
+./AGENTS.md                    # Project instructions (primary)
+./AGENTS.override.md           # Project overrides
+./.codex/
+└── skills/                    # Project skills
+    └── skill-name/
+        └── SKILL.md
+
+~/.codex/
+├── config.toml                # Main configuration (TOML)
+├── AGENTS.md                  # Global instructions
+├── AGENTS.override.md         # Personal overrides
+└── skills/                    # Global skills
 ```
 
 ## GitHub Copilot

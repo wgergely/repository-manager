@@ -10,7 +10,7 @@ The **Repository Manager** is a Rust-based system designed to orchestrate the st
 
 The system operates in two distinct modes. The chosen mode determines how files, configurations, and git branches are physically mapped to the filesystem.
 
-#### A. Normal Mode (Standard Git)
+#### A. Standard Mode (Standard Git)
 
 * **Description**: Traditional single-directory Git repository.
 * **Structure**: Project root contains `.git`, source code, and configuration files directly.
@@ -67,7 +67,7 @@ When `repo init` is called:
 
 Operations are abstracted to handle mode differences:
 
-| Operation | Standard Mode | Worktree Mode |
+| Operation | Standard Mode | Worktrees Mode |
 | :--- | :--- | :--- |
 | **Add Branch** | `git checkout -b <name>` | `git worktree add <path>/<name> <name>` |
 | **Remove Branch** | `git branch -d <name>` | `git worktree remove <path>/<name>` (+ dir cleanup) |

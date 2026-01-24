@@ -1,4 +1,4 @@
-# design/02-configuration-spec.md
+# Configuration Strategy
 
 ## 1. The Repository Manifest Hierarchy
 
@@ -43,7 +43,7 @@ This is the primary interface for enabling capabilities.
 
 ### 2.2 Dependency Modeling ("Preset Composition")
 
-Presets is an invalid graph concept. Presets can imply/require other presets. This allows for "Stacks".
+Presets form a directed acyclic graph. Presets can imply or require other presets. This allows for "Stacks".
 
 - **Concept**: A `stack:backend` preset is a "Meta-Preset".
 - **Resolution**: When the system sees `stack:backend`, it effectively expands it into:
@@ -60,8 +60,7 @@ To support developer preference without breaking the repository standard:
 
 ## 3. Metadata Exposure (The "Agent Interface")
 
-Agents (like the one writing this) need to know *how* to interact with the environment without parsing TOML.
-The system projects the configuration into a **Runtime Context JSON**.
+The system projects resolved configuration into a Runtime Context JSON for agent consumption.
 
 ### 3.1 The Context Projection
 

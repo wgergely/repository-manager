@@ -2,138 +2,69 @@
 
 Evaluation of git operation libraries for repo-manager.
 
-## Recommendation: gix (gitoxide)
+## Recommendation: git2
 
-Pure Rust implementation, rapidly maturing, used by cargo.
+Battle-tested libgit2 bindings with complete feature coverage.
+
+**Alternative**: `gix` (gitoxide) for pure-Rust preference or when avoiding C dependencies.
 
 ## Comparison Matrix
 
 | Crate | Implementation | Performance | Safety | Features | Size |
 |-------|----------------|-------------|--------|----------|------|
-| **gix** | Pure Rust | Excellent | Memory-safe | Growing | Large |
-| git2 | libgit2 bindings | Good | C FFI | Complete | Medium |
+| **git2** | libgit2 bindings | Good | C FFI | Complete | Medium |
+| gix | Pure Rust | Excellent | Memory-safe | Growing | Large |
 
-## gix Advantages
+## git2 Advantages
+
+- Complete feature coverage (worktrees, remotes, all git operations)
+- Battle-tested in production (used by cargo historically)
+- Stable API with excellent documentation
+- Wide ecosystem support and examples
+
+## gix Advantages (Alternative)
 
 - Memory safe (no C dependencies)
-- Excellent performance (often faster than libgit2)
 - Cross-compilation friendly
 - Active development by Byron (sponsored by GitButler)
 - Used in production by cargo
 
-## gix Example
+## Code Examples
+
+Either library can be used. Examples show typical patterns:
 
 ```rust
-use gix::{Repository, progress::Discard};
-use std::path::Path;
+// git2 (recommended) - worktree operations
+use git2::Repository;
 
-struct GitOperations {
-    repo: Repository,
+let repo = Repository::open(path)?;
+let worktrees = repo.worktrees()?;
+for name in worktrees.iter().flatten() {
+    let wt = repo.find_worktree(name)?;
+    println!("Worktree: {} at {:?}", name, wt.path());
 }
 
-impl GitOperations {
-    fn open(path: &Path) -> Result<Self> {
-        let repo = gix::open(path)?;
-        Ok(Self { repo })
-    }
-
-    fn list_worktrees(&self) -> Result<Vec<WorktreeInfo>> {
-        let worktrees = self.repo.worktrees()?;
-        let mut result = Vec::new();
-
-        for wt in worktrees {
-            let wt = wt?;
-            result.push(WorktreeInfo {
-                name: wt.id().to_string(),
-                path: wt.base()?.to_path_buf(),
-                branch: wt.head_ref()?.map(|r| r.name().to_string()),
-                locked: wt.is_locked(),
-            });
-        }
-
-        Ok(result)
-    }
-
-    fn create_worktree(&self, name: &str, branch: &str, path: &Path) -> Result<()> {
-        let reference = self.repo.find_reference(branch)?;
-        self.repo.worktree_add(name, path, reference)?;
-        Ok(())
-    }
-
-    fn remove_worktree(&self, name: &str, force: bool) -> Result<()> {
-        let worktree = self.repo.find_worktree(name)?;
-        if force || !worktree.is_locked() {
-            worktree.remove()?;
-        }
-        Ok(())
-    }
-
-    fn clone_bare(url: &str, path: &Path) -> Result<Repository> {
-        let mut prepare = gix::prepare_clone_bare(url, path)?;
-        let (repo, _) = prepare.fetch_then_checkout(
-            Discard,
-            &std::sync::atomic::AtomicBool::new(false)
-        )?;
-        Ok(repo)
-    }
-
-    fn is_worktree(&self) -> bool {
-        self.repo.is_worktree()
-    }
-}
-
-#[derive(Debug)]
-struct WorktreeInfo {
-    name: String,
-    path: PathBuf,
-    branch: Option<String>,
-    locked: bool,
-}
-```
-
-## git2 Alternative
-
-Use when you need features not yet in gix:
-
-```rust
-use git2::{Repository, WorktreePruneOptions};
-
-fn git2_worktree_operations(repo_path: &Path) -> Result<()> {
-    let repo = Repository::open(repo_path)?;
-
-    // List worktrees
-    let worktrees = repo.worktrees()?;
-    for name in worktrees.iter() {
-        if let Some(name) = name {
-            let wt = repo.find_worktree(name)?;
-            println!("Worktree: {} at {:?}", name, wt.path());
-        }
-    }
-
-    Ok(())
-}
+// gix alternative - similar pattern
+let repo = gix::open(path)?;
+let worktrees = repo.worktrees()?;
 ```
 
 ## Cargo Dependencies
 
 ```toml
 [dependencies]
-gix = { version = "0.60", default-features = false, features = [
-    "worktree",
-    "clone",
-    "status",
-    "revision",
-    "index",
-] }
+git2 = "0.19"
 
-# Optional fallback
-[dependencies.git2]
-version = "0.18"
+# Optional pure-Rust alternative
+[dependencies.gix]
+version = "0.60"
 optional = true
+default-features = false
+features = ["worktree", "clone", "status"]
 
 [features]
 default = []
-libgit2 = ["git2"]
+pure-rust = ["gix"]
 ```
 
 ---

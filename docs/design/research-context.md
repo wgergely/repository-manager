@@ -78,7 +78,7 @@ Context is the data the agent works with.
 
 ## 4. Design Proposal: The Unified `.repository` Schema
 
-To satisfy the user's request for a tool that manages this complexity, we propose a `.repository` (or `.agentic`) schema that abstracts these concepts.
+To satisfy the user's request for a tool that manages this complexity, we propose a `.repository` schema that abstracts these concepts.
 
 ### 4.1 Directory Structure
 
@@ -100,7 +100,7 @@ To satisfy the user's request for a tool that manages this complexity, we propos
 
 ### 4.2 The "Compiler" (Orchestrator)
 
-The CLI tool will read this structure and **transpile** it to the target environments:
+The CLI tool will read this structure and **unroll** it to the target environments:
 
 1. **Sync to Claude**:
     * Concatenate `rules/*.md` -> `CLAUDE.md`
