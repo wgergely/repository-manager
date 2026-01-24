@@ -1,0 +1,18 @@
+[package]
+name = "integration-tests"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+repo-fs = { path = "../../crates/repo-fs" }
+repo-meta = { path = "../../crates/repo-meta" }
+repo-presets = { path = "../../crates/repo-presets" }
+repo-tools = { path = "../../crates/repo-tools" }
+repo-blocks = { path = "../../crates/repo-blocks" }
+tempfile = { workspace = true }
+tokio = { version = "1.42", features = ["rt-multi-thread", "macros"] }
+
+[[test]]
+name = "integration_test"
+path = "src/integration_test.rs"

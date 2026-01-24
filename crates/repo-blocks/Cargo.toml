@@ -1,0 +1,18 @@
+[package]
+name = "repo-blocks"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Block parsing and writing for Repository Manager"
+
+[dependencies]
+repo-fs = { path = "../repo-fs" }
+uuid = { workspace = true }
+regex = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+rstest = { workspace = true }
+pretty_assertions = { workspace = true }
