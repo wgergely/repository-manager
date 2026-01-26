@@ -45,7 +45,7 @@ pub use config::{ConfigResolver, Manifest, ResolvedConfig, RuntimeContext};
 pub use error::{Error, Result};
 pub use ledger::{Intent, Ledger, Projection, ProjectionKind};
 pub use mode::Mode;
-pub use sync::{CheckReport, CheckStatus, DriftItem, SyncEngine, SyncReport};
+pub use sync::{CheckReport, CheckStatus, DriftItem, SyncEngine, SyncOptions, SyncReport};
 
 #[cfg(test)]
 mod tests {

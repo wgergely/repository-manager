@@ -55,6 +55,14 @@ impl SyncReport {
     }
 }
 
+/// Options for sync and fix operations
+#[derive(Debug, Clone, Default)]
+pub struct SyncOptions {
+    /// If true, simulate changes without modifying the filesystem.
+    /// Actions will be prefixed with "[dry-run] Would ..."
+    pub dry_run: bool,
+}
+
 /// Engine for synchronizing configuration state
 ///
 /// The SyncEngine provides three main operations:
@@ -327,6 +335,29 @@ impl SyncEngine {
         }
     }
 
+    /// Synchronize configuration to the filesystem with options
+    ///
+    /// When `options.dry_run` is true, simulates changes without writing.
+    pub fn sync_with_options(&self, options: SyncOptions) -> Result<SyncReport> {
+        let ledger = self.load_ledger()?;
+        let ledger_path = self.ledger_path();
+        let mut report = SyncReport::success();
+
+        if !ledger_path.exists() {
+            if options.dry_run {
+                report = report.with_action("[dry-run] Would create ledger file".to_string());
+            } else {
+                self.save_ledger(&ledger)?;
+                report = report.with_action("Created ledger file".to_string());
+            }
+        }
+
+        // TODO: Full sync implementation - apply configuration changes
+        // For now, we just ensure the ledger exists
+
+        Ok(report)
+    }
+
     /// Synchronize configuration to the filesystem
     ///
     /// This operation:
@@ -338,21 +369,16 @@ impl SyncEngine {
     ///
     /// A `SyncReport` containing the actions taken.
     pub fn sync(&self) -> Result<SyncReport> {
-        let ledger = self.load_ledger()?;
+        self.sync_with_options(SyncOptions::default())
+    }
 
-        // Create/save ledger if it doesn't exist
-        let ledger_path = self.ledger_path();
-        let mut report = SyncReport::success();
-
-        if !ledger_path.exists() {
-            self.save_ledger(&ledger)?;
-            report = report.with_action("Created ledger file".to_string());
-        }
-
-        // TODO: Full sync implementation - apply configuration changes
-        // For now, we just ensure the ledger exists
-
-        Ok(report)
+    /// Fix synchronization issues with options
+    ///
+    /// When `options.dry_run` is true, simulates fixes without applying.
+    pub fn fix_with_options(&self, options: SyncOptions) -> Result<SyncReport> {
+        // For now, fix just re-runs sync
+        // In the future, this would also repair drifted/missing projections
+        self.sync_with_options(options)
     }
 
     /// Fix synchronization issues
@@ -363,9 +389,7 @@ impl SyncEngine {
     ///
     /// A `SyncReport` containing the actions taken.
     pub fn fix(&self) -> Result<SyncReport> {
-        // For now, fix just re-runs sync
-        // In the future, this would also repair drifted/missing projections
-        self.sync()
+        self.fix_with_options(SyncOptions::default())
     }
 
     /// Get the repository root path

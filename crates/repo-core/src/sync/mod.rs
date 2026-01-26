@@ -9,4 +9,4 @@ mod check;
 mod engine;
 
 pub use check::{CheckReport, CheckStatus, DriftItem};
-pub use engine::{SyncEngine, SyncReport};
+pub use engine::{compute_file_checksum, get_json_path, SyncEngine, SyncOptions, SyncReport};
