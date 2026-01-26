@@ -50,7 +50,7 @@ impl Format {
         if trimmed
             .lines()
             .next()
-            .map_or(false, |l| l.contains(": ") && !l.starts_with('#'))
+            .is_some_and(|l| l.contains(": ") && !l.starts_with('#'))
         {
             return Self::Yaml;
         }
