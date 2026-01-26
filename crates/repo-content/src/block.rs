@@ -60,9 +60,10 @@ impl ManagedBlock {
 }
 
 /// Where to insert a block in a document
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum BlockLocation {
     /// Append to end of document
+    #[default]
     End,
     /// After specific section/key
     After(String),
@@ -70,10 +71,4 @@ pub enum BlockLocation {
     Before(String),
     /// At specific byte offset
     Offset(usize),
-}
-
-impl Default for BlockLocation {
-    fn default() -> Self {
-        Self::End
-    }
 }
