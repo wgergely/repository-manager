@@ -42,6 +42,9 @@ pub enum Error {
 
     #[error("Lock acquisition failed for {path}")]
     LockFailed { path: PathBuf },
+
+    #[error("Refusing to write through symlink: {path}")]
+    SymlinkInPath { path: PathBuf },
 }
 
 impl Error {
