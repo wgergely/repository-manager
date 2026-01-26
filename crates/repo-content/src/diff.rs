@@ -1,5 +1,7 @@
 //! Semantic diff types and computation
 
+use serde_json::Value;
+use similar::TextDiff;
 use uuid::Uuid;
 
 /// Result of comparing two documents semantically
@@ -25,6 +27,63 @@ impl SemanticDiff {
 
     /// Create a diff with changes
     pub fn with_changes(changes: Vec<SemanticChange>, similarity: f64) -> Self {
+        Self {
+            is_equivalent: changes.is_empty(),
+            changes,
+            similarity,
+        }
+    }
+
+    /// Compute a semantic diff between two JSON values
+    ///
+    /// This recursively compares two JSON values and tracks all changes
+    /// with their paths (e.g., "config.host" for nested keys).
+    pub fn compute(old: &Value, new: &Value) -> Self {
+        let mut changes = Vec::new();
+        diff_values(old, new, String::new(), &mut changes);
+
+        let similarity = compute_similarity(old, new);
+
+        Self {
+            is_equivalent: changes.is_empty(),
+            changes,
+            similarity,
+        }
+    }
+
+    /// Compute a semantic diff between two text strings
+    ///
+    /// Uses the `similar` crate's TextDiff for line-by-line comparison.
+    pub fn compute_text(old: &str, new: &str) -> Self {
+        if old == new {
+            return Self::equivalent();
+        }
+
+        let text_diff = TextDiff::from_lines(old, new);
+        let similarity = text_diff.ratio() as f64;
+
+        let mut changes = Vec::new();
+
+        for change in text_diff.iter_all_changes() {
+            match change.tag() {
+                similar::ChangeTag::Delete => {
+                    changes.push(SemanticChange::BlockRemoved {
+                        uuid: None,
+                        content: change.value().to_string(),
+                    });
+                }
+                similar::ChangeTag::Insert => {
+                    changes.push(SemanticChange::BlockAdded {
+                        uuid: None,
+                        content: change.value().to_string(),
+                    });
+                }
+                similar::ChangeTag::Equal => {
+                    // No change needed for equal lines
+                }
+            }
+        }
+
         Self {
             is_equivalent: changes.is_empty(),
             changes,
@@ -74,4 +133,219 @@ pub enum SemanticChange {
         old: String,
         new: String,
     },
+}
+
+/// Recursively diff two JSON values, collecting changes with path tracking
+fn diff_values(old: &Value, new: &Value, path: String, changes: &mut Vec<SemanticChange>) {
+    match (old, new) {
+        // Both are objects - compare keys
+        (Value::Object(old_obj), Value::Object(new_obj)) => {
+            // Check for removed and modified keys
+            for (key, old_value) in old_obj {
+                let child_path = if path.is_empty() {
+                    key.clone()
+                } else {
+                    format!("{}.{}", path, key)
+                };
+
+                match new_obj.get(key) {
+                    Some(new_value) => {
+                        // Key exists in both - recurse
+                        diff_values(old_value, new_value, child_path, changes);
+                    }
+                    None => {
+                        // Key removed
+                        changes.push(SemanticChange::Removed {
+                            path: child_path,
+                            value: old_value.clone(),
+                        });
+                    }
+                }
+            }
+
+            // Check for added keys
+            for (key, new_value) in new_obj {
+                if !old_obj.contains_key(key) {
+                    let child_path = if path.is_empty() {
+                        key.clone()
+                    } else {
+                        format!("{}.{}", path, key)
+                    };
+                    changes.push(SemanticChange::Added {
+                        path: child_path,
+                        value: new_value.clone(),
+                    });
+                }
+            }
+        }
+
+        // Both are arrays - compare element by element
+        (Value::Array(old_arr), Value::Array(new_arr)) => {
+            let max_len = old_arr.len().max(new_arr.len());
+            for i in 0..max_len {
+                let child_path = if path.is_empty() {
+                    format!("[{}]", i)
+                } else {
+                    format!("{}[{}]", path, i)
+                };
+
+                match (old_arr.get(i), new_arr.get(i)) {
+                    (Some(old_val), Some(new_val)) => {
+                        diff_values(old_val, new_val, child_path, changes);
+                    }
+                    (Some(old_val), None) => {
+                        changes.push(SemanticChange::Removed {
+                            path: child_path,
+                            value: old_val.clone(),
+                        });
+                    }
+                    (None, Some(new_val)) => {
+                        changes.push(SemanticChange::Added {
+                            path: child_path,
+                            value: new_val.clone(),
+                        });
+                    }
+                    (None, None) => unreachable!(),
+                }
+            }
+        }
+
+        // Different types or scalar values - compare directly
+        _ => {
+            if old != new {
+                changes.push(SemanticChange::Modified {
+                    path,
+                    old: old.clone(),
+                    new: new.clone(),
+                });
+            }
+        }
+    }
+}
+
+/// Compute similarity ratio between two JSON values
+///
+/// This uses a simple approach: serialize both to strings and use
+/// similar::TextDiff::ratio() for a quick similarity estimate.
+fn compute_similarity(old: &Value, new: &Value) -> f64 {
+    if old == new {
+        return 1.0;
+    }
+
+    // Serialize both values to canonical JSON strings for comparison
+    let old_str = serde_json::to_string(old).unwrap_or_default();
+    let new_str = serde_json::to_string(new).unwrap_or_default();
+
+    let diff = TextDiff::from_chars(&old_str, &new_str);
+    diff.ratio() as f64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_compute_empty_objects_equivalent() {
+        let old = json!({});
+        let new = json!({});
+        let diff = SemanticDiff::compute(&old, &new);
+        assert!(diff.is_equivalent);
+        assert!(diff.changes.is_empty());
+        assert_eq!(diff.similarity, 1.0);
+    }
+
+    #[test]
+    fn test_compute_added_key() {
+        let old = json!({"a": 1});
+        let new = json!({"a": 1, "b": 2});
+        let diff = SemanticDiff::compute(&old, &new);
+
+        assert!(!diff.is_equivalent);
+        assert_eq!(diff.changes.len(), 1);
+        assert!(matches!(
+            &diff.changes[0],
+            SemanticChange::Added { path, value } if path == "b" && value == &json!(2)
+        ));
+    }
+
+    #[test]
+    fn test_compute_removed_key() {
+        let old = json!({"a": 1, "b": 2});
+        let new = json!({"a": 1});
+        let diff = SemanticDiff::compute(&old, &new);
+
+        assert!(!diff.is_equivalent);
+        assert_eq!(diff.changes.len(), 1);
+        assert!(matches!(
+            &diff.changes[0],
+            SemanticChange::Removed { path, value } if path == "b" && value == &json!(2)
+        ));
+    }
+
+    #[test]
+    fn test_compute_modified_value() {
+        let old = json!({"a": 1});
+        let new = json!({"a": 2});
+        let diff = SemanticDiff::compute(&old, &new);
+
+        assert!(!diff.is_equivalent);
+        assert_eq!(diff.changes.len(), 1);
+        assert!(matches!(
+            &diff.changes[0],
+            SemanticChange::Modified { path, old, new } if path == "a" && old == &json!(1) && new == &json!(2)
+        ));
+    }
+
+    #[test]
+    fn test_compute_nested_path() {
+        let old = json!({"config": {"host": "localhost"}});
+        let new = json!({"config": {"host": "example.com"}});
+        let diff = SemanticDiff::compute(&old, &new);
+
+        assert!(!diff.is_equivalent);
+        assert_eq!(diff.changes.len(), 1);
+        assert!(matches!(
+            &diff.changes[0],
+            SemanticChange::Modified { path, .. } if path == "config.host"
+        ));
+    }
+
+    #[test]
+    fn test_compute_array_changes() {
+        let old = json!({"items": [1, 2, 3]});
+        let new = json!({"items": [1, 2, 4]});
+        let diff = SemanticDiff::compute(&old, &new);
+
+        assert!(!diff.is_equivalent);
+        assert!(diff.changes.iter().any(|c| matches!(c,
+            SemanticChange::Modified { path, .. } if path == "items[2]"
+        )));
+    }
+
+    #[test]
+    fn test_compute_text_equivalent() {
+        let diff = SemanticDiff::compute_text("hello\nworld", "hello\nworld");
+        assert!(diff.is_equivalent);
+        assert!(diff.changes.is_empty());
+        assert_eq!(diff.similarity, 1.0);
+    }
+
+    #[test]
+    fn test_compute_text_added_line() {
+        let diff = SemanticDiff::compute_text("line1\n", "line1\nline2\n");
+        assert!(!diff.is_equivalent);
+        assert!(diff.changes.iter().any(|c| matches!(c,
+            SemanticChange::BlockAdded { content, .. } if content.contains("line2")
+        )));
+    }
+
+    #[test]
+    fn test_compute_text_removed_line() {
+        let diff = SemanticDiff::compute_text("line1\nline2\n", "line1\n");
+        assert!(!diff.is_equivalent);
+        assert!(diff.changes.iter().any(|c| matches!(c,
+            SemanticChange::BlockRemoved { content, .. } if content.contains("line2")
+        )));
+    }
 }

@@ -105,22 +105,46 @@ impl Document {
 
     /// Compute semantic diff between two documents.
     ///
-    /// **Note:** This is a basic implementation that only reports whether
-    /// documents are equivalent. Full diff computation with detailed changes
-    /// is planned for Phase 4. The `similar` crate is available for this.
+    /// For structured formats (JSON, TOML, YAML), this performs a recursive
+    /// comparison of the normalized JSON representations, tracking changes
+    /// with their paths (e.g., "config.host" for nested keys).
     ///
-    /// Currently returns:
-    /// - Empty changes list (no detailed diff)
-    /// - Similarity of 1.0 if equivalent, 0.5 if not
+    /// For text formats (Markdown, PlainText), this performs a line-by-line
+    /// text diff using the `similar` crate.
+    ///
+    /// Returns:
+    /// - `is_equivalent`: true if documents are semantically equal
+    /// - `changes`: list of Added/Removed/Modified changes with paths
+    /// - `similarity`: ratio from 0.0 to 1.0
     pub fn diff(&self, other: &Document) -> SemanticDiff {
+        // First check semantic equality
         if self.semantic_eq(other) {
-            SemanticDiff::equivalent()
-        } else {
-            SemanticDiff {
-                is_equivalent: false,
-                changes: Vec::new(),
-                similarity: 0.5,
+            return SemanticDiff::equivalent();
+        }
+
+        // For structured formats, use JSON diff
+        match (self.format, other.format) {
+            (Format::Json, _)
+            | (Format::Toml, _)
+            | (Format::Yaml, _)
+            | (_, Format::Json)
+            | (_, Format::Toml)
+            | (_, Format::Yaml) => {
+                // Normalize both to JSON and compute diff
+                let Ok(old_norm) = self.handler.normalize(&self.source) else {
+                    return SemanticDiff::with_changes(Vec::new(), 0.0);
+                };
+                let Ok(new_norm) = other.handler.normalize(&other.source) else {
+                    return SemanticDiff::with_changes(Vec::new(), 0.0);
+                };
+                SemanticDiff::compute(&old_norm, &new_norm)
             }
+            // For text formats, use text diff
+            (Format::Markdown, Format::Markdown) | (Format::PlainText, Format::PlainText) => {
+                SemanticDiff::compute_text(&self.source, &other.source)
+            }
+            // Mixed text formats - also use text diff
+            _ => SemanticDiff::compute_text(&self.source, &other.source),
         }
     }
 
