@@ -37,7 +37,7 @@ use serde_json::Value;
 pub enum PathSegment {
     /// A key in an object (e.g., "database" in "config.database")
     Key(String),
-    /// An index in an array (e.g., 0 in "items[0]")
+    /// An index in an array (e.g., 0 in `items[0]`)
     Index(usize),
 }
 
