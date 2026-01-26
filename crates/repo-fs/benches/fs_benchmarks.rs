@@ -1,5 +1,6 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use repo_fs::io;
+use repo_fs::{io, NormalizedPath};
+use repo_fs::io::RobustnessConfig;
 use repo_fs::layout::WorkspaceLayout;
 use std::fs;
 use tempfile::tempdir;
@@ -8,10 +9,12 @@ fn write_atomic_benchmark(c: &mut Criterion) {
     c.bench_function("io::write_atomic", |b| {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test_file.txt");
+        let np = NormalizedPath::new(&path);
         let content = "hello world".as_bytes();
+        let config = RobustnessConfig::default();
 
         b.iter(|| {
-            io::write_atomic(black_box(&path), black_box(content)).unwrap();
+            io::write_atomic(black_box(&np), black_box(content), config).unwrap();
         })
     });
 }
