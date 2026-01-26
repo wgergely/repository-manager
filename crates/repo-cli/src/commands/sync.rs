@@ -6,7 +6,7 @@ use std::path::Path;
 
 use colored::Colorize;
 
-use repo_core::{CheckStatus, ConfigResolver, Mode, SyncEngine};
+use repo_core::{CheckStatus, ConfigResolver, Mode, SyncEngine, SyncOptions};
 use repo_fs::NormalizedPath;
 
 use crate::error::{CliError, Result};
@@ -116,23 +116,32 @@ pub fn run_check(path: &Path) -> Result<()> {
 /// Run the sync command
 ///
 /// Synchronizes configuration from the ledger to the filesystem.
-pub fn run_sync(path: &Path) -> Result<()> {
-    println!(
-        "{} Synchronizing tool configurations...",
-        "=>".blue().bold()
-    );
+pub fn run_sync(path: &Path, dry_run: bool) -> Result<()> {
+    if dry_run {
+        println!(
+            "{} Previewing sync (dry-run)...",
+            "=>".blue().bold()
+        );
+    } else {
+        println!(
+            "{} Synchronizing tool configurations...",
+            "=>".blue().bold()
+        );
+    }
 
     let root = NormalizedPath::new(path);
     let mode = detect_mode(&root)?;
     let engine = SyncEngine::new(root, mode)?;
 
-    let report = engine.sync()?;
+    let options = SyncOptions { dry_run };
+    let report = engine.sync_with_options(options)?;
 
     if report.success {
         if report.actions.is_empty() {
             println!("{} Already synchronized. No changes needed.", "OK".green().bold());
         } else {
-            println!("{} Synchronization complete:", "OK".green().bold());
+            let prefix = if dry_run { "Would take actions" } else { "Synchronization complete" };
+            println!("{} {}:", "OK".green().bold(), prefix);
             for action in &report.actions {
                 println!("   {} {}", "+".green(), action);
             }
@@ -151,11 +160,18 @@ pub fn run_sync(path: &Path) -> Result<()> {
 /// Run the fix command
 ///
 /// Repairs configuration drift by re-synchronizing.
-pub fn run_fix(path: &Path) -> Result<()> {
-    println!(
-        "{} Fixing configuration drift...",
-        "=>".blue().bold()
-    );
+pub fn run_fix(path: &Path, dry_run: bool) -> Result<()> {
+    if dry_run {
+        println!(
+            "{} Previewing fix (dry-run)...",
+            "=>".blue().bold()
+        );
+    } else {
+        println!(
+            "{} Fixing configuration drift...",
+            "=>".blue().bold()
+        );
+    }
 
     let root = NormalizedPath::new(path);
     let mode = detect_mode(&root)?;
@@ -169,14 +185,17 @@ pub fn run_fix(path: &Path) -> Result<()> {
         return Ok(());
     }
 
-    // Now fix it
-    let report = engine.fix()?;
+    // Now fix it (or simulate)
+    let options = SyncOptions { dry_run };
+    let report = engine.fix_with_options(options)?;
 
     if report.success {
         if report.actions.is_empty() {
-            println!("{} Configuration fixed.", "OK".green().bold());
+            let msg = if dry_run { "No actions needed." } else { "Configuration fixed." };
+            println!("{} {}", "OK".green().bold(), msg);
         } else {
-            println!("{} Configuration fixed:", "OK".green().bold());
+            let prefix = if dry_run { "Would take actions" } else { "Configuration fixed" };
+            println!("{} {}:", "OK".green().bold(), prefix);
             for action in &report.actions {
                 println!("   {} {}", "+".green(), action);
             }
@@ -246,7 +265,7 @@ mode = "{}"
         assert!(!ledger_path.exists());
 
         // Run sync
-        let result = run_sync(path);
+        let result = run_sync(path, false);
         assert!(result.is_ok());
 
         // Ledger should now exist
@@ -299,7 +318,33 @@ mode = "{}"
         create_minimal_repo(path, "standard");
 
         // Fix should complete successfully (nothing to fix)
-        let result = run_fix(path);
+        let result = run_fix(path, false);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_sync_dry_run() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path();
+
+        // Create a minimal repo
+        create_minimal_repo(path, "standard");
+
+        // Run sync in dry-run mode
+        let result = run_sync(path, true);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_fix_dry_run() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path();
+
+        // Create a minimal repo
+        create_minimal_repo(path, "standard");
+
+        // Fix in dry-run mode should complete successfully
+        let result = run_fix(path, true);
         assert!(result.is_ok());
     }
 }

@@ -59,8 +59,8 @@ fn execute_command(cmd: Commands) -> Result<()> {
             presets,
         } => cmd_init(&mode, &tools, &presets),
         Commands::Check => cmd_check(),
-        Commands::Sync => cmd_sync(),
-        Commands::Fix => cmd_fix(),
+        Commands::Sync { dry_run } => cmd_sync(dry_run),
+        Commands::Fix { dry_run } => cmd_fix(dry_run),
         Commands::AddTool { name } => cmd_add_tool(&name),
         Commands::RemoveTool { name } => cmd_remove_tool(&name),
         Commands::AddPreset { name } => cmd_add_preset(&name),
@@ -81,14 +81,14 @@ fn cmd_check() -> Result<()> {
     commands::run_check(&cwd)
 }
 
-fn cmd_sync() -> Result<()> {
+fn cmd_sync(dry_run: bool) -> Result<()> {
     let cwd = std::env::current_dir()?;
-    commands::run_sync(&cwd)
+    commands::run_sync(&cwd, dry_run)
 }
 
-fn cmd_fix() -> Result<()> {
+fn cmd_fix(dry_run: bool) -> Result<()> {
     let cwd = std::env::current_dir()?;
-    commands::run_fix(&cwd)
+    commands::run_fix(&cwd, dry_run)
 }
 
 fn cmd_add_tool(name: &str) -> Result<()> {
@@ -211,7 +211,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         create_minimal_repo(temp_dir.path(), "standard");
 
-        let result = commands::run_sync(temp_dir.path());
+        let result = commands::run_sync(temp_dir.path(), false);
         assert!(result.is_ok());
     }
 
@@ -220,7 +220,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         create_minimal_repo(temp_dir.path(), "standard");
 
-        let result = commands::run_fix(temp_dir.path());
+        let result = commands::run_fix(temp_dir.path(), false);
         assert!(result.is_ok());
     }
 }

@@ -38,10 +38,18 @@ pub enum Commands {
     Check,
 
     /// Synchronize tool configurations
-    Sync,
+    Sync {
+        /// Preview changes without applying them
+        #[arg(long)]
+        dry_run: bool,
+    },
 
     /// Fix configuration drift automatically
-    Fix,
+    Fix {
+        /// Preview fixes without applying them
+        #[arg(long)]
+        dry_run: bool,
+    },
 
     /// Add a tool to the repository
     AddTool {
@@ -171,13 +179,25 @@ mod tests {
     #[test]
     fn parse_sync_command() {
         let cli = Cli::parse_from(["repo", "sync"]);
-        assert!(matches!(cli.command, Some(Commands::Sync)));
+        assert!(matches!(cli.command, Some(Commands::Sync { dry_run: false })));
+    }
+
+    #[test]
+    fn parse_sync_command_dry_run() {
+        let cli = Cli::parse_from(["repo", "sync", "--dry-run"]);
+        assert!(matches!(cli.command, Some(Commands::Sync { dry_run: true })));
     }
 
     #[test]
     fn parse_fix_command() {
         let cli = Cli::parse_from(["repo", "fix"]);
-        assert!(matches!(cli.command, Some(Commands::Fix)));
+        assert!(matches!(cli.command, Some(Commands::Fix { dry_run: false })));
+    }
+
+    #[test]
+    fn parse_fix_command_dry_run() {
+        let cli = Cli::parse_from(["repo", "fix", "--dry-run"]);
+        assert!(matches!(cli.command, Some(Commands::Fix { dry_run: true })));
     }
 
     #[test]
