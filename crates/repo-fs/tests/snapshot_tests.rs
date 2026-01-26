@@ -1,5 +1,5 @@
 use assert_fs::prelude::*;
-use repo_fs::{LayoutMode, RepoPath, WorkspaceLayout};
+use repo_fs::{RepoPath, WorkspaceLayout};
 
 #[test]
 fn snapshot_container_layout_detection() {

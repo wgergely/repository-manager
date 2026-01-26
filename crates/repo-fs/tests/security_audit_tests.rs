@@ -3,9 +3,8 @@
 // These tests are intended to audit the `repo-fs` crate for security vulnerabilities.
 // The focus is on path traversal, symlink attacks, and race conditions.
 
-use repo_fs::{NormalizedPath, io};
+use repo_fs::NormalizedPath;
 use rstest::rstest;
-use tempfile::TempDir;
 
 #[cfg(test)]
 mod path_normalization_security {
@@ -29,11 +28,13 @@ mod path_normalization_security {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(windows)))]
 mod io_security {
     use super::*;
+    use repo_fs::io;
     use std::fs;
     use std::io::Read;
+    use tempfile::TempDir;
 
     /// Creates a temporary directory to act as a "jail" for tests.
     fn setup_jail() -> TempDir {
@@ -41,7 +42,6 @@ mod io_security {
     }
 
     #[test]
-    #[cfg(not(windows))] // Symlinks work differently on Windows
     fn test_write_atomic_does_not_follow_symlink_in_path() {
         let jail = setup_jail();
         let jail_path = jail.path();
@@ -80,7 +80,6 @@ mod io_security {
     }
 
     #[test]
-    #[cfg(not(windows))]
     fn test_write_atomic_replaces_symlink_at_destination() {
         let jail = setup_jail();
         let jail_path = jail.path();
