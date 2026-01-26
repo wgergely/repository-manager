@@ -1,6 +1,5 @@
 use assert_fs::prelude::*;
 use repo_fs::{LayoutMode, RepoPath, WorkspaceLayout};
-use std::fs;
 
 #[test]
 fn detect_at_prefers_container_layout() {

@@ -104,6 +104,7 @@ impl LayoutProvider for ContainerLayout {
     }
 
     fn create_feature(&self, name: &str, base: Option<&str>) -> Result<NormalizedPath> {
+        tracing::debug!(name, base, "Creating feature worktree");
         let repo = self.open_repo()?;
         let worktree_path = self.feature_worktree(name);
         let dir_name = branch_to_directory(name, self.naming);
@@ -146,6 +147,7 @@ impl LayoutProvider for ContainerLayout {
     }
 
     fn remove_feature(&self, name: &str) -> Result<()> {
+        tracing::debug!(name, "Removing feature worktree");
         let repo = self.open_repo()?;
         let dir_name = branch_to_directory(name, self.naming);
 
@@ -165,8 +167,14 @@ impl LayoutProvider for ContainerLayout {
         wt.prune(Some(&mut prune_opts))?;
 
         // Also try to delete the branch
-        if let Ok(mut branch) = repo.find_branch(&dir_name, BranchType::Local) {
-            let _ = branch.delete(); // Ignore error if branch doesn't exist
+        if let Ok(mut branch) = repo.find_branch(&dir_name, BranchType::Local)
+            && let Err(e) = branch.delete()
+        {
+            tracing::warn!(
+                branch = %dir_name,
+                error = %e,
+                "Failed to delete branch after worktree removal"
+            );
         }
 
         Ok(())

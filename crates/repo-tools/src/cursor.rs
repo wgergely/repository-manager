@@ -47,7 +47,7 @@ impl ToolIntegration for CursorIntegration {
 
         // Upsert each rule as a managed block
         for rule in rules {
-            content = upsert_block(&content, &rule.id, &rule.content);
+            content = upsert_block(&content, &rule.id, &rule.content)?;
         }
 
         // Write content back

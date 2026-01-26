@@ -1,97 +1,134 @@
-# Documentation Cleanup & Fix Plan
+# Rust Crate Review Implementation Plan
 
-> **For Antigravity:** Use `/superpowers-execute-plan` to implement this plan.
+## Goal
 
-**Goal:** Fix the errors from the previous reorganization:
+Fix error handling issues and establish consistent logging patterns across all Rust crates to ensure:
 
-1. Move the leftover "Skill context" research document to a more appropriate location (`repository-management`).
-2. Clean up the `metadata.md` file to remove the inaccurate architecture graph and simplify it to a high-level correlation document.
-3. Remove the redundant/unwanted `docs/design/README.md`.
+- No errors are silently swallowed
+- Warning and failure conditions are properly logged
+- Crates follow modern Rust best practices
 
-**Architecture:** Use the existing folder structure.
+## Assumptions
+
+1. The existing API contracts remain unchanged (fixes are internal behavior)
+2. `tracing` crate is already a workspace dependency and initialized at runtime
+3. Tests pass before and after changes
+4. Changes follow the fixed pattern already established in `in_repo_worktrees.rs`
+
+## Plan
+
+### Step 1: Fix Swallowed Error in container.rs
+
+**Files**: [container.rs](file:///y:/code/repository-manager-worktrees/feature-rust-core/crates/repo-git/src/container.rs)
+
+**Change**: Replace `let _ = branch.delete()` at line 169 with proper error logging:
+
+```rust
+if let Err(e) = branch.delete() {
+    tracing::warn!(
+        branch = %dir_name,
+        error = %e,
+        "Failed to delete branch after worktree removal"
+    );
+}
+```
+
+**Verify**:
+
+```bash
+cargo test -p repo-git -- container
+cargo clippy -p repo-git
+```
 
 ---
 
-## Task 1: Fix Leftover Files
+### Step 2: Add tracing instrumentation to key repo-git operations
 
-**Files:**
+**Files**: [container.rs](file:///y:/code/repository-manager-worktrees/feature-rust-core/crates/repo-git/src/container.rs), [in_repo_worktrees.rs](file:///y:/code/repository-manager-worktrees/feature-rust-core/crates/repo-git/src/in_repo_worktrees.rs)
 
-- Move: `docs/design/01-skill-context-management-2026.md` -> `docs/design/repository-management/skill-context-management-2026.md`
-- Remove: `docs/design/README.md` (User requested removal/didn't ask for it).
-- Edit: `docs/design/metadata.md` (Update link for context management if needed, though no link existed).
+**Change**: Add `tracing::debug!` at entry points of key methods:
 
-**Step 1: Move file**
-Run:
+- `create_feature` - log branch name and base
+- `remove_feature` - log branch name
 
-```powershell
-Move-Item docs/design/01-skill-context-management-2026.md docs/design/repository-management/skill-context-management-2026.md
-```
-
-**Step 2: Remove README**
-Run:
-
-```powershell
-Remove-Item docs/design/README.md
-```
-
-**Step 3: Commit**
-Run:
+**Verify**:
 
 ```bash
-git add docs/design/repository-management/skill-context-management-2026.md docs/design/README.md docs/design/01-skill-context-management-2026.md
-git commit -m "docs: move leftover research doc and remove unwanted readme"
+cargo test -p repo-git
+cargo clippy -p repo-git
 ```
 
-## Task 2: Fix Imprecise Metadata
+---
 
-**Files:**
+### Step 3: Add tracing instrumentation to repo-fs write operations
 
-- Edit: `docs/design/metadata.md`
+**Files**: [io.rs](file:///y:/code/repository-manager-worktrees/feature-rust-core/crates/repo-git/src/io.rs)
 
-**Step 1: Overwrite metadata.md**
-Content for `docs/design/metadata.md`:
+**Change**: Add `tracing::debug!` at entry of `write_atomic`:
 
-```markdown
-# System Crystallization & Correlation
-
-This document serves as the high-level map correlating the various design documents.
-
-> **Status**: Early Design Phase. Architecture is evolving.
-
-## Subsystem Index
-
-*   **[CLI](cli/spec.md)**: Top-level command line tool implementation.
-*   **[Tools](tools/spec.md)**: Definition and registration of external tools (coding agents, IDEs).
-*   **[Presets](presets/spec.md)**: Capability provider system (venvs, gitignores, configs).
-*   **[Repository Management](repository-management/architecture.md)**: Core logic for repository structure.
-    *   *[Context Research](repository-management/skill-context-management-2026.md)*: Analysis of agentic context patterns.
-*   **[Metadata System](metadata-system/spec.md)**: The `.repository` directory structure and registry.
-*   **[File Management](file-management/spec.md)**: Robust I/O utilities.
-*   **[Git Management](git-management/spec.md)**: Worktree and remote sync management.
-
-## Correlation Goals
-
-*   **Presets** provide the capabilities.
-*   **Tools** consume the environment configured by Presets.
-*   **Metadata System** connects them by registering which tools and presets are active in a repository.
-*   **CLI** is the conductor that orchestrates these interactions.
+```rust
+tracing::debug!(path = %path.as_str(), "Starting atomic write");
 ```
 
-**Step 2: Commit**
-Run:
+**Verify**:
 
 ```bash
-git add docs/design/metadata.md
-git commit -m "docs: simplify metadata.md and remove inaccurate graph"
+cargo test -p repo-fs
+cargo clippy -p repo-fs
+```
+
+---
+
+### Step 4: Fix unused import warning in robustness_tests.rs
+
+**Files**: [robustness_tests.rs](file:///y:/code/repository-manager-worktrees/feature-rust-core/crates/repo-fs/tests/robustness_tests.rs)
+
+**Change**: Remove `use std::fs;` unused import at line 3.
+
+**Verify**:
+
+```bash
+cargo test -p repo-fs
+```
+
+---
+
+### Step 5: Full verification
+
+**Verify**:
+
+```bash
+cargo check --all-targets
+cargo test --all
+cargo clippy --all -- -D warnings
 ```
 
 ## Risks & Mitigations
 
-- **Risk**: Deleting `README.md` leaves folder without index on GitHub.
-  - **Mitigation**: `metadata.md` effectively acts as the index now, which is what the user seems to prefer ("wrap all that using a metadata.md").
+| Risk | Mitigation |
+|------|------------|
+| Adding tracing imports breaks builds | Use `tracing` which is already a workspace dependency |
+| New log messages flood output | Use `debug!` level which is off by default |
+| Tests fail due to behavior changes | No behavior changes, only additional logging |
 
-## Rollback
+## Rollback Plan
+
+All changes are additive logging. Rollback by reverting the commit:
 
 ```bash
-git reset --hard HEAD~2
+git revert HEAD
 ```
+
+---
+
+## Existing Test Commands
+
+The following commands are already available to verify changes:
+
+| Command | Purpose |
+|---------|---------|
+| `cargo test -p repo-git -- container` | Tests container.rs remove_feature |
+| `cargo test -p repo-git -- in_repo` | Tests in_repo_worktrees.rs |
+| `cargo test -p repo-fs` | Tests io.rs operations |
+| `cargo test --all` | Full test suite |
+| `cargo clippy --all` | Lint all crates |

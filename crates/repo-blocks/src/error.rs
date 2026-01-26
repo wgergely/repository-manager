@@ -20,4 +20,7 @@ pub enum Error {
 
     #[error("Invalid UUID format: {value}")]
     InvalidUuid { value: String },
+
+    #[error("Regex compilation failed: {0}")]
+    Regex(#[from] regex::Error),
 }
