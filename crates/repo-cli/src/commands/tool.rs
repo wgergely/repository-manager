@@ -9,6 +9,7 @@ use serde_json;
 
 use repo_core::Manifest;
 use repo_fs::NormalizedPath;
+use repo_meta::{Registry, ToolRegistry};
 
 use crate::error::{CliError, Result};
 
@@ -24,6 +25,17 @@ pub fn run_add_tool(path: &Path, name: &str) -> Result<()> {
         "=>".blue().bold(),
         name.cyan()
     );
+
+    // Validate tool name
+    let tool_registry = ToolRegistry::with_builtins();
+    if !tool_registry.is_known(name) {
+        eprintln!(
+            "{} Unknown tool '{}'. Known tools: {}",
+            "warning:".yellow().bold(),
+            name,
+            tool_registry.list_known().join(", ")
+        );
+    }
 
     let config_path = NormalizedPath::new(path.join(CONFIG_PATH));
 
@@ -90,6 +102,17 @@ pub fn run_add_preset(path: &Path, name: &str) -> Result<()> {
         "=>".blue().bold(),
         name.cyan()
     );
+
+    // Validate preset name
+    let registry = Registry::with_builtins();
+    if !registry.has_provider(name) {
+        eprintln!(
+            "{} Unknown preset '{}'. Known presets: {}",
+            "warning:".yellow().bold(),
+            name,
+            registry.list_presets().join(", ")
+        );
+    }
 
     let config_path = NormalizedPath::new(path.join(CONFIG_PATH));
 

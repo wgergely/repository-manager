@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 repo-core = { path = "../repo-core" }
 repo-fs = { path = "../repo-fs" }
+repo-meta = { path = "../repo-meta" }
 
 clap = { version = "4", features = ["derive", "env"] }
 colored = "2"

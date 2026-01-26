@@ -1443,6 +1443,7 @@ dependencies = [
  "predicates",
  "repo-core",
  "repo-fs",
+ "repo-meta",
  "serde_json",
  "tempfile",
  "thiserror",
