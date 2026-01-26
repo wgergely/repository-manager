@@ -1,6 +1,6 @@
 //! Container layout implementation with .gt database
 
-use std::cell::OnceCell;
+use std::sync::OnceLock;
 
 use crate::{
     Error, Result,
@@ -23,7 +23,7 @@ pub struct ContainerLayout {
     git_dir: NormalizedPath,
     main_dir: NormalizedPath,
     naming: NamingStrategy,
-    repo_cache: OnceCell<Repository>,
+    repo_cache: OnceLock<Repository>,
 }
 
 impl ContainerLayout {
@@ -37,19 +37,18 @@ impl ContainerLayout {
             git_dir,
             main_dir,
             naming,
-            repo_cache: OnceCell::new(),
+            repo_cache: OnceLock::new(),
         })
     }
 
     fn open_repo(&self) -> Result<&Repository> {
-        if self.repo_cache.get().is_none() {
-            let repo = Repository::open(self.git_dir.to_native())?;
-            // We ignore the error because if it fails, it means another thread set it?
-            // But OnceCell for single thread shouldn't race.
-            // set returns Result<(), T>. If Err, it returns the value back.
-            let _ = self.repo_cache.set(repo);
+        if let Some(repo) = self.repo_cache.get() {
+            return Ok(repo);
         }
-        Ok(self.repo_cache.get().unwrap())
+        let repo = Repository::open(self.git_dir.to_native())?;
+        // OnceLock::set is thread-safe; if another thread won the race, use their value
+        let _ = self.repo_cache.set(repo);
+        Ok(self.repo_cache.get().expect("just initialized"))
     }
 }
 
