@@ -103,15 +103,19 @@ impl Document {
         norm1 == norm2
     }
 
-    /// Compute semantic diff
+    /// Compute semantic diff between two documents.
+    ///
+    /// **Note:** This is a basic implementation that only reports whether
+    /// documents are equivalent. Full diff computation with detailed changes
+    /// is planned for Phase 4. The `similar` crate is available for this.
+    ///
+    /// Currently returns:
+    /// - Empty changes list (no detailed diff)
+    /// - Similarity of 1.0 if equivalent, 0.5 if not
     pub fn diff(&self, other: &Document) -> SemanticDiff {
-        // Basic implementation - full diff using `similar` crate is Phase 4
         if self.semantic_eq(other) {
             SemanticDiff::equivalent()
         } else {
-            // Create a non-equivalent diff
-            // Note: is_equivalent is derived from changes.is_empty() in with_changes,
-            // so we need to construct directly for non-equivalent empty changes
             SemanticDiff {
                 is_equivalent: false,
                 changes: Vec::new(),
@@ -131,8 +135,13 @@ impl Document {
         }
     }
 
-    /// Check if modified from original (always returns false for simplicity)
+    /// Check if document has been modified from its original source.
+    ///
+    /// **Note:** This method is not yet implemented and always returns `false`.
+    /// Full implementation requires tracking original source state.
+    /// See: Phase 5 in the implementation plan.
     pub fn is_modified(&self) -> bool {
+        // TODO: Track original source to enable modification detection
         false
     }
 
