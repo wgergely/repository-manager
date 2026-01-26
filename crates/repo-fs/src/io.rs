@@ -31,6 +31,34 @@ impl Default for RobustnessConfig {
     }
 }
 
+/// Check if any component in the path (or its ancestors) is a symlink.
+///
+/// This prevents symlink-based attacks where writes could escape intended directories.
+fn contains_symlink(path: &std::path::Path) -> std::io::Result<bool> {
+    use std::path::PathBuf;
+
+    let mut current = PathBuf::from(path);
+
+    // Walk up the path checking each component
+    loop {
+        if current.exists() {
+            let metadata = std::fs::symlink_metadata(&current)?;
+            if metadata.file_type().is_symlink() {
+                return Ok(true);
+            }
+        }
+
+        match current.parent() {
+            Some(parent) if !parent.as_os_str().is_empty() => {
+                current = parent.to_path_buf();
+            }
+            _ => break,
+        }
+    }
+
+    Ok(false)
+}
+
 /// Write content atomically to a file with locking and retry logic.
 ///
 /// Uses write-to-temp-then-rename strategy to prevent partial writes.
@@ -43,6 +71,13 @@ impl Default for RobustnessConfig {
 pub fn write_atomic(path: &NormalizedPath, content: &[u8], config: RobustnessConfig) -> Result<()> {
     tracing::debug!(path = %path.as_str(), content_len = content.len(), "Starting atomic write");
     let native_path = path.to_native();
+
+    // Security: Reject paths containing symlinks to prevent escape attacks
+    if contains_symlink(&native_path).unwrap_or(false) {
+        return Err(Error::SymlinkInPath {
+            path: native_path.clone(),
+        });
+    }
 
     // Ensure parent directory exists
     if let Some(parent) = native_path.parent() {
