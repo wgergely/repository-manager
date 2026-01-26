@@ -98,7 +98,7 @@ pub fn update_block(content: &str, uuid: &str, new_content: &str) -> Result<Stri
         regex::escape(uuid),
         regex::escape(uuid)
     );
-    let re = Regex::new(&pattern).expect("Invalid update regex");
+    let re = Regex::new(&pattern)?;
 
     let replacement = format_block(uuid, new_content);
     Ok(re.replace(content, replacement.as_str()).to_string())
@@ -145,7 +145,7 @@ pub fn remove_block(content: &str, uuid: &str) -> Result<String> {
         regex::escape(uuid),
         regex::escape(uuid)
     );
-    let re = Regex::new(&pattern).expect("Invalid remove regex");
+    let re = Regex::new(&pattern)?;
 
     let result = re.replace(content, "\n").to_string();
 
@@ -168,25 +168,27 @@ pub fn remove_block(content: &str, uuid: &str) -> Result<String> {
 /// # Returns
 /// The content with the block inserted or updated.
 ///
+/// # Errors
+/// Returns an error if regex compilation fails (should not happen with valid UUIDs).
+///
 /// # Example
 /// ```
 /// use repo_blocks::writer::upsert_block;
 ///
 /// // Insert new block
 /// let content = "";
-/// let result = upsert_block(content, "abc-123", "content");
+/// let result = upsert_block(content, "abc-123", "content").unwrap();
 /// assert!(result.contains("abc-123"));
 ///
 /// // Update existing block
-/// let result = upsert_block(&result, "abc-123", "new content");
+/// let result = upsert_block(&result, "abc-123", "new content").unwrap();
 /// assert!(result.contains("new content"));
 /// ```
-pub fn upsert_block(content: &str, uuid: &str, block_content: &str) -> String {
+pub fn upsert_block(content: &str, uuid: &str, block_content: &str) -> Result<String> {
     if has_block(content, uuid) {
-        // update_block returns Result, but we know the block exists
-        update_block(content, uuid, block_content).expect("Block exists but update failed")
+        update_block(content, uuid, block_content)
     } else {
-        insert_block(content, uuid, block_content)
+        Ok(insert_block(content, uuid, block_content))
     }
 }
 
@@ -227,14 +229,14 @@ mod tests {
 
     #[test]
     fn test_upsert_insert() {
-        let result = upsert_block("", "abc-123", "content");
+        let result = upsert_block("", "abc-123", "content").unwrap();
         assert!(result.contains("abc-123"));
     }
 
     #[test]
     fn test_upsert_update() {
         let content = "<!-- repo:block:abc-123 -->\nold\n<!-- /repo:block:abc-123 -->";
-        let result = upsert_block(content, "abc-123", "new");
+        let result = upsert_block(content, "abc-123", "new").unwrap();
         assert!(result.contains("new"));
         assert!(!result.contains("old"));
     }

@@ -41,6 +41,7 @@ impl Default for RobustnessConfig {
 /// - Acquiring locks (simulating timeout via try_lock loop)
 /// - Transient I/O errors (e.g. network blips)
 pub fn write_atomic(path: &NormalizedPath, content: &[u8], config: RobustnessConfig) -> Result<()> {
+    tracing::debug!(path = %path.as_str(), content_len = content.len(), "Starting atomic write");
     let native_path = path.to_native();
 
     // Ensure parent directory exists
@@ -48,39 +49,51 @@ pub fn write_atomic(path: &NormalizedPath, content: &[u8], config: RobustnessCon
         fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
     }
 
-    // Generate temp file path in same directory (ensures same filesystem)
-    let temp_name = format!(
-        ".{}.{}.tmp",
-        native_path
-            .file_name()
-            .map(|n| n.to_string_lossy())
-            .unwrap_or_default(),
-        std::process::id()
-    );
-    let temp_path = native_path.with_file_name(&temp_name);
+    // 1. Acquire coordination lock on a separate lock file
+    let lock_path = format!("{}.lock", native_path.to_string_lossy());
+    let lock_file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(false) // Don't truncate lock file, just open it
+        .open(&lock_path)
+        .map_err(|e| Error::io(&lock_path, e))?;
 
     // Define the operation to perform with retry support
+    // We wrap the whole locking + write + rename sequence
     let op = || -> std::result::Result<(), backoff::Error<Error>> {
-        // Write to temp file
+        // Try to acquire exclusive lock on the lock file
+        // This coordinates between processes
+        lock_file.try_lock_exclusive().map_err(|_| {
+            backoff::Error::transient(Error::LockFailed {
+                path: native_path.clone(),
+            })
+        })?;
+
+        // Guard to ensure we unlock even if we panic (though try_lock_exclusive releases on close)
+        // Explicit unlock is not strictly needed if we drop the file, but good for clarity.
+        // We will hold this lock until the end of the closure.
+
+        // 2. Write to temp file
+        // Generate temp file path in same directory (ensures same filesystem)
+        // We keep the PID to avoid collisions within the locked region if different threads used different temp files?
+        // Actually, since we hold the .lock, we are the only one writing TO THIS DESTINATION.
+        // But to be extra safe against stale temp files, we use a random/pid name.
+        let temp_name = format!(
+            ".{}.{}.tmp",
+            native_path
+                .file_name()
+                .map(|n| n.to_string_lossy())
+                .unwrap_or_default(),
+            std::process::id()
+        );
+        let temp_path = native_path.with_file_name(&temp_name);
+
         let mut temp_file = OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
             .open(&temp_path)
             .map_err(|e| backoff::Error::transient(Error::io(&temp_path, e)))?;
-
-        // Acquire exclusive lock with timeout simulation
-        // fs2::lock_exclusive blocks, so we use try_lock_exclusive in a loop if we wanted strict timeout
-        // But for backoff retry, we can just try_lock and if it fails, return transient error.
-
-        // Note: try_lock_exclusive returns Error if it would block (on some platforms) or if locked.
-        // fs2 documentation says: "Returns an error if the lock could not be acquired"
-        temp_file.try_lock_exclusive().map_err(|_| {
-            // Treat lock failure as transient (retryable)
-            backoff::Error::transient(Error::LockFailed {
-                path: native_path.clone(),
-            })
-        })?;
 
         // Write content
         temp_file
@@ -94,12 +107,16 @@ pub fn write_atomic(path: &NormalizedPath, content: &[u8], config: RobustnessCon
                 .map_err(|e| backoff::Error::transient(Error::io(&temp_path, e)))?;
         }
 
-        // Release lock
-        let _ = temp_file.unlock(); // Ignore unlock errors, we are closing anyway
+        // Close temp file explicitly before rename (improves Windows reliability)
+        drop(temp_file);
 
-        // Atomic rename
+        // 3. Atomic rename
+        // Replaces target if exists
         fs::rename(&temp_path, &native_path)
             .map_err(|e| backoff::Error::transient(Error::io(&native_path, e)))?;
+
+        // 4. Release lock
+        let _ = lock_file.unlock();
 
         Ok(())
     };

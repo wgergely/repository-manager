@@ -69,14 +69,10 @@ pub fn parse_blocks(content: &str) -> Vec<Block> {
 
             // Extract content between markers
             // The content is everything between the opening marker end and the closing marker start
-            // We strip the leading newline (if present) and trailing newline (if present)
+            // We strip a single leading and trailing newline if present (but not multiple)
             let raw_content = &content[open_end..close_start];
-            let block_content = raw_content
-                .strip_prefix('\n')
-                .unwrap_or(raw_content)
-                .strip_suffix('\n')
-                .unwrap_or(raw_content.strip_prefix('\n').unwrap_or(raw_content))
-                .to_string();
+            let trimmed = raw_content.strip_prefix('\n').unwrap_or(raw_content);
+            let block_content = trimmed.strip_suffix('\n').unwrap_or(trimmed).to_string();
 
             // Calculate line numbers
             let start_line = content[..open_match.start()].lines().count() + 1;

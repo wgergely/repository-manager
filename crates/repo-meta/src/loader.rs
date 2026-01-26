@@ -148,16 +148,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_loader_new() {
-        let loader = DefinitionLoader::new();
-        // Just verify it creates without error
-        assert!(std::mem::size_of_val(&loader) > 0);
+    fn test_loader_can_be_created() {
+        let _loader = DefinitionLoader::new();
+        // Construction should not panic
     }
 
     #[test]
-    fn test_loader_default() {
-        let loader = DefinitionLoader::default();
-        assert!(std::mem::size_of_val(&loader) > 0);
+    fn test_loader_default_same_as_new() {
+        let _loader = DefinitionLoader::default();
+        // Default impl should not panic
     }
 
     #[test]

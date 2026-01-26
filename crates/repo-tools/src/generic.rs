@@ -52,7 +52,7 @@ impl GenericToolIntegration {
         // Insert/update each rule as a managed block
         for rule in rules {
             let block_content = format!("## {}\n\n{}", rule.id, rule.content);
-            content = upsert_block(&content, &rule.id, &block_content);
+            content = upsert_block(&content, &rule.id, &block_content)?;
         }
 
         io::write_text(&path, &content)?;

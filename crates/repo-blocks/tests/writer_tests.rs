@@ -133,7 +133,7 @@ keep this 2
 #[test]
 fn test_upsert_inserts_when_missing() {
     let content = "Existing content";
-    let result = upsert_block(content, "new-uuid", "new block");
+    let result = upsert_block(content, "new-uuid", "new block").unwrap();
 
     assert!(result.contains("Existing content"));
     assert!(result.contains("<!-- repo:block:new-uuid -->"));
@@ -146,7 +146,7 @@ fn test_upsert_updates_when_exists() {
 old content
 <!-- /repo:block:existing -->"#;
 
-    let result = upsert_block(content, "existing", "updated content");
+    let result = upsert_block(content, "existing", "updated content").unwrap();
 
     assert!(result.contains("updated content"));
     assert!(!result.contains("old content"));
