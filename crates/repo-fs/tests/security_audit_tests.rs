@@ -33,7 +33,6 @@ mod io_security {
     use super::*;
     use repo_fs::io;
     use std::fs;
-    use std::io::Read;
     use tempfile::TempDir;
 
     /// Creates a temporary directory to act as a "jail" for tests.
@@ -42,7 +41,7 @@ mod io_security {
     }
 
     #[test]
-    fn test_write_atomic_does_not_follow_symlink_in_path() {
+    fn test_write_atomic_rejects_symlink_in_path() {
         let jail = setup_jail();
         let jail_path = jail.path();
 
@@ -53,30 +52,28 @@ mod io_security {
         std::os::unix::fs::symlink(&secret_dir_path, &symlink_path).unwrap();
 
         // Attempt to write a file inside the symlinked directory
-        // This should write to `jail/symlink_dir/file.txt`, not `jail/secret_dir/file.txt`
-        // if interpreted naively. However, `create_dir_all` in `write_atomic` will
-        // follow the symlink.
         let path_with_symlink = NormalizedPath::new(symlink_path.join("file.txt"));
-        let content = "evil content";
+        let content = "content";
 
         let result = io::write_text(&path_with_symlink, content);
-        assert!(result.is_ok(), "Write should succeed");
 
-        // Check that the file was created inside the *secret* directory, because
-        // `create_dir_all` resolves the symlink. This demonstrates the vulnerability.
-        let secret_file_path = secret_dir_path.join("file.txt");
+        // Should now FAIL with SymlinkInPath error
+        assert!(result.is_err(), "Write through symlink should be rejected");
+
+        let err = result.unwrap_err();
+        let err_str = format!("{}", err);
         assert!(
-            secret_file_path.exists(),
-            "VULNERABILITY: File was written into symlinked directory!"
+            err_str.contains("symlink"),
+            "Error should mention symlink, got: {}",
+            err_str
         );
 
-        // The file content should be the evil content
-        let mut file_content = String::new();
-        fs::File::open(&secret_file_path)
-            .unwrap()
-            .read_to_string(&mut file_content)
-            .unwrap();
-        assert_eq!(file_content, content);
+        // Verify no file was created
+        let secret_file_path = secret_dir_path.join("file.txt");
+        assert!(
+            !secret_file_path.exists(),
+            "File should NOT have been written through symlink"
+        );
     }
 
     #[test]
