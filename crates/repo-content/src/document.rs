@@ -5,7 +5,7 @@ use crate::diff::SemanticDiff;
 use crate::edit::Edit;
 use crate::error::Result;
 use crate::format::{Format, FormatHandler};
-use crate::handlers::{JsonHandler, PlainTextHandler, TomlHandler, YamlHandler};
+use crate::handlers::{JsonHandler, MarkdownHandler, PlainTextHandler, TomlHandler, YamlHandler};
 use uuid::Uuid;
 
 /// Unified document type wrapping format-specific backends
@@ -27,7 +27,8 @@ impl Document {
         let handler: Box<dyn FormatHandler> = match format {
             Format::Toml => Box::new(TomlHandler::new()),
             Format::Json => Box::new(JsonHandler::new()),
-            Format::PlainText | Format::Markdown => Box::new(PlainTextHandler::new()),
+            Format::PlainText => Box::new(PlainTextHandler::new()),
+            Format::Markdown => Box::new(MarkdownHandler::new()),
             Format::Yaml => Box::new(YamlHandler::new()),
         };
 
