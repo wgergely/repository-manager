@@ -9,6 +9,7 @@ description = "Content parsing, editing, and diffing for Repository Manager"
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+toml = { workspace = true }
 toml_edit = { workspace = true }
 tree-sitter = { workspace = true }
 tree-sitter-md = { workspace = true }

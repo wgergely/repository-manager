@@ -56,6 +56,7 @@ pub mod edit;
 pub mod error;
 pub mod format;
 pub mod handlers;
+pub mod path;
 
 pub use block::{BlockLocation, ManagedBlock};
 pub use diff::{SemanticChange, SemanticDiff};
