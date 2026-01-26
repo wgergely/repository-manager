@@ -40,6 +40,7 @@ pub mod ledger;
 pub mod mode;
 pub mod sync;
 
+pub use backend::{BranchInfo, ModeBackend, StandardBackend, WorktreeBackend};
 pub use config::{ConfigResolver, Manifest, ResolvedConfig, RuntimeContext};
 pub use error::{Error, Result};
 pub use ledger::{Intent, Ledger, Projection, ProjectionKind};

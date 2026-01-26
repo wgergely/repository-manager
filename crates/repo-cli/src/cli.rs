@@ -1,0 +1,281 @@
+//! CLI argument parsing using clap derive
+
+use clap::{Parser, Subcommand};
+
+/// Repository Manager - Manage tool configurations for your repository
+#[derive(Parser, Debug)]
+#[command(name = "repo")]
+#[command(author, version, about, long_about = None)]
+pub struct Cli {
+    /// Enable verbose output
+    #[arg(short, long, global = true)]
+    pub verbose: bool,
+
+    /// The command to run
+    #[command(subcommand)]
+    pub command: Option<Commands>,
+}
+
+/// Available commands
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum Commands {
+    /// Initialize a new repository configuration
+    Init {
+        /// Repository mode (standard or worktree)
+        #[arg(short, long, default_value = "standard")]
+        mode: String,
+
+        /// Tools to enable
+        #[arg(short, long)]
+        tools: Vec<String>,
+
+        /// Presets to apply
+        #[arg(short, long)]
+        presets: Vec<String>,
+    },
+
+    /// Check repository configuration for drift
+    Check,
+
+    /// Synchronize tool configurations
+    Sync,
+
+    /// Fix configuration drift automatically
+    Fix,
+
+    /// Add a tool to the repository
+    AddTool {
+        /// Name of the tool to add
+        name: String,
+    },
+
+    /// Remove a tool from the repository
+    RemoveTool {
+        /// Name of the tool to remove
+        name: String,
+    },
+
+    /// Add a preset to the repository
+    AddPreset {
+        /// Name of the preset to add
+        name: String,
+    },
+
+    /// Remove a preset from the repository
+    RemovePreset {
+        /// Name of the preset to remove
+        name: String,
+    },
+
+    /// Manage branches (worktree mode)
+    Branch {
+        /// Branch action to perform
+        #[command(subcommand)]
+        action: BranchAction,
+    },
+}
+
+/// Branch management actions
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum BranchAction {
+    /// Add a new branch worktree
+    Add {
+        /// Name of the branch
+        name: String,
+
+        /// Base branch to create from
+        #[arg(short, long, default_value = "main")]
+        base: String,
+    },
+
+    /// Remove a branch worktree
+    Remove {
+        /// Name of the branch to remove
+        name: String,
+    },
+
+    /// List all branch worktrees
+    List,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    #[test]
+    fn verify_cli() {
+        // Verify the CLI is valid
+        Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn parse_no_args() {
+        let cli = Cli::parse_from::<[&str; 0], &str>([]);
+        assert!(!cli.verbose);
+        assert!(cli.command.is_none());
+    }
+
+    #[test]
+    fn parse_verbose_flag() {
+        let cli = Cli::parse_from(["repo", "--verbose"]);
+        assert!(cli.verbose);
+        assert!(cli.command.is_none());
+    }
+
+    #[test]
+    fn parse_short_verbose_flag() {
+        let cli = Cli::parse_from(["repo", "-v"]);
+        assert!(cli.verbose);
+    }
+
+    #[test]
+    fn parse_init_command_defaults() {
+        let cli = Cli::parse_from(["repo", "init"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Init {
+                mode,
+                tools,
+                presets
+            }) if mode == "standard" && tools.is_empty() && presets.is_empty()
+        ));
+    }
+
+    #[test]
+    fn parse_init_command_with_options() {
+        let cli = Cli::parse_from([
+            "repo", "init", "--mode", "worktree", "--tools", "eslint", "--tools", "prettier",
+            "--presets", "typescript",
+        ]);
+        match cli.command {
+            Some(Commands::Init {
+                mode,
+                tools,
+                presets,
+            }) => {
+                assert_eq!(mode, "worktree");
+                assert_eq!(tools, vec!["eslint", "prettier"]);
+                assert_eq!(presets, vec!["typescript"]);
+            }
+            _ => panic!("Expected Init command"),
+        }
+    }
+
+    #[test]
+    fn parse_check_command() {
+        let cli = Cli::parse_from(["repo", "check"]);
+        assert!(matches!(cli.command, Some(Commands::Check)));
+    }
+
+    #[test]
+    fn parse_sync_command() {
+        let cli = Cli::parse_from(["repo", "sync"]);
+        assert!(matches!(cli.command, Some(Commands::Sync)));
+    }
+
+    #[test]
+    fn parse_fix_command() {
+        let cli = Cli::parse_from(["repo", "fix"]);
+        assert!(matches!(cli.command, Some(Commands::Fix)));
+    }
+
+    #[test]
+    fn parse_add_tool_command() {
+        let cli = Cli::parse_from(["repo", "add-tool", "eslint"]);
+        match cli.command {
+            Some(Commands::AddTool { name }) => assert_eq!(name, "eslint"),
+            _ => panic!("Expected AddTool command"),
+        }
+    }
+
+    #[test]
+    fn parse_remove_tool_command() {
+        let cli = Cli::parse_from(["repo", "remove-tool", "eslint"]);
+        match cli.command {
+            Some(Commands::RemoveTool { name }) => assert_eq!(name, "eslint"),
+            _ => panic!("Expected RemoveTool command"),
+        }
+    }
+
+    #[test]
+    fn parse_add_preset_command() {
+        let cli = Cli::parse_from(["repo", "add-preset", "typescript"]);
+        match cli.command {
+            Some(Commands::AddPreset { name }) => assert_eq!(name, "typescript"),
+            _ => panic!("Expected AddPreset command"),
+        }
+    }
+
+    #[test]
+    fn parse_remove_preset_command() {
+        let cli = Cli::parse_from(["repo", "remove-preset", "typescript"]);
+        match cli.command {
+            Some(Commands::RemovePreset { name }) => assert_eq!(name, "typescript"),
+            _ => panic!("Expected RemovePreset command"),
+        }
+    }
+
+    #[test]
+    fn parse_branch_add_command() {
+        let cli = Cli::parse_from(["repo", "branch", "add", "feature-x"]);
+        match cli.command {
+            Some(Commands::Branch {
+                action: BranchAction::Add { name, base },
+            }) => {
+                assert_eq!(name, "feature-x");
+                assert_eq!(base, "main");
+            }
+            _ => panic!("Expected Branch Add command"),
+        }
+    }
+
+    #[test]
+    fn parse_branch_add_with_base() {
+        let cli = Cli::parse_from(["repo", "branch", "add", "feature-x", "--base", "develop"]);
+        match cli.command {
+            Some(Commands::Branch {
+                action: BranchAction::Add { name, base },
+            }) => {
+                assert_eq!(name, "feature-x");
+                assert_eq!(base, "develop");
+            }
+            _ => panic!("Expected Branch Add command"),
+        }
+    }
+
+    #[test]
+    fn parse_branch_remove_command() {
+        let cli = Cli::parse_from(["repo", "branch", "remove", "feature-x"]);
+        match cli.command {
+            Some(Commands::Branch {
+                action: BranchAction::Remove { name },
+            }) => {
+                assert_eq!(name, "feature-x");
+            }
+            _ => panic!("Expected Branch Remove command"),
+        }
+    }
+
+    #[test]
+    fn parse_branch_list_command() {
+        let cli = Cli::parse_from(["repo", "branch", "list"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Branch {
+                action: BranchAction::List
+            })
+        ));
+    }
+
+    #[test]
+    fn verbose_flag_works_with_commands() {
+        let cli = Cli::parse_from(["repo", "-v", "check"]);
+        assert!(cli.verbose);
+        assert!(matches!(cli.command, Some(Commands::Check)));
+
+        let cli = Cli::parse_from(["repo", "check", "--verbose"]);
+        assert!(cli.verbose);
+        assert!(matches!(cli.command, Some(Commands::Check)));
+    }
+}
