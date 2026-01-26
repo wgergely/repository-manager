@@ -60,7 +60,7 @@ impl ManagedBlock {
 }
 
 /// Where to insert a block in a document
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BlockLocation {
     /// Append to end of document
     #[default]
