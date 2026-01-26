@@ -90,7 +90,7 @@ fn test_init_creates_structure() {
 }
 
 #[test]
-fn test_init_default_mode_is_standard() {
+fn test_init_default_mode_is_worktrees() {
     let dir = tempdir().unwrap();
 
     let mut cmd = repo_cmd();
@@ -100,7 +100,10 @@ fn test_init_default_mode_is_standard() {
         .success();
 
     let config_content = fs::read_to_string(dir.path().join(".repository/config.toml")).unwrap();
-    assert!(config_content.contains("mode = \"standard\""));
+    assert!(config_content.contains("mode = \"worktrees\""));
+
+    // Worktrees mode should create main/ directory
+    assert!(dir.path().join("main").exists());
 }
 
 #[test]

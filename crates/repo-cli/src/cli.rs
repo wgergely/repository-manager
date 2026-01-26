@@ -22,7 +22,7 @@ pub enum Commands {
     /// Initialize a new repository configuration
     Init {
         /// Repository mode (standard or worktree)
-        #[arg(short, long, default_value = "standard")]
+        #[arg(short, long, default_value = "worktrees")]
         mode: String,
 
         /// Tools to enable
@@ -146,7 +146,7 @@ mod tests {
                 mode,
                 tools,
                 presets
-            }) if mode == "standard" && tools.is_empty() && presets.is_empty()
+            }) if mode == "worktrees" && tools.is_empty() && presets.is_empty()
         ));
     }
 
