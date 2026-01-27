@@ -5,9 +5,11 @@
 //! known tools (vscode, cursor, claude) and falls back to schema-driven generic
 //! integrations for other tools.
 
+use crate::antigravity::antigravity_integration;
 use crate::claude::claude_integration;
 use crate::cursor::cursor_integration;
 use crate::error::Result;
+use crate::gemini::gemini_integration;
 use crate::generic::GenericToolIntegration;
 use crate::integration::{Rule, SyncContext, ToolIntegration};
 use crate::vscode::VSCodeIntegration;
@@ -56,6 +58,8 @@ impl ToolDispatcher {
             "cursor" => return Some(Box::new(cursor_integration())),
             "claude" => return Some(Box::new(claude_integration())),
             "windsurf" => return Some(Box::new(windsurf_integration())),
+            "antigravity" => return Some(Box::new(antigravity_integration())),
+            "gemini" => return Some(Box::new(gemini_integration())),
             _ => {}
         }
 
@@ -67,8 +71,10 @@ impl ToolDispatcher {
 
     /// Check if a tool is available (built-in or schema-defined).
     pub fn has_tool(&self, tool_name: &str) -> bool {
-        matches!(tool_name, "vscode" | "cursor" | "claude" | "windsurf")
-            || self.schema_tools.contains_key(tool_name)
+        matches!(
+            tool_name,
+            "vscode" | "cursor" | "claude" | "windsurf" | "antigravity" | "gemini"
+        ) || self.schema_tools.contains_key(tool_name)
     }
 
     /// Sync rules to all specified tools.
@@ -99,6 +105,8 @@ impl ToolDispatcher {
             "cursor".to_string(),
             "claude".to_string(),
             "windsurf".to_string(),
+            "antigravity".to_string(),
+            "gemini".to_string(),
         ];
 
         for slug in self.schema_tools.keys() {
@@ -163,6 +171,8 @@ mod tests {
         assert!(dispatcher.get_integration("cursor").is_some());
         assert!(dispatcher.get_integration("claude").is_some());
         assert!(dispatcher.get_integration("windsurf").is_some());
+        assert!(dispatcher.get_integration("antigravity").is_some());
+        assert!(dispatcher.get_integration("gemini").is_some());
     }
 
     #[test]
@@ -174,6 +184,8 @@ mod tests {
         assert!(dispatcher.has_tool("cursor"));
         assert!(dispatcher.has_tool("claude"));
         assert!(dispatcher.has_tool("windsurf"));
+        assert!(dispatcher.has_tool("antigravity"));
+        assert!(dispatcher.has_tool("gemini"));
 
         // Unknown tool
         assert!(!dispatcher.has_tool("zed"));
@@ -216,10 +228,12 @@ mod tests {
         assert!(available.contains(&"cursor".to_string()));
         assert!(available.contains(&"claude".to_string()));
         assert!(available.contains(&"windsurf".to_string()));
+        assert!(available.contains(&"antigravity".to_string()));
+        assert!(available.contains(&"gemini".to_string()));
         assert!(available.contains(&"zed".to_string()));
 
-        // First item should be "claude" (alphabetically first)
-        assert_eq!(available[0], "claude");
+        // First item should be "antigravity" (alphabetically first)
+        assert_eq!(available[0], "antigravity");
     }
 
     #[test]
