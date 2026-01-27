@@ -19,8 +19,8 @@ pub fn detect_mode(root: &NormalizedPath) -> Result<Mode> {
     let resolver = ConfigResolver::new(root.clone());
 
     if !resolver.has_config() {
-        // No config file, default to standard mode
-        return Ok(Mode::Standard);
+        // No config file, default to worktrees mode (per spec)
+        return Ok(Mode::Worktrees);
     }
 
     let config = resolver.resolve()?;
@@ -303,10 +303,10 @@ mode = "{}"
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
 
-        // No config file - should default to standard
+        // No config file - should default to worktrees (per spec)
         let root = NormalizedPath::new(path);
         let mode = detect_mode(&root).unwrap();
-        assert_eq!(mode, Mode::Standard);
+        assert_eq!(mode, Mode::Worktrees);
     }
 
     #[test]

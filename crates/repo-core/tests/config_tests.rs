@@ -64,7 +64,7 @@ config = "strict"
         let toml_content = "";
         let manifest = Manifest::parse(toml_content).expect("Should parse empty TOML");
 
-        assert_eq!(manifest.core.mode, "standard"); // default
+        assert_eq!(manifest.core.mode, "worktrees"); // default per spec
         assert!(manifest.presets.is_empty());
         assert!(manifest.tools.is_empty());
         assert!(manifest.rules.is_empty());
@@ -74,7 +74,7 @@ config = "strict"
     fn test_manifest_empty() {
         let manifest = Manifest::empty();
 
-        assert_eq!(manifest.core.mode, "standard");
+        assert_eq!(manifest.core.mode, "worktrees");
         assert!(manifest.presets.is_empty());
         assert!(manifest.tools.is_empty());
         assert!(manifest.rules.is_empty());
@@ -178,7 +178,7 @@ mod resolver_tests {
         let resolver = ConfigResolver::new(root);
         let config = resolver.resolve().expect("Should resolve with defaults");
 
-        assert_eq!(config.mode, "standard");
+        assert_eq!(config.mode, "worktrees");
         assert!(config.presets.is_empty());
         assert!(config.tools.is_empty());
         assert!(config.rules.is_empty());

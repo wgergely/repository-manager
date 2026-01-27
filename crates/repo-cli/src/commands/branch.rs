@@ -221,11 +221,11 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
 
-        // No config file - should default to standard mode
+        // No config file - should default to worktrees mode (per spec)
         let root = NormalizedPath::new(path);
         let mode = detect_mode(&root).unwrap();
 
-        assert_eq!(mode, Mode::Standard);
+        assert_eq!(mode, Mode::Worktrees);
     }
 
     #[test]
@@ -272,6 +272,15 @@ mod tests {
     fn test_list_branches() {
         let temp = setup_git_repo();
         let path = temp.path();
+
+        // Create config with standard mode (since setup_git_repo creates standard layout)
+        let repo_dir = path.join(".repository");
+        fs::create_dir_all(&repo_dir).unwrap();
+        fs::write(
+            repo_dir.join("config.toml"),
+            "[core]\nmode = \"standard\"\n",
+        )
+        .unwrap();
 
         let result = run_branch_list(path);
         assert!(result.is_ok());

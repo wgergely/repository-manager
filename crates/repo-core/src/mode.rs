@@ -18,7 +18,6 @@ pub enum Mode {
     ///
     /// Branches are managed via `git checkout` and only one branch
     /// can be active at a time.
-    #[default]
     Standard,
 
     /// Container-based layout with multiple worktrees.
@@ -29,6 +28,7 @@ pub enum Mode {
     /// - `{branch}/` - Feature worktrees as sibling directories
     ///
     /// Multiple branches can be worked on simultaneously.
+    #[default]
     Worktrees,
 }
 
@@ -72,6 +72,6 @@ mod tests {
 
     #[test]
     fn test_default() {
-        assert_eq!(Mode::default(), Mode::Standard);
+        assert_eq!(Mode::default(), Mode::Worktrees);
     }
 }
