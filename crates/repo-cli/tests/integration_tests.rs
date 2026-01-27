@@ -136,9 +136,9 @@ fn test_init_with_tools() {
         .stdout(predicate::str::contains("cursor"));
 
     let config_content = fs::read_to_string(dir.path().join(".repository/config.toml")).unwrap();
-    assert!(config_content.contains("[tools]"));
-    assert!(config_content.contains("vscode"));
-    assert!(config_content.contains("cursor"));
+    assert!(config_content.contains("tools = ["));
+    assert!(config_content.contains("\"vscode\""));
+    assert!(config_content.contains("\"cursor\""));
 }
 
 #[test]
@@ -154,9 +154,8 @@ fn test_init_with_presets() {
         .stdout(predicate::str::contains("react"));
 
     let config_content = fs::read_to_string(dir.path().join(".repository/config.toml")).unwrap();
-    assert!(config_content.contains("[presets]"));
-    assert!(config_content.contains("typescript"));
-    assert!(config_content.contains("react"));
+    assert!(config_content.contains("[presets.\"typescript\"]"));
+    assert!(config_content.contains("[presets.\"react\"]"));
 }
 
 #[test]
@@ -175,10 +174,9 @@ fn test_init_with_tools_and_presets() {
         .success();
 
     let config_content = fs::read_to_string(dir.path().join(".repository/config.toml")).unwrap();
-    assert!(config_content.contains("[tools]"));
-    assert!(config_content.contains("eslint"));
-    assert!(config_content.contains("[presets]"));
-    assert!(config_content.contains("typescript"));
+    assert!(config_content.contains("tools = ["));
+    assert!(config_content.contains("\"eslint\""));
+    assert!(config_content.contains("[presets.\"typescript\"]"));
 }
 
 #[test]
@@ -856,4 +854,275 @@ fn test_workflow_remove_tools_and_presets() {
     assert!(config_content.contains("prettier"));
     assert!(!config_content.contains("typescript"));
     assert!(config_content.contains("react"));
+}
+
+// ============================================================================
+// E2E Workflow Tests (Phase 6)
+// ============================================================================
+
+#[test]
+fn test_e2e_init_add_rule_creates_rule_file() {
+    let dir = tempdir().unwrap();
+
+    // 1. Init project with cursor tool
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["init", "--mode", "standard", "--tools", "cursor"])
+        .assert()
+        .success();
+
+    // 2. Add a rule
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["add-rule", "test-rule", "--instruction", "Test instruction for testing"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("test-rule"))
+        .stdout(predicate::str::contains("added"));
+
+    // 3. Verify rule file was created
+    let rule_path = dir.path().join(".repository/rules/test-rule.md");
+    assert!(rule_path.exists(), "Rule file should be created");
+
+    let rule_content = fs::read_to_string(&rule_path).unwrap();
+    assert!(rule_content.contains("Test instruction for testing"));
+}
+
+#[test]
+fn test_e2e_add_rule_with_tags() {
+    let dir = tempdir().unwrap();
+
+    // 1. Init project
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["init", "--mode", "standard"])
+        .assert()
+        .success();
+
+    // 2. Add a rule with tags
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args([
+            "add-rule",
+            "python-style",
+            "--instruction", "Use snake_case for variables",
+            "-t", "python",
+            "-t", "style",
+        ])
+        .assert()
+        .success();
+
+    // 3. Verify rule file contains tags
+    let rule_path = dir.path().join(".repository/rules/python-style.md");
+    assert!(rule_path.exists());
+
+    let rule_content = fs::read_to_string(&rule_path).unwrap();
+    assert!(rule_content.contains("tags: python, style"));
+    assert!(rule_content.contains("snake_case"));
+}
+
+#[test]
+fn test_e2e_list_rules() {
+    let dir = tempdir().unwrap();
+
+    // 1. Init project
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["init", "--mode", "standard"])
+        .assert()
+        .success();
+
+    // 2. Add rules
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["add-rule", "rule-one", "-i", "First rule"])
+        .assert()
+        .success();
+
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["add-rule", "rule-two", "-i", "Second rule"])
+        .assert()
+        .success();
+
+    // 3. List rules
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .arg("list-rules")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("rule-one"))
+        .stdout(predicate::str::contains("rule-two"));
+}
+
+#[test]
+fn test_e2e_remove_rule() {
+    let dir = tempdir().unwrap();
+
+    // 1. Init and add rule
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["init", "--mode", "standard"])
+        .assert()
+        .success();
+
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["add-rule", "temp-rule", "-i", "Temporary rule"])
+        .assert()
+        .success();
+
+    // Verify rule exists
+    assert!(dir.path().join(".repository/rules/temp-rule.md").exists());
+
+    // 2. Remove rule
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["remove-rule", "temp-rule"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("removed"));
+
+    // 3. Verify rule removed
+    assert!(!dir.path().join(".repository/rules/temp-rule.md").exists());
+}
+
+#[test]
+fn test_e2e_backup_on_tool_removal() {
+    let dir = tempdir().unwrap();
+
+    // 1. Init with cursor tool
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["init", "--mode", "standard", "--tools", "cursor"])
+        .assert()
+        .success();
+
+    // 2. Create a .cursorrules file (simulating tool sync having created it)
+    let cursorrules_path = dir.path().join(".cursorrules");
+    fs::write(&cursorrules_path, "# My cursor rules\nOriginal content").unwrap();
+
+    // Verify cursor is in initial config
+    let initial_config = fs::read_to_string(dir.path().join(".repository/config.toml")).unwrap();
+    assert!(initial_config.contains("\"cursor\""), "Initial config should contain cursor");
+
+    // 3. Remove the cursor tool
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["remove-tool", "cursor"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("removed"));
+
+    // 4. Verify tool was removed from config
+    // After removal, cursor should no longer be in the config
+    // (tools line may be omitted entirely if empty, or show tools = [])
+    let config_content = fs::read_to_string(dir.path().join(".repository/config.toml")).unwrap();
+    assert!(
+        !config_content.contains("\"cursor\""),
+        "Config should not contain cursor after removal. Got: {}",
+        config_content
+    );
+
+    // Note: backup is only created if ToolSyncer.remove_tool is called
+    // CLI's remove-tool updates config but doesn't call ToolSyncer backup
+    // This documents the gap for future implementation
+}
+
+#[test]
+fn test_e2e_context_detection_from_subdirectory() {
+    let dir = tempdir().unwrap();
+
+    // 1. Init project
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["init", "--mode", "standard"])
+        .assert()
+        .success();
+
+    // 2. Create a subdirectory
+    let subdir = dir.path().join("src").join("lib");
+    fs::create_dir_all(&subdir).unwrap();
+
+    // 3. Run check from subdirectory - should find repo root
+    let mut cmd = repo_cmd();
+    cmd.current_dir(&subdir)
+        .arg("check")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_e2e_worktree_mode_init() {
+    let dir = tempdir().unwrap();
+
+    // 1. Init in worktree mode
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["init", "--mode", "worktree", "--tools", "cursor", "--tools", "claude"])
+        .assert()
+        .success();
+
+    // 2. Verify structure
+    assert!(dir.path().join(".repository/config.toml").exists());
+    assert!(dir.path().join("main").exists());
+
+    // 3. Verify config content
+    let config_content = fs::read_to_string(dir.path().join(".repository/config.toml")).unwrap();
+    assert!(config_content.contains("mode = \"worktree\""));
+    assert!(config_content.contains("cursor"));
+    assert!(config_content.contains("claude"));
+}
+
+#[test]
+fn test_e2e_full_workflow_multiple_tools() {
+    let dir = tempdir().unwrap();
+
+    // 1. Init with multiple tools
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args([
+            "init",
+            "--mode", "standard",
+            "--tools", "cursor",
+            "--tools", "claude",
+            "--tools", "vscode",
+        ])
+        .assert()
+        .success();
+
+    // 2. Add multiple rules
+    for (id, instruction) in [
+        ("api-design", "Return JSON with data, error, meta fields"),
+        ("code-style", "Use consistent naming conventions"),
+        ("testing", "Write unit tests for all public functions"),
+    ] {
+        let mut cmd = repo_cmd();
+        cmd.current_dir(dir.path())
+            .args(["add-rule", id, "-i", instruction])
+            .assert()
+            .success();
+    }
+
+    // 3. Check status
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .arg("check")
+        .assert()
+        .success();
+
+    // 4. Sync
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .arg("sync")
+        .assert()
+        .success();
+
+    // 5. Verify ledger created
+    assert!(dir.path().join(".repository/ledger.toml").exists());
+
+    // 6. Verify rules exist
+    assert!(dir.path().join(".repository/rules/api-design.md").exists());
+    assert!(dir.path().join(".repository/rules/code-style.md").exists());
+    assert!(dir.path().join(".repository/rules/testing.md").exists());
 }

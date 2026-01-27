@@ -153,28 +153,34 @@ pub fn init_repository(
 }
 
 /// Generate the config.toml content
+///
+/// Generates config in the Manifest format (top-level tools and presets arrays):
+/// ```toml
+/// tools = ["cursor", "claude"]
+///
+/// [core]
+/// mode = "standard"
+///
+/// [presets."env:python"]
+/// version = "3.12"
+/// ```
 pub fn generate_config(mode: &str, tools: &[String], presets: &[String]) -> String {
     let mut config = String::new();
 
+    // tools array at top level (before [core] section)
+    let tools_arr: Vec<String> = tools.iter().map(|t| format!("\"{}\"", t)).collect();
+    config.push_str(&format!("tools = [{}]\n", tools_arr.join(", ")));
+
     // [core] section
+    config.push('\n');
     config.push_str("[core]\n");
     config.push_str(&format!("mode = \"{}\"\n", mode));
 
-    // Add tools if present
-    if !tools.is_empty() {
-        config.push('\n');
-        config.push_str("[tools]\n");
-        for tool in tools {
-            config.push_str(&format!("{} = {{}}\n", tool));
-        }
-    }
-
-    // Add presets if present
+    // [presets] section with each preset as a table
     if !presets.is_empty() {
-        config.push('\n');
-        config.push_str("[presets]\n");
         for preset in presets {
-            config.push_str(&format!("{} = {{}}\n", preset));
+            config.push('\n');
+            config.push_str(&format!("[presets.\"{}\"]\n", preset));
         }
     }
 
@@ -340,12 +346,12 @@ mod tests {
         let result = init_repository(path, "standard", &tools, &[]);
         assert!(result.is_ok());
 
-        // Verify tools in config
+        // Verify tools in config using top-level array format
         let config_path = path.join(".repository").join("config.toml");
         let config_content = std::fs::read_to_string(&config_path).unwrap();
-        assert!(config_content.contains("[tools]"));
-        assert!(config_content.contains("eslint = {}"));
-        assert!(config_content.contains("prettier = {}"));
+        assert!(config_content.contains("tools = ["));
+        assert!(config_content.contains("\"eslint\""));
+        assert!(config_content.contains("\"prettier\""));
     }
 
     #[test]
@@ -357,44 +363,40 @@ mod tests {
         let result = init_repository(path, "standard", &[], &presets);
         assert!(result.is_ok());
 
-        // Verify presets in config
+        // Verify presets in config using [presets.X] section format
         let config_path = path.join(".repository").join("config.toml");
         let config_content = std::fs::read_to_string(&config_path).unwrap();
-        assert!(config_content.contains("[presets]"));
-        assert!(config_content.contains("typescript = {}"));
-        assert!(config_content.contains("react = {}"));
+        assert!(config_content.contains("[presets.\"typescript\"]"));
+        assert!(config_content.contains("[presets.\"react\"]"));
     }
 
     #[test]
     fn test_generate_config() {
-        // Test basic config
+        // Test basic config (always has tools array)
         let config = generate_config("standard", &[], &[]);
-        assert_eq!(config, "[core]\nmode = \"standard\"\n");
+        assert!(config.contains("tools = []"));
+        assert!(config.contains("[core]\nmode = \"standard\"\n"));
 
         // Test with tools
         let tools = vec!["eslint".to_string()];
         let config = generate_config("standard", &tools, &[]);
         assert!(config.contains("[core]\nmode = \"standard\"\n"));
-        assert!(config.contains("[tools]\n"));
-        assert!(config.contains("eslint = {}"));
+        assert!(config.contains("tools = [\"eslint\"]"));
 
         // Test with presets
         let presets = vec!["typescript".to_string()];
         let config = generate_config("standard", &[], &presets);
         assert!(config.contains("[core]\nmode = \"standard\"\n"));
-        assert!(config.contains("[presets]\n"));
-        assert!(config.contains("typescript = {}"));
+        assert!(config.contains("[presets.\"typescript\"]"));
 
         // Test with both tools and presets
         let tools = vec!["eslint".to_string(), "prettier".to_string()];
         let presets = vec!["typescript".to_string()];
         let config = generate_config("worktree", &tools, &presets);
         assert!(config.contains("[core]\nmode = \"worktree\"\n"));
-        assert!(config.contains("[tools]\n"));
-        assert!(config.contains("eslint = {}"));
-        assert!(config.contains("prettier = {}"));
-        assert!(config.contains("[presets]\n"));
-        assert!(config.contains("typescript = {}"));
+        assert!(config.contains("\"eslint\""));
+        assert!(config.contains("\"prettier\""));
+        assert!(config.contains("[presets.\"typescript\"]"));
     }
 
     #[test]
