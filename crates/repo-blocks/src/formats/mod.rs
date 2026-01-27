@@ -4,6 +4,8 @@
 //! the `FormatHandler` trait for parsing and writing managed blocks.
 
 pub mod json;
+pub mod toml;
+pub mod yaml;
 
 use uuid::Uuid;
 
@@ -44,3 +46,5 @@ pub trait FormatHandler: Send + Sync {
 }
 
 pub use json::JsonFormatHandler;
+pub use toml::TomlFormatHandler;
+pub use yaml::YamlFormatHandler;
