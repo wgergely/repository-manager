@@ -12,21 +12,11 @@ use crate::projection::{compute_checksum, ProjectionWriter};
 use crate::rules::RuleRegistry;
 use crate::Result;
 use repo_fs::NormalizedPath;
-use std::fs;
 use std::path::PathBuf;
 
-/// A loaded rule file (legacy format from markdown files)
+/// A rule loaded from the registry with UUID for block markers
 #[derive(Debug, Clone)]
 pub struct RuleFile {
-    /// The rule identifier (filename without extension)
-    pub id: String,
-    /// The content of the rule file
-    pub content: String,
-}
-
-/// A rule loaded from the registry (preferred format with UUID)
-#[derive(Debug, Clone)]
-pub struct RegistryRule {
     /// UUID for the rule (used as block marker)
     pub uuid: uuid::Uuid,
     /// Human-readable identifier
@@ -37,8 +27,8 @@ pub struct RegistryRule {
 
 /// Synchronizes rules to tool configurations
 ///
-/// The `RuleSyncer` reads rule files from `.repository/rules/` and
-/// combines them into tool-specific configuration files like `.cursorrules`.
+/// The `RuleSyncer` reads rules from the central registry and
+/// writes them to tool-specific configuration files like `.cursorrules`.
 pub struct RuleSyncer {
     /// Root path for the repository
     root: NormalizedPath,
@@ -60,12 +50,12 @@ impl RuleSyncer {
     /// Load all rules from the rule registry
     ///
     /// Reads rules from `.repository/rules/registry.toml` and returns them
-    /// as `RegistryRule` structs with UUIDs for block markers.
+    /// as `RuleFile` structs with UUIDs for block markers.
     ///
     /// # Returns
     ///
-    /// A vector of `RegistryRule` structs, empty if the registry doesn't exist.
-    pub fn load_registry_rules(&self) -> Result<Vec<RegistryRule>> {
+    /// A vector of `RuleFile` structs, empty if the registry doesn't exist.
+    pub fn load_rules(&self) -> Result<Vec<RuleFile>> {
         let registry_path = self.root.join(".repository/rules/registry.toml");
         let native_path = registry_path.to_native();
 
@@ -74,10 +64,10 @@ impl RuleSyncer {
         }
 
         let registry = RuleRegistry::load(native_path)?;
-        let mut rules: Vec<RegistryRule> = registry
+        let mut rules: Vec<RuleFile> = registry
             .all_rules()
             .iter()
-            .map(|r| RegistryRule {
+            .map(|r| RuleFile {
                 uuid: r.uuid,
                 id: r.id.clone(),
                 content: r.content.clone(),
@@ -90,51 +80,13 @@ impl RuleSyncer {
         Ok(rules)
     }
 
-    /// Load all rules from the rules directory (legacy format)
-    ///
-    /// Reads all `.md` files from `.repository/rules/` and returns them
-    /// as `RuleFile` structs sorted by filename.
-    ///
-    /// # Returns
-    ///
-    /// A vector of `RuleFile` structs, empty if the rules directory doesn't exist.
-    pub fn load_rules(&self) -> Result<Vec<RuleFile>> {
-        let rules_dir = self.root.join(".repository/rules");
-        let native_path = rules_dir.to_native();
-
-        if !native_path.exists() {
-            return Ok(Vec::new());
-        }
-
-        let mut rules = Vec::new();
-        for entry in fs::read_dir(&native_path)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.extension().is_some_and(|e| e == "md") {
-                let id = path
-                    .file_stem()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string();
-                let content = fs::read_to_string(&path)?;
-                rules.push(RuleFile { id, content });
-            }
-        }
-
-        // Sort by ID for consistent output
-        rules.sort_by(|a, b| a.id.cmp(&b.id));
-
-        Ok(rules)
-    }
-
     /// Sync all rules to applicable tool configurations
     ///
     /// This method:
     /// 1. Loads all rules from the rule registry (`.repository/rules/registry.toml`)
-    /// 2. Falls back to legacy markdown files if registry is empty
-    /// 3. Combines rules into content with UUID-based block markers
-    /// 4. Writes to each tool's rules file (e.g., `.cursorrules`)
-    /// 5. Updates the ledger with the projection
+    /// 2. Combines rules into content with UUID-based block markers
+    /// 3. Writes to each tool's rules file (e.g., `.cursorrules`)
+    /// 4. Updates the ledger with the projection
     ///
     /// # Arguments
     ///
@@ -147,23 +99,13 @@ impl RuleSyncer {
     pub fn sync_rules(&self, tools: &[String], ledger: &mut Ledger) -> Result<Vec<String>> {
         let mut actions = Vec::new();
 
-        // Try to load from registry first (preferred)
-        let registry_rules = self.load_registry_rules()?;
+        let rules = self.load_rules()?;
+        if rules.is_empty() {
+            actions.push("No rules found in registry".to_string());
+            return Ok(actions);
+        }
 
-        // Determine combined content based on available rules
-        let combined_rules = if !registry_rules.is_empty() {
-            // Use registry rules with UUID markers
-            self.combine_registry_rules(&registry_rules)
-        } else {
-            // Fall back to legacy markdown files
-            let legacy_rules = self.load_rules()?;
-            if legacy_rules.is_empty() {
-                actions.push("No rules found in .repository/rules/".to_string());
-                return Ok(actions);
-            }
-            self.combine_rules(&legacy_rules)
-        };
-
+        let combined_rules = self.combine_rules(&rules);
         let writer = ProjectionWriter::new(self.root.clone(), self.dry_run);
 
         // Apply rules to each applicable tool
@@ -233,7 +175,7 @@ impl RuleSyncer {
     ///
     /// Returns the path to the rules file for the tool, or None if the tool
     /// doesn't support rules files.
-    fn get_rules_file_for_tool(&self, tool: &str) -> Option<String> {
+    pub fn get_rules_file_for_tool(&self, tool: &str) -> Option<String> {
         match tool {
             "cursor" => Some(".cursorrules".to_string()),
             // Claude uses CLAUDE.md which we don't manage through rules yet
@@ -244,7 +186,7 @@ impl RuleSyncer {
         }
     }
 
-    /// Combine multiple registry rules into a single content block with UUID markers
+    /// Combine multiple rules into a single content block with UUID markers
     ///
     /// Each rule is wrapped in managed block markers using its UUID,
     /// enabling bidirectional traceability between registry and output.
@@ -256,7 +198,7 @@ impl RuleSyncer {
     /// rule content
     /// <!-- /repo:block:UUID -->
     /// ```
-    fn combine_registry_rules(&self, rules: &[RegistryRule]) -> String {
+    pub fn combine_rules(&self, rules: &[RuleFile]) -> String {
         let header = "# Repository Rules\n\n\
             # This file is auto-generated by repository-manager.\n\
             # Do not edit directly - modify rules in .repository/rules/registry.toml instead.\n";
@@ -274,30 +216,21 @@ impl RuleSyncer {
 
         format!("{}\n\n{}", header, rule_content)
     }
-
-    /// Combine multiple rules into a single content block (legacy format)
-    ///
-    /// Each rule is formatted with its ID as a header and separated by
-    /// horizontal rules for readability.
-    fn combine_rules(&self, rules: &[RuleFile]) -> String {
-        let header = "# Repository Rules\n\n\
-            # This file is auto-generated by repository-manager.\n\
-            # Do not edit directly - modify rules in .repository/rules/ instead.\n";
-
-        let rule_content = rules
-            .iter()
-            .map(|r| format!("## {}\n\n{}", r.id, r.content.trim()))
-            .collect::<Vec<_>>()
-            .join("\n\n---\n\n");
-
-        format!("{}\n\n{}", header, rule_content)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rules::RuleRegistry;
+    use std::fs;
     use tempfile::tempdir;
+
+    fn setup_registry(dir: &std::path::Path) -> RuleRegistry {
+        let rules_dir = dir.join(".repository/rules");
+        fs::create_dir_all(&rules_dir).unwrap();
+        let registry_path = rules_dir.join("registry.toml");
+        RuleRegistry::new(registry_path)
+    }
 
     #[test]
     fn test_rule_syncer_new() {
@@ -326,16 +259,18 @@ mod tests {
     }
 
     #[test]
-    fn test_load_rules_finds_md_files() {
+    fn test_load_rules_finds_registry_rules() {
         let dir = tempdir().unwrap();
         let root = NormalizedPath::new(dir.path());
 
-        // Create rules directory and files
-        let rules_dir = dir.path().join(".repository/rules");
-        fs::create_dir_all(&rules_dir).unwrap();
-        fs::write(rules_dir.join("code-style.md"), "Use 4 spaces").unwrap();
-        fs::write(rules_dir.join("naming.md"), "Use snake_case").unwrap();
-        fs::write(rules_dir.join("ignore.txt"), "Not a rule").unwrap();
+        // Create registry with rules
+        let mut registry = setup_registry(dir.path());
+        registry
+            .add_rule("code-style", "Use 4 spaces", vec![])
+            .unwrap();
+        registry
+            .add_rule("naming", "Use snake_case", vec![])
+            .unwrap();
 
         let syncer = RuleSyncer::new(root, false);
         let rules = syncer.load_rules().unwrap();
@@ -344,6 +279,9 @@ mod tests {
         // Should be sorted alphabetically
         assert_eq!(rules[0].id, "code-style");
         assert_eq!(rules[1].id, "naming");
+        // Should have UUIDs
+        assert!(!rules[0].uuid.is_nil());
+        assert!(!rules[1].uuid.is_nil());
     }
 
     #[test]
@@ -352,12 +290,17 @@ mod tests {
         let root = NormalizedPath::new(dir.path());
         let syncer = RuleSyncer::new(root, false);
 
+        let uuid1 = uuid::Uuid::new_v4();
+        let uuid2 = uuid::Uuid::new_v4();
+
         let rules = vec![
             RuleFile {
+                uuid: uuid1,
                 id: "style".to_string(),
                 content: "Use consistent formatting".to_string(),
             },
             RuleFile {
+                uuid: uuid2,
                 id: "naming".to_string(),
                 content: "Use descriptive names".to_string(),
             },
@@ -370,6 +313,8 @@ mod tests {
         assert!(combined.contains("## naming"));
         assert!(combined.contains("Use consistent formatting"));
         assert!(combined.contains("Use descriptive names"));
+        assert!(combined.contains(&format!("<!-- repo:block:{} -->", uuid1)));
+        assert!(combined.contains(&format!("<!-- /repo:block:{} -->", uuid1)));
         assert!(combined.contains("---"));
     }
 
@@ -407,10 +352,12 @@ mod tests {
         let dir = tempdir().unwrap();
         let root = NormalizedPath::new(dir.path());
 
-        // Create rules directory and files
-        let rules_dir = dir.path().join(".repository/rules");
-        fs::create_dir_all(&rules_dir).unwrap();
-        fs::write(rules_dir.join("code-style.md"), "Use 4 spaces").unwrap();
+        // Create registry with rule
+        let mut registry = setup_registry(dir.path());
+        let rule_uuid = registry
+            .add_rule("code-style", "Use 4 spaces", vec![])
+            .unwrap()
+            .uuid;
 
         let syncer = RuleSyncer::new(root.clone(), false);
         let mut ledger = Ledger::new();
@@ -427,9 +374,10 @@ mod tests {
         let cursorrules = root.join(".cursorrules");
         assert!(cursorrules.exists());
 
-        // Content should include the rule
+        // Content should include the rule and UUID
         let content = fs::read_to_string(cursorrules.as_ref()).unwrap();
         assert!(content.contains("Use 4 spaces"));
+        assert!(content.contains(&rule_uuid.to_string()));
     }
 
     #[test]
@@ -437,10 +385,11 @@ mod tests {
         let dir = tempdir().unwrap();
         let root = NormalizedPath::new(dir.path());
 
-        // Create rules directory and files
-        let rules_dir = dir.path().join(".repository/rules");
-        fs::create_dir_all(&rules_dir).unwrap();
-        fs::write(rules_dir.join("code-style.md"), "Use 4 spaces").unwrap();
+        // Create registry with rule
+        let mut registry = setup_registry(dir.path());
+        registry
+            .add_rule("code-style", "Use 4 spaces", vec![])
+            .unwrap();
 
         let syncer = RuleSyncer::new(root.clone(), true);
         let mut ledger = Ledger::new();
@@ -462,10 +411,12 @@ mod tests {
         let dir = tempdir().unwrap();
         let root = NormalizedPath::new(dir.path());
 
-        // Create rules directory and files
-        let rules_dir = dir.path().join(".repository/rules");
-        fs::create_dir_all(&rules_dir).unwrap();
-        fs::write(rules_dir.join("code-style.md"), "Use 4 spaces").unwrap();
+        // Create registry with rule
+        let mut registry = setup_registry(dir.path());
+        let rule = registry
+            .add_rule("code-style", "Use 4 spaces", vec![])
+            .unwrap();
+        let rule_uuid = rule.uuid;
 
         let syncer = RuleSyncer::new(root.clone(), false);
         let mut ledger = Ledger::new();
@@ -473,19 +424,23 @@ mod tests {
 
         // First sync
         syncer.sync_rules(&tools, &mut ledger).unwrap();
-        let original_uuid = ledger.intents()[0].uuid;
+        let original_intent_uuid = ledger.intents()[0].uuid;
 
-        // Modify the rule
-        fs::write(rules_dir.join("code-style.md"), "Use 2 spaces").unwrap();
+        // Modify the rule in registry
+        registry.update_rule(rule_uuid, "Use 2 spaces").unwrap();
 
         // Second sync should update
         let actions = syncer.sync_rules(&tools, &mut ledger).unwrap();
 
-        assert!(actions.iter().any(|a| a.contains("Created") || a.contains("Updated")));
+        assert!(
+            actions
+                .iter()
+                .any(|a| a.contains("Created") || a.contains("Updated"))
+        );
         // Should still have one intent (old removed, new added)
         assert_eq!(ledger.intents().len(), 1);
-        // UUID should be different (new intent)
-        assert_ne!(ledger.intents()[0].uuid, original_uuid);
+        // Intent UUID should be different (new intent)
+        assert_ne!(ledger.intents()[0].uuid, original_intent_uuid);
 
         // Content should have new value
         let content = fs::read_to_string(root.join(".cursorrules").as_ref()).unwrap();
@@ -497,10 +452,11 @@ mod tests {
         let dir = tempdir().unwrap();
         let root = NormalizedPath::new(dir.path());
 
-        // Create rules directory and files
-        let rules_dir = dir.path().join(".repository/rules");
-        fs::create_dir_all(&rules_dir).unwrap();
-        fs::write(rules_dir.join("code-style.md"), "Use 4 spaces").unwrap();
+        // Create registry with rule
+        let mut registry = setup_registry(dir.path());
+        registry
+            .add_rule("code-style", "Use 4 spaces", vec![])
+            .unwrap();
 
         let syncer = RuleSyncer::new(root, false);
         let mut ledger = Ledger::new();
@@ -523,10 +479,11 @@ mod tests {
         let dir = tempdir().unwrap();
         let root = NormalizedPath::new(dir.path());
 
-        // Create rules directory and files
-        let rules_dir = dir.path().join(".repository/rules");
-        fs::create_dir_all(&rules_dir).unwrap();
-        fs::write(rules_dir.join("code-style.md"), "Use 4 spaces").unwrap();
+        // Create registry with rule
+        let mut registry = setup_registry(dir.path());
+        registry
+            .add_rule("code-style", "Use 4 spaces", vec![])
+            .unwrap();
 
         let syncer = RuleSyncer::new(root, false);
         let mut ledger = Ledger::new();
