@@ -4,10 +4,11 @@ use std::sync::OnceLock;
 
 use crate::{
     Error, Result,
+    helpers,
     naming::{NamingStrategy, branch_to_directory},
     provider::{LayoutProvider, WorktreeInfo},
 };
-use git2::{BranchType, Repository, WorktreeAddOptions, WorktreePruneOptions};
+use git2::{BranchType, MergeOptions, Repository};
 use repo_fs::NormalizedPath;
 
 /// Container layout with `.gt/` database and sibling worktrees.
@@ -116,31 +117,12 @@ impl LayoutProvider for ContainerLayout {
             });
         }
 
-        // Get the commit to base the new branch on
-        let base_commit = match base {
-            Some(base_name) => {
-                let branch = repo
-                    .find_branch(base_name, BranchType::Local)
-                    .map_err(|_| Error::BranchNotFound {
-                        name: base_name.to_string(),
-                    })?;
-                branch.get().peel_to_commit()?
-            }
-            None => {
-                let head = repo.head()?;
-                head.peel_to_commit()?
-            }
-        };
-
-        // Create a new branch for the feature worktree
-        let new_branch = repo.branch(&dir_name, &base_commit, false)?;
-        let new_branch_ref = new_branch.into_reference();
-
-        // Create worktree with the new branch
-        let mut opts = WorktreeAddOptions::new();
-        opts.reference(Some(&new_branch_ref));
-
-        repo.worktree(&dir_name, worktree_path.to_native().as_path(), Some(&opts))?;
+        helpers::create_worktree_with_branch(
+            repo,
+            worktree_path.to_native().as_path(),
+            &dir_name,
+            base,
+        )?;
 
         Ok(worktree_path)
     }
@@ -150,43 +132,169 @@ impl LayoutProvider for ContainerLayout {
         let repo = self.open_repo()?;
         let dir_name = branch_to_directory(name, self.naming);
 
-        // Find and remove worktree
-        let wt = repo
-            .find_worktree(&dir_name)
-            .map_err(|_| Error::WorktreeNotFound {
-                name: name.to_string(),
-            })?;
-
-        // Configure prune options to remove valid worktrees and their directories
-        let mut prune_opts = WorktreePruneOptions::new();
-        prune_opts.valid(true); // Allow pruning valid (existing) worktrees
-        prune_opts.working_tree(true); // Also remove the working tree directory
-
-        // Prune the worktree (removes directory and git references)
-        wt.prune(Some(&mut prune_opts))?;
-
-        // Also try to delete the branch
-        if let Ok(mut branch) = repo.find_branch(&dir_name, BranchType::Local)
-            && let Err(e) = branch.delete()
-        {
-            tracing::warn!(
-                branch = %dir_name,
-                error = %e,
-                "Failed to delete branch after worktree removal"
-            );
-        }
-
-        Ok(())
+        helpers::remove_worktree_and_branch(repo, &dir_name)
     }
 
     fn current_branch(&self) -> Result<String> {
         let repo = self.open_repo()?;
-        let head = repo.head()?;
+        helpers::get_current_branch(repo)
+    }
 
-        if head.is_branch() {
-            Ok(head.shorthand().unwrap_or("HEAD").to_string())
-        } else {
-            Ok("HEAD".to_string())
+    fn push(&self, remote: Option<&str>, branch: Option<&str>) -> Result<()> {
+        let repo = self.open_repo()?;
+        let remote_name = remote.unwrap_or("origin");
+        let branch_name = match branch {
+            Some(b) => b.to_string(),
+            None => self.current_branch()?,
+        };
+
+        let mut remote = repo.find_remote(remote_name).map_err(|_| Error::RemoteNotFound {
+            name: remote_name.to_string(),
+        })?;
+
+        let refspec = format!("refs/heads/{}:refs/heads/{}", branch_name, branch_name);
+
+        // Push using default options (relies on credential helpers)
+        remote.push(&[&refspec], None).map_err(|e| Error::PushFailed {
+            message: e.message().to_string(),
+        })?;
+
+        Ok(())
+    }
+
+    fn pull(&self, remote: Option<&str>, branch: Option<&str>) -> Result<()> {
+        let repo = self.open_repo()?;
+        let remote_name = remote.unwrap_or("origin");
+        let branch_name = match branch {
+            Some(b) => b.to_string(),
+            None => self.current_branch()?,
+        };
+
+        // Fetch from remote
+        let mut remote = repo.find_remote(remote_name).map_err(|_| Error::RemoteNotFound {
+            name: remote_name.to_string(),
+        })?;
+
+        remote
+            .fetch(&[&branch_name], None, None)
+            .map_err(|e| Error::PullFailed {
+                message: format!("Fetch failed: {}", e.message()),
+            })?;
+
+        // Get FETCH_HEAD
+        let fetch_head = repo.find_reference("FETCH_HEAD").map_err(|e| Error::PullFailed {
+            message: format!("Could not find FETCH_HEAD: {}", e.message()),
+        })?;
+
+        let fetch_commit = fetch_head.peel_to_commit().map_err(|e| Error::PullFailed {
+            message: format!("Could not resolve FETCH_HEAD: {}", e.message()),
+        })?;
+
+        // Get current HEAD commit
+        let head = repo.head()?;
+        let head_commit = head.peel_to_commit()?;
+
+        // Check if we can fast-forward
+        let (merge_analysis, _) = repo.merge_analysis(&[&repo.find_annotated_commit(fetch_commit.id())?])?;
+
+        if merge_analysis.is_up_to_date() {
+            // Already up to date
+            return Ok(());
         }
+
+        if merge_analysis.is_fast_forward() {
+            // Fast-forward merge
+            let refname = format!("refs/heads/{}", branch_name);
+            let mut reference = repo.find_reference(&refname)?;
+            reference.set_target(fetch_commit.id(), &format!("pull: fast-forward to {}", fetch_commit.id()))?;
+
+            // Update working directory in main worktree
+            let main_repo = Repository::open(self.main_dir.to_native())?;
+            main_repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
+            return Ok(());
+        }
+
+        // Cannot fast-forward
+        Err(Error::CannotFastForward {
+            message: format!(
+                "Cannot fast-forward {} from {} to {}. Manual merge required.",
+                branch_name,
+                head_commit.id(),
+                fetch_commit.id()
+            ),
+        })
+    }
+
+    fn merge(&self, source: &str) -> Result<()> {
+        let repo = self.open_repo()?;
+
+        // Find the source branch
+        let source_branch = repo
+            .find_branch(source, BranchType::Local)
+            .map_err(|_| Error::BranchNotFound {
+                name: source.to_string(),
+            })?;
+
+        let source_commit = source_branch.get().peel_to_commit()?;
+        let annotated_commit = repo.find_annotated_commit(source_commit.id())?;
+
+        // Analyze what kind of merge we can do
+        let (merge_analysis, _) = repo.merge_analysis(&[&annotated_commit])?;
+
+        if merge_analysis.is_up_to_date() {
+            // Nothing to do
+            return Ok(());
+        }
+
+        if merge_analysis.is_fast_forward() {
+            // Fast-forward merge
+            let current_branch = self.current_branch()?;
+            let refname = format!("refs/heads/{}", current_branch);
+            let mut reference = repo.find_reference(&refname)?;
+            reference.set_target(source_commit.id(), &format!("merge {}: fast-forward", source))?;
+
+            // Update working directory in main worktree
+            let main_repo = Repository::open(self.main_dir.to_native())?;
+            main_repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
+            return Ok(());
+        }
+
+        // Normal merge required - need to work in the main worktree for merge operations
+        let main_repo = Repository::open(self.main_dir.to_native())?;
+
+        let mut merge_opts = MergeOptions::new();
+        main_repo.merge(&[&main_repo.find_annotated_commit(source_commit.id())?], Some(&mut merge_opts), None)?;
+
+        // Check for conflicts
+        let mut index = main_repo.index()?;
+        if index.has_conflicts() {
+            // Clean up merge state
+            main_repo.cleanup_state()?;
+            return Err(Error::MergeConflict {
+                message: format!("Merge of '{}' resulted in conflicts", source),
+            });
+        }
+
+        // Create merge commit
+        let signature = main_repo.signature()?;
+        let tree_id = index.write_tree()?;
+        let tree = main_repo.find_tree(tree_id)?;
+        let head_commit = main_repo.head()?.peel_to_commit()?;
+        let source_commit_in_main = main_repo.find_commit(source_commit.id())?;
+
+        let message = format!("Merge branch '{}'", source);
+        main_repo.commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            &message,
+            &tree,
+            &[&head_commit, &source_commit_in_main],
+        )?;
+
+        // Clean up merge state
+        main_repo.cleanup_state()?;
+
+        Ok(())
     }
 }
