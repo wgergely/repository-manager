@@ -9,7 +9,27 @@ use colored::Colorize;
 use repo_core::{CheckStatus, ConfigResolver, Mode, SyncEngine, SyncOptions};
 use repo_fs::NormalizedPath;
 
+use crate::context::{detect_context, RepoContext};
 use crate::error::{CliError, Result};
+
+/// Resolve the repository root from any path within the repo
+///
+/// Uses context detection to find the correct root:
+/// - In worktrees mode: returns container root
+/// - In standard mode: returns repo root
+/// - Not in a repo: returns error
+pub fn resolve_root(path: &Path) -> Result<NormalizedPath> {
+    let context = detect_context(path);
+
+    match context {
+        RepoContext::ContainerRoot { path } => Ok(NormalizedPath::new(&path)),
+        RepoContext::Worktree { container, .. } => Ok(NormalizedPath::new(&container)),
+        RepoContext::StandardRepo { path } => Ok(NormalizedPath::new(&path)),
+        RepoContext::NotARepo => Err(CliError::user(
+            "Not in a repository. Run 'repo init' to create one.",
+        )),
+    }
+}
 
 /// Detect the repository mode from config.toml
 ///
@@ -40,7 +60,7 @@ pub fn run_check(path: &Path) -> Result<()> {
         "=>".blue().bold()
     );
 
-    let root = NormalizedPath::new(path);
+    let root = resolve_root(path)?;
     let mode = detect_mode(&root)?;
     let engine = SyncEngine::new(root, mode)?;
 
@@ -129,7 +149,7 @@ pub fn run_sync(path: &Path, dry_run: bool) -> Result<()> {
         );
     }
 
-    let root = NormalizedPath::new(path);
+    let root = resolve_root(path)?;
     let mode = detect_mode(&root)?;
     let engine = SyncEngine::new(root, mode)?;
 
@@ -173,7 +193,7 @@ pub fn run_fix(path: &Path, dry_run: bool) -> Result<()> {
         );
     }
 
-    let root = NormalizedPath::new(path);
+    let root = resolve_root(path)?;
     let mode = detect_mode(&root)?;
     let engine = SyncEngine::new(root, mode)?;
 
@@ -346,5 +366,70 @@ mode = "{}"
         // Fix in dry-run mode should complete successfully
         let result = run_fix(path, true);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_resolve_root_standard_repo() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path();
+
+        create_minimal_repo(path, "standard");
+
+        // From root should return root
+        let root = resolve_root(path).unwrap();
+        assert_eq!(root.as_ref(), path);
+    }
+
+    #[test]
+    fn test_resolve_root_worktrees_container() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path();
+
+        // Create worktrees mode config
+        let repo_dir = path.join(".repository");
+        fs::create_dir_all(&repo_dir).unwrap();
+        fs::write(
+            repo_dir.join("config.toml"),
+            "[core]\nmode = \"worktrees\"\n",
+        )
+        .unwrap();
+
+        // From container root should return container root
+        let root = resolve_root(path).unwrap();
+        assert_eq!(root.as_ref(), path);
+    }
+
+    #[test]
+    fn test_resolve_root_from_worktree() {
+        let temp_dir = TempDir::new().unwrap();
+        let container = temp_dir.path();
+
+        // Create worktrees mode config at container root
+        let repo_dir = container.join(".repository");
+        fs::create_dir_all(&repo_dir).unwrap();
+        fs::write(
+            repo_dir.join("config.toml"),
+            "[core]\nmode = \"worktrees\"\n",
+        )
+        .unwrap();
+
+        // Create a worktree directory
+        let worktree = container.join("feature-branch");
+        let nested = worktree.join("src");
+        fs::create_dir_all(&nested).unwrap();
+
+        // From nested inside worktree should return container root
+        let root = resolve_root(&nested).unwrap();
+        assert_eq!(root.as_ref(), container);
+    }
+
+    #[test]
+    fn test_resolve_root_not_a_repo() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path();
+
+        // No .repository directory - should error
+        let result = resolve_root(path);
+        assert!(result.is_err());
     }
 }
