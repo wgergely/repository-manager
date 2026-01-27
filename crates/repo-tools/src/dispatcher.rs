@@ -11,6 +11,7 @@ use crate::error::Result;
 use crate::generic::GenericToolIntegration;
 use crate::integration::{Rule, SyncContext, ToolIntegration};
 use crate::vscode::VSCodeIntegration;
+use crate::windsurf::windsurf_integration;
 use repo_meta::schema::ToolDefinition;
 use std::collections::HashMap;
 
@@ -54,6 +55,7 @@ impl ToolDispatcher {
             "vscode" => return Some(Box::new(VSCodeIntegration::new())),
             "cursor" => return Some(Box::new(cursor_integration())),
             "claude" => return Some(Box::new(claude_integration())),
+            "windsurf" => return Some(Box::new(windsurf_integration())),
             _ => {}
         }
 
@@ -65,7 +67,7 @@ impl ToolDispatcher {
 
     /// Check if a tool is available (built-in or schema-defined).
     pub fn has_tool(&self, tool_name: &str) -> bool {
-        matches!(tool_name, "vscode" | "cursor" | "claude")
+        matches!(tool_name, "vscode" | "cursor" | "claude" | "windsurf")
             || self.schema_tools.contains_key(tool_name)
     }
 
@@ -96,6 +98,7 @@ impl ToolDispatcher {
             "vscode".to_string(),
             "cursor".to_string(),
             "claude".to_string(),
+            "windsurf".to_string(),
         ];
 
         for slug in self.schema_tools.keys() {
@@ -125,21 +128,21 @@ mod tests {
     use super::*;
     use repo_meta::schema::{ConfigType, ToolCapabilities, ToolIntegrationConfig, ToolMeta};
 
-    fn create_windsurf_definition() -> ToolDefinition {
+    fn create_zed_definition() -> ToolDefinition {
         ToolDefinition {
             meta: ToolMeta {
-                name: "Windsurf".to_string(),
-                slug: "windsurf".to_string(),
-                description: Some("Codeium's AI IDE".to_string()),
+                name: "Zed".to_string(),
+                slug: "zed".to_string(),
+                description: Some("Zed code editor".to_string()),
             },
             integration: ToolIntegrationConfig {
-                config_path: ".windsurfrules".to_string(),
-                config_type: ConfigType::Text,
+                config_path: ".zed/rules.md".to_string(),
+                config_type: ConfigType::Markdown,
                 additional_paths: vec![],
             },
             capabilities: ToolCapabilities {
                 supports_custom_instructions: true,
-                supports_mcp: true,
+                supports_mcp: false,
                 supports_rules_directory: false,
             },
             schema_keys: None,
@@ -159,6 +162,7 @@ mod tests {
         assert!(dispatcher.get_integration("vscode").is_some());
         assert!(dispatcher.get_integration("cursor").is_some());
         assert!(dispatcher.get_integration("claude").is_some());
+        assert!(dispatcher.get_integration("windsurf").is_some());
     }
 
     #[test]
@@ -169,48 +173,50 @@ mod tests {
         assert!(dispatcher.has_tool("vscode"));
         assert!(dispatcher.has_tool("cursor"));
         assert!(dispatcher.has_tool("claude"));
+        assert!(dispatcher.has_tool("windsurf"));
 
         // Unknown tool
-        assert!(!dispatcher.has_tool("windsurf"));
+        assert!(!dispatcher.has_tool("zed"));
 
         // Register and check again
-        dispatcher.register(create_windsurf_definition());
-        assert!(dispatcher.has_tool("windsurf"));
+        dispatcher.register(create_zed_definition());
+        assert!(dispatcher.has_tool("zed"));
     }
 
     #[test]
     fn test_register_schema_tool() {
         let mut dispatcher = ToolDispatcher::new();
-        dispatcher.register(create_windsurf_definition());
+        dispatcher.register(create_zed_definition());
 
-        let integration = dispatcher.get_integration("windsurf");
+        let integration = dispatcher.get_integration("zed");
         assert!(integration.is_some());
-        assert_eq!(integration.unwrap().name(), "windsurf");
+        assert_eq!(integration.unwrap().name(), "zed");
     }
 
     #[test]
     fn test_with_definitions() {
         let mut definitions = HashMap::new();
-        definitions.insert("windsurf".to_string(), create_windsurf_definition());
+        definitions.insert("zed".to_string(), create_zed_definition());
 
         let dispatcher = ToolDispatcher::with_definitions(definitions);
 
-        assert!(dispatcher.get_integration("windsurf").is_some());
+        assert!(dispatcher.get_integration("zed").is_some());
         assert_eq!(dispatcher.schema_tool_count(), 1);
     }
 
     #[test]
     fn test_list_available() {
         let mut dispatcher = ToolDispatcher::new();
-        dispatcher.register(create_windsurf_definition());
+        dispatcher.register(create_zed_definition());
 
         let available = dispatcher.list_available();
 
-        // Should be sorted
+        // Should be sorted and include all built-ins plus schema tool
         assert!(available.contains(&"vscode".to_string()));
         assert!(available.contains(&"cursor".to_string()));
         assert!(available.contains(&"claude".to_string()));
         assert!(available.contains(&"windsurf".to_string()));
+        assert!(available.contains(&"zed".to_string()));
 
         // First item should be "claude" (alphabetically first)
         assert_eq!(available[0], "claude");
