@@ -17,6 +17,7 @@ use crate::Result;
 use repo_fs::NormalizedPath;
 
 use super::check::{CheckReport, CheckStatus, DriftItem};
+use super::rule_syncer::RuleSyncer;
 use super::tool_syncer::ToolSyncer;
 
 /// Report from a sync or fix operation
@@ -366,19 +367,35 @@ impl SyncEngine {
             && let Some(tools) = config.get("tools").and_then(|t| t.as_array())
         {
             let tool_syncer = ToolSyncer::new(self.root.clone(), options.dry_run);
+            let tool_names: Vec<String> = tools
+                .iter()
+                .filter_map(|t| t.as_str().map(String::from))
+                .collect();
 
-            for tool_value in tools {
-                if let Some(tool_name) = tool_value.as_str() {
-                    match tool_syncer.sync_tool(tool_name, &mut ledger) {
-                        Ok(actions) => {
-                            for action in actions {
-                                report = report.with_action(action);
-                            }
-                        }
-                        Err(e) => {
-                            report.errors.push(format!("Failed to sync {}: {}", tool_name, e));
+            // Sync tool configurations
+            for tool_name in &tool_names {
+                match tool_syncer.sync_tool(tool_name, &mut ledger) {
+                    Ok(actions) => {
+                        for action in actions {
+                            report = report.with_action(action);
                         }
                     }
+                    Err(e) => {
+                        report.errors.push(format!("Failed to sync {}: {}", tool_name, e));
+                    }
+                }
+            }
+
+            // Sync rules to tool configurations
+            let rule_syncer = RuleSyncer::new(self.root.clone(), options.dry_run);
+            match rule_syncer.sync_rules(&tool_names, &mut ledger) {
+                Ok(actions) => {
+                    for action in actions {
+                        report = report.with_action(action);
+                    }
+                }
+                Err(e) => {
+                    report.errors.push(format!("Failed to sync rules: {}", e));
                 }
             }
         }

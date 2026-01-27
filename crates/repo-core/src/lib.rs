@@ -47,7 +47,9 @@ pub use error::{Error, Result};
 pub use ledger::{Intent, Ledger, Projection, ProjectionKind};
 pub use mode::Mode;
 pub use projection::{compute_checksum, ProjectionWriter};
-pub use sync::{CheckReport, CheckStatus, DriftItem, SyncEngine, SyncOptions, SyncReport};
+pub use sync::{
+    CheckReport, CheckStatus, DriftItem, RuleFile, RuleSyncer, SyncEngine, SyncOptions, SyncReport,
+};
 
 #[cfg(test)]
 mod tests {
