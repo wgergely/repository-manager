@@ -15,7 +15,8 @@ use repo_git::{ClassicLayout, ContainerLayout, LayoutProvider, NamingStrategy, n
 use repo_meta::load_config;
 use repo_presets::{Context, PresetProvider, PresetStatus, UvProvider};
 use repo_tools::{
-    claude_integration, cursor_integration, VSCodeIntegration,
+    antigravity_integration, claude_integration, cursor_integration,
+    gemini_integration, windsurf_integration, VSCodeIntegration,
     Rule, SyncContext, ToolIntegration,
 };
 use std::collections::HashMap;
@@ -679,34 +680,118 @@ content = "Test content"
         // This is documented behavior - fix is currently a stub
     }
 
-    /// GAP-006: Antigravity tool not implemented
+    /// Antigravity tool integration test (was GAP-006, now implemented)
+    /// Config location: .agent/rules.md
     #[test]
-    #[ignore = "GAP-006: Antigravity tool not implemented"]
-    fn gap_006_antigravity_tool() {
-        // When implemented, should create .agent/rules/ directory
-        panic!("Antigravity tool integration not implemented");
+    fn test_antigravity_tool_integration() {
+        let mut repo = TestRepo::new();
+        repo.init_git();
+        repo.init_repo_manager("standard", &["antigravity"], &[]);
+
+        let root = NormalizedPath::new(repo.root());
+        let rules = vec![
+            Rule {
+                id: "test-rule".to_string(),
+                content: "Test content for Antigravity".to_string(),
+            },
+        ];
+        let context = SyncContext::new(root);
+
+        antigravity_integration().sync(&context, &rules).unwrap();
+
+        // Verify config file created at .agent/rules.md
+        let config_path = repo.root().join(".agent/rules.md");
+        assert!(config_path.exists(), "Antigravity config should be created");
+
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert!(content.contains("Test content for Antigravity"));
     }
 
-    /// GAP-007: Windsurf tool not implemented
+    /// Windsurf tool integration test (was GAP-007, now implemented)
+    /// Config location: .windsurfrules
     #[test]
-    #[ignore = "GAP-007: Windsurf tool not implemented"]
-    fn gap_007_windsurf_tool() {
-        panic!("Windsurf tool integration not implemented");
+    fn test_windsurf_tool_integration() {
+        let mut repo = TestRepo::new();
+        repo.init_git();
+        repo.init_repo_manager("standard", &["windsurf"], &[]);
+
+        let root = NormalizedPath::new(repo.root());
+        let rules = vec![
+            Rule {
+                id: "test-rule".to_string(),
+                content: "Test content for Windsurf".to_string(),
+            },
+        ];
+        let context = SyncContext::new(root);
+
+        windsurf_integration().sync(&context, &rules).unwrap();
+
+        // Verify config file created at .windsurfrules
+        let config_path = repo.root().join(".windsurfrules");
+        assert!(config_path.exists(), "Windsurf config should be created");
+
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert!(content.contains("Test content for Windsurf"));
     }
 
-    /// GAP-008: Gemini CLI tool not implemented
+    /// Gemini CLI tool integration test (was GAP-008, now implemented)
+    /// Config location: GEMINI.md
     #[test]
-    #[ignore = "GAP-008: Gemini CLI tool not implemented"]
-    fn gap_008_gemini_tool() {
-        panic!("Gemini CLI tool integration not implemented");
+    fn test_gemini_tool_integration() {
+        let mut repo = TestRepo::new();
+        repo.init_git();
+        repo.init_repo_manager("standard", &["gemini"], &[]);
+
+        let root = NormalizedPath::new(repo.root());
+        let rules = vec![
+            Rule {
+                id: "test-rule".to_string(),
+                content: "Test content for Gemini".to_string(),
+            },
+        ];
+        let context = SyncContext::new(root);
+
+        gemini_integration().sync(&context, &rules).unwrap();
+
+        // Verify config file created at GEMINI.md
+        let config_path = repo.root().join("GEMINI.md");
+        assert!(config_path.exists(), "Gemini config should be created");
+
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert!(content.contains("Test content for Gemini"));
     }
 
-    /// GAP-010: Python venv provider not implemented
-    #[test]
-    #[ignore = "GAP-010: Python venv provider not implemented"]
-    fn gap_010_python_venv_provider() {
-        // Should support provider = "venv" in addition to "uv"
-        panic!("Python venv provider not implemented");
+    /// Python venv provider test (was GAP-010, now implemented)
+    /// Tests provider = "venv" in addition to "uv"
+    #[tokio::test]
+    async fn test_python_venv_provider() {
+        use repo_presets::VenvProvider;
+
+        let temp = TempDir::new().unwrap();
+        let provider = VenvProvider::new();
+
+        // Create test context
+        let root = NormalizedPath::new(temp.path());
+        let layout = WorkspaceLayout {
+            root: root.clone(),
+            active_context: root.clone(),
+            mode: LayoutMode::Classic,
+        };
+        let context = Context::new(layout, HashMap::new());
+
+        // Check should succeed (venv provider is now implemented)
+        let report = provider.check(&context).await;
+
+        // The check should return Ok - provider shouldn't panic
+        assert!(report.is_ok(), "VenvProvider.check() should not error");
+
+        // For a fresh directory without a venv, status should be Missing
+        let check_report = report.unwrap();
+        assert_eq!(
+            check_report.status,
+            PresetStatus::Missing,
+            "Fresh directory should show venv as Missing"
+        );
     }
 
     /// GAP-012: Node env provider not implemented
@@ -1236,6 +1321,14 @@ fn test_summary() {
     println!("Mission 7 (Rules):    CLI exists, sync missing");
 
     println!("\n------------------------------------------");
+    println!("CLOSED GAPS:");
+    println!("------------------------------------------");
+    println!("GAP-006: Antigravity tool - IMPLEMENTED");
+    println!("GAP-007: Windsurf tool - IMPLEMENTED");
+    println!("GAP-008: Gemini CLI tool - IMPLEMENTED");
+    println!("GAP-010: Python venv provider - IMPLEMENTED");
+
+    println!("\n------------------------------------------");
     println!("KNOWN GAPS (ignored tests document these):");
     println!("------------------------------------------");
     println!("GAP-001: repo push");
@@ -1243,10 +1336,6 @@ fn test_summary() {
     println!("GAP-003: repo merge");
     println!("GAP-004: sync doesn't apply projections");
     println!("GAP-005: fix is just a stub");
-    println!("GAP-006: Antigravity tool");
-    println!("GAP-007: Windsurf tool");
-    println!("GAP-008: Gemini CLI tool");
-    println!("GAP-010: Python venv provider");
     println!("GAP-012: Node provider");
     println!("GAP-013: Rust provider");
     println!("GAP-018: MCP Server");
