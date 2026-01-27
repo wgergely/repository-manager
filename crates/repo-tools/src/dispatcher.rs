@@ -5,10 +5,12 @@
 //! known tools (vscode, cursor, claude) and falls back to schema-driven generic
 //! integrations for other tools.
 
+use crate::claude::claude_integration;
+use crate::cursor::cursor_integration;
 use crate::error::Result;
 use crate::generic::GenericToolIntegration;
 use crate::integration::{Rule, SyncContext, ToolIntegration};
-use crate::{ClaudeIntegration, CursorIntegration, VSCodeIntegration};
+use crate::vscode::VSCodeIntegration;
 use repo_meta::schema::ToolDefinition;
 use std::collections::HashMap;
 
@@ -45,13 +47,13 @@ impl ToolDispatcher {
 
     /// Get an integration for a tool by name.
     ///
-    /// Prefers optimized built-in integrations, falls back to generic schema-driven.
+    /// Prefers built-in integrations, falls back to generic schema-driven.
     pub fn get_integration(&self, tool_name: &str) -> Option<Box<dyn ToolIntegration>> {
-        // Check for optimized built-in integrations first
+        // Check for built-in integrations first
         match tool_name {
             "vscode" => return Some(Box::new(VSCodeIntegration::new())),
-            "cursor" => return Some(Box::new(CursorIntegration::new())),
-            "claude" => return Some(Box::new(ClaudeIntegration::new())),
+            "cursor" => return Some(Box::new(cursor_integration())),
+            "claude" => return Some(Box::new(claude_integration())),
             _ => {}
         }
 

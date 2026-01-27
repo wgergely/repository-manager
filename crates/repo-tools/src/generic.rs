@@ -20,17 +20,31 @@ use serde_json::{Value, json};
 #[derive(Debug, Clone)]
 pub struct GenericToolIntegration {
     definition: ToolDefinition,
+    /// If true, insert rule content directly without adding headers
+    raw_content: bool,
 }
 
 impl GenericToolIntegration {
     /// Create a new generic integration from a tool definition.
     pub fn new(definition: ToolDefinition) -> Self {
-        Self { definition }
+        Self {
+            definition,
+            raw_content: false,
+        }
     }
 
     /// Create from a definition (alias for new).
     pub fn from_definition(definition: ToolDefinition) -> Self {
         Self::new(definition)
+    }
+
+    /// Set raw content mode (no headers added around rule content).
+    ///
+    /// When true, rule content is inserted directly into managed blocks
+    /// without adding `## {rule_id}` headers.
+    pub fn with_raw_content(mut self, raw: bool) -> Self {
+        self.raw_content = raw;
+        self
     }
 
     /// Get the config file path for this tool.
@@ -51,7 +65,11 @@ impl GenericToolIntegration {
 
         // Insert/update each rule as a managed block
         for rule in rules {
-            let block_content = format!("## {}\n\n{}", rule.id, rule.content);
+            let block_content = if self.raw_content {
+                rule.content.clone()
+            } else {
+                format!("## {}\n\n{}", rule.id, rule.content)
+            };
             content = upsert_block(&content, &rule.id, &block_content)?;
         }
 
@@ -90,11 +108,19 @@ impl GenericToolIntegration {
             if let Some(ref key) = schema_keys.instruction_key
                 && !rules.is_empty()
             {
-                let instructions: String = rules
-                    .iter()
-                    .map(|r| format!("## {}\n{}", r.id, r.content))
-                    .collect::<Vec<_>>()
-                    .join("\n\n");
+                let instructions: String = if self.raw_content {
+                    rules
+                        .iter()
+                        .map(|r| r.content.as_str())
+                        .collect::<Vec<_>>()
+                        .join("\n\n")
+                } else {
+                    rules
+                        .iter()
+                        .map(|r| format!("## {}\n{}", r.id, r.content))
+                        .collect::<Vec<_>>()
+                        .join("\n\n")
+                };
                 settings[key] = json!(instructions);
             }
         }

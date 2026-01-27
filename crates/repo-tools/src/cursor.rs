@@ -2,76 +2,65 @@
 //!
 //! Manages `.cursorrules` file using managed blocks for rule content.
 
-use crate::error::Result;
-use crate::integration::{Rule, SyncContext, ToolIntegration};
-use repo_blocks::upsert_block;
-use repo_fs::{NormalizedPath, io};
+use crate::generic::GenericToolIntegration;
+use repo_meta::schema::{ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta};
 
-/// Cursor integration.
+/// Creates a Cursor integration.
 ///
-/// Syncs rules to `.cursorrules` using managed blocks. Each rule is wrapped
-/// in a block marker identified by its UUID.
-#[derive(Debug, Default)]
-pub struct CursorIntegration;
-
-impl CursorIntegration {
-    /// Creates a new Cursor integration.
-    pub fn new() -> Self {
-        Self
-    }
-
-    /// Load existing cursorrules content or empty string.
-    fn load_content(path: &NormalizedPath) -> String {
-        if path.exists() {
-            io::read_text(path).unwrap_or_default()
-        } else {
-            String::new()
-        }
-    }
+/// Returns a GenericToolIntegration configured for Cursor's `.cursorrules` file.
+/// Uses raw content mode (no headers) for backward compatibility.
+pub fn cursor_integration() -> GenericToolIntegration {
+    GenericToolIntegration::new(ToolDefinition {
+        meta: ToolMeta {
+            name: "Cursor".into(),
+            slug: "cursor".into(),
+            description: Some("Cursor AI IDE".into()),
+        },
+        integration: ToolIntegrationConfig {
+            config_path: ".cursorrules".into(),
+            config_type: ConfigType::Text,
+            additional_paths: vec![],
+        },
+        capabilities: ToolCapabilities {
+            supports_custom_instructions: true,
+            supports_mcp: false,
+            supports_rules_directory: false,
+        },
+        schema_keys: None,
+    })
+    .with_raw_content(true)
 }
 
-impl ToolIntegration for CursorIntegration {
-    fn name(&self) -> &str {
-        "cursor"
-    }
+/// Type alias for backward compatibility.
+///
+/// Prefer using `cursor_integration()` factory function for new code.
+pub type CursorIntegration = GenericToolIntegration;
 
-    fn config_paths(&self) -> Vec<&str> {
-        vec![".cursorrules"]
-    }
-
-    fn sync(&self, context: &SyncContext, rules: &[Rule]) -> Result<()> {
-        let cursorrules_path = context.root.join(".cursorrules");
-
-        // Load existing content
-        let mut content = Self::load_content(&cursorrules_path);
-
-        // Upsert each rule as a managed block
-        for rule in rules {
-            content = upsert_block(&content, &rule.id, &rule.content)?;
-        }
-
-        // Write content back
-        io::write_text(&cursorrules_path, &content)?;
-
-        Ok(())
-    }
+/// Creates a new Cursor integration (legacy API).
+///
+/// # Deprecated
+/// Use `cursor_integration()` instead.
+pub fn new() -> GenericToolIntegration {
+    cursor_integration()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::integration::{Rule, SyncContext, ToolIntegration};
+    use repo_fs::NormalizedPath;
     use std::fs;
     use tempfile::TempDir;
 
     #[test]
     fn test_name() {
-        let integration = CursorIntegration::new();
+        let integration = cursor_integration();
         assert_eq!(integration.name(), "cursor");
     }
 
     #[test]
     fn test_config_paths() {
-        let integration = CursorIntegration::new();
+        let integration = cursor_integration();
         let paths = integration.config_paths();
         assert_eq!(paths, vec![".cursorrules"]);
     }
@@ -93,7 +82,7 @@ mod tests {
             },
         ];
 
-        let integration = CursorIntegration::new();
+        let integration = cursor_integration();
         integration.sync(&context, &rules).unwrap();
 
         let cursorrules_path = temp_dir.path().join(".cursorrules");
@@ -120,7 +109,7 @@ mod tests {
             content: "Original content".to_string(),
         }];
 
-        let integration = CursorIntegration::new();
+        let integration = cursor_integration();
         integration.sync(&context, &rules).unwrap();
 
         // Update the same rule
@@ -155,7 +144,7 @@ mod tests {
             content: "Automated rule".to_string(),
         }];
 
-        let integration = CursorIntegration::new();
+        let integration = cursor_integration();
         integration.sync(&context, &rules).unwrap();
 
         let content = fs::read_to_string(temp_dir.path().join(".cursorrules")).unwrap();

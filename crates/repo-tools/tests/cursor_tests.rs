@@ -1,19 +1,19 @@
 //! Integration tests for Cursor integration.
 
 use repo_fs::NormalizedPath;
-use repo_tools::{CursorIntegration, Rule, SyncContext, ToolIntegration};
+use repo_tools::{cursor_integration, Rule, SyncContext, ToolIntegration};
 use std::fs;
 use tempfile::TempDir;
 
 #[test]
 fn test_cursor_name() {
-    let integration = CursorIntegration::new();
+    let integration = cursor_integration();
     assert_eq!(integration.name(), "cursor");
 }
 
 #[test]
 fn test_cursor_config_paths() {
-    let integration = CursorIntegration::new();
+    let integration = cursor_integration();
     let paths = integration.config_paths();
     assert_eq!(paths, vec![".cursorrules"]);
 }
@@ -29,7 +29,7 @@ fn test_cursor_creates_cursorrules() {
         content: "Test rule content".to_string(),
     }];
 
-    let integration = CursorIntegration::new();
+    let integration = cursor_integration();
     integration.sync(&context, &rules).unwrap();
 
     let cursorrules_path = temp_dir.path().join(".cursorrules");
@@ -47,7 +47,7 @@ fn test_cursor_uses_managed_blocks() {
         content: "Block content here".to_string(),
     }];
 
-    let integration = CursorIntegration::new();
+    let integration = cursor_integration();
     integration.sync(&context, &rules).unwrap();
 
     let content = fs::read_to_string(temp_dir.path().join(".cursorrules")).unwrap();
@@ -79,7 +79,7 @@ fn test_cursor_multiple_rules() {
         },
     ];
 
-    let integration = CursorIntegration::new();
+    let integration = cursor_integration();
     integration.sync(&context, &rules).unwrap();
 
     let content = fs::read_to_string(temp_dir.path().join(".cursorrules")).unwrap();
@@ -99,7 +99,7 @@ fn test_cursor_updates_existing_block() {
     let root = NormalizedPath::new(temp_dir.path());
 
     let context = SyncContext::new(root.clone());
-    let integration = CursorIntegration::new();
+    let integration = cursor_integration();
 
     // First sync
     let rules = vec![Rule {
@@ -149,7 +149,7 @@ These are manual rules for the project.
         content: "Automated rule".to_string(),
     }];
 
-    let integration = CursorIntegration::new();
+    let integration = cursor_integration();
     integration.sync(&context, &rules).unwrap();
 
     let content = fs::read_to_string(temp_dir.path().join(".cursorrules")).unwrap();
@@ -175,7 +175,7 @@ fn test_cursor_empty_rules() {
     let context = SyncContext::new(root);
     let rules: Vec<Rule> = vec![];
 
-    let integration = CursorIntegration::new();
+    let integration = cursor_integration();
     integration.sync(&context, &rules).unwrap();
 
     let content = fs::read_to_string(temp_dir.path().join(".cursorrules")).unwrap();
@@ -195,7 +195,7 @@ fn test_cursor_multiline_rule_content() {
         content: "Line 1\nLine 2\nLine 3\n\nWith blank line".to_string(),
     }];
 
-    let integration = CursorIntegration::new();
+    let integration = cursor_integration();
     integration.sync(&context, &rules).unwrap();
 
     let content = fs::read_to_string(temp_dir.path().join(".cursorrules")).unwrap();

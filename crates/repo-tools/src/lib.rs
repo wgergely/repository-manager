@@ -26,8 +26,8 @@ pub mod integration;
 pub mod logging;
 pub mod vscode;
 
-pub use claude::ClaudeIntegration;
-pub use cursor::CursorIntegration;
+pub use claude::{claude_integration, ClaudeIntegration};
+pub use cursor::{cursor_integration, CursorIntegration};
 pub use dispatcher::ToolDispatcher;
 pub use error::{Error, Result};
 pub use generic::GenericToolIntegration;

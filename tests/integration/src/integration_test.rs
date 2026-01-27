@@ -6,7 +6,7 @@ use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
 use repo_meta::{Registry, load_config};
 use repo_presets::{Context, PresetProvider, PresetStatus, UvProvider};
 use repo_tools::{
-    ClaudeIntegration, CursorIntegration, Rule, SyncContext, ToolIntegration, VSCodeIntegration,
+    claude_integration, cursor_integration, Rule, SyncContext, ToolIntegration, VSCodeIntegration,
 };
 use std::collections::HashMap;
 use std::fs;
@@ -93,8 +93,8 @@ fn test_tool_sync_creates_files() {
 
     // Sync all three tools
     VSCodeIntegration::new().sync(&context, &rules).unwrap();
-    CursorIntegration::new().sync(&context, &rules).unwrap();
-    ClaudeIntegration::new().sync(&context, &rules).unwrap();
+    cursor_integration().sync(&context, &rules).unwrap();
+    claude_integration().sync(&context, &rules).unwrap();
 
     // Verify all files were created
     assert!(temp.path().join(".vscode/settings.json").exists());
@@ -139,8 +139,8 @@ fn test_full_vertical_slice() {
     for tool_name in &config.active.tools {
         match tool_name.as_str() {
             "vscode" => VSCodeIntegration::new().sync(&context, &rules).unwrap(),
-            "cursor" => CursorIntegration::new().sync(&context, &rules).unwrap(),
-            "claude" => ClaudeIntegration::new().sync(&context, &rules).unwrap(),
+            "cursor" => cursor_integration().sync(&context, &rules).unwrap(),
+            "claude" => claude_integration().sync(&context, &rules).unwrap(),
             _ => {}
         }
     }
@@ -224,11 +224,11 @@ fn test_tool_integration_names_and_paths() {
     assert_eq!(vscode.name(), "vscode");
     assert_eq!(vscode.config_paths(), vec![".vscode/settings.json"]);
 
-    let cursor = CursorIntegration::new();
+    let cursor = cursor_integration();
     assert_eq!(cursor.name(), "cursor");
     assert_eq!(cursor.config_paths(), vec![".cursorrules"]);
 
-    let claude = ClaudeIntegration::new();
+    let claude = claude_integration();
     assert_eq!(claude.name(), "claude");
     assert_eq!(claude.config_paths(), vec!["CLAUDE.md", ".claude/rules/"]);
 }

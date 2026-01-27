@@ -2,76 +2,65 @@
 //!
 //! Manages `CLAUDE.md` and `.claude/rules/` using managed blocks for rule content.
 
-use crate::error::Result;
-use crate::integration::{Rule, SyncContext, ToolIntegration};
-use repo_blocks::upsert_block;
-use repo_fs::{NormalizedPath, io};
+use crate::generic::GenericToolIntegration;
+use repo_meta::schema::{ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta};
 
-/// Claude integration.
+/// Creates a Claude integration.
 ///
-/// Syncs rules to `CLAUDE.md` using managed blocks. Each rule is wrapped
-/// in a block marker identified by its UUID.
-#[derive(Debug, Default)]
-pub struct ClaudeIntegration;
-
-impl ClaudeIntegration {
-    /// Creates a new Claude integration.
-    pub fn new() -> Self {
-        Self
-    }
-
-    /// Load existing CLAUDE.md content or empty string.
-    fn load_content(path: &NormalizedPath) -> String {
-        if path.exists() {
-            io::read_text(path).unwrap_or_default()
-        } else {
-            String::new()
-        }
-    }
+/// Returns a GenericToolIntegration configured for Claude's `CLAUDE.md` file.
+/// Uses raw content mode (no headers) for backward compatibility.
+pub fn claude_integration() -> GenericToolIntegration {
+    GenericToolIntegration::new(ToolDefinition {
+        meta: ToolMeta {
+            name: "Claude".into(),
+            slug: "claude".into(),
+            description: Some("Anthropic Claude AI assistant".into()),
+        },
+        integration: ToolIntegrationConfig {
+            config_path: "CLAUDE.md".into(),
+            config_type: ConfigType::Markdown,
+            additional_paths: vec![".claude/rules/".into()],
+        },
+        capabilities: ToolCapabilities {
+            supports_custom_instructions: true,
+            supports_mcp: true,
+            supports_rules_directory: true,
+        },
+        schema_keys: None,
+    })
+    .with_raw_content(true)
 }
 
-impl ToolIntegration for ClaudeIntegration {
-    fn name(&self) -> &str {
-        "claude"
-    }
+/// Type alias for backward compatibility.
+///
+/// Prefer using `claude_integration()` factory function for new code.
+pub type ClaudeIntegration = GenericToolIntegration;
 
-    fn config_paths(&self) -> Vec<&str> {
-        vec!["CLAUDE.md", ".claude/rules/"]
-    }
-
-    fn sync(&self, context: &SyncContext, rules: &[Rule]) -> Result<()> {
-        let claude_md_path = context.root.join("CLAUDE.md");
-
-        // Load existing content
-        let mut content = Self::load_content(&claude_md_path);
-
-        // Upsert each rule as a managed block
-        for rule in rules {
-            content = upsert_block(&content, &rule.id, &rule.content)?;
-        }
-
-        // Write content back
-        io::write_text(&claude_md_path, &content)?;
-
-        Ok(())
-    }
+/// Creates a new Claude integration (legacy API).
+///
+/// # Deprecated
+/// Use `claude_integration()` instead.
+pub fn new() -> GenericToolIntegration {
+    claude_integration()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::integration::{Rule, SyncContext, ToolIntegration};
+    use repo_fs::NormalizedPath;
     use std::fs;
     use tempfile::TempDir;
 
     #[test]
     fn test_name() {
-        let integration = ClaudeIntegration::new();
+        let integration = claude_integration();
         assert_eq!(integration.name(), "claude");
     }
 
     #[test]
     fn test_config_paths() {
-        let integration = ClaudeIntegration::new();
+        let integration = claude_integration();
         let paths = integration.config_paths();
         assert_eq!(paths, vec!["CLAUDE.md", ".claude/rules/"]);
     }
@@ -93,7 +82,7 @@ mod tests {
             },
         ];
 
-        let integration = ClaudeIntegration::new();
+        let integration = claude_integration();
         integration.sync(&context, &rules).unwrap();
 
         let claude_md_path = temp_dir.path().join("CLAUDE.md");
@@ -120,7 +109,7 @@ mod tests {
             content: "Initial context".to_string(),
         }];
 
-        let integration = ClaudeIntegration::new();
+        let integration = claude_integration();
         integration.sync(&context, &rules).unwrap();
 
         // Update the same rule
@@ -155,7 +144,7 @@ mod tests {
             content: "Managed context".to_string(),
         }];
 
-        let integration = ClaudeIntegration::new();
+        let integration = claude_integration();
         integration.sync(&context, &rules).unwrap();
 
         let content = fs::read_to_string(temp_dir.path().join("CLAUDE.md")).unwrap();

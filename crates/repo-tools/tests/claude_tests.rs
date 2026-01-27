@@ -1,19 +1,19 @@
 //! Integration tests for Claude integration.
 
 use repo_fs::NormalizedPath;
-use repo_tools::{ClaudeIntegration, Rule, SyncContext, ToolIntegration};
+use repo_tools::{claude_integration, Rule, SyncContext, ToolIntegration};
 use std::fs;
 use tempfile::TempDir;
 
 #[test]
 fn test_claude_name() {
-    let integration = ClaudeIntegration::new();
+    let integration = claude_integration();
     assert_eq!(integration.name(), "claude");
 }
 
 #[test]
 fn test_claude_config_paths() {
-    let integration = ClaudeIntegration::new();
+    let integration = claude_integration();
     let paths = integration.config_paths();
     assert_eq!(paths, vec!["CLAUDE.md", ".claude/rules/"]);
 }
@@ -29,7 +29,7 @@ fn test_claude_creates_claude_md() {
         content: "This is a test project.".to_string(),
     }];
 
-    let integration = ClaudeIntegration::new();
+    let integration = claude_integration();
     integration.sync(&context, &rules).unwrap();
 
     let claude_md_path = temp_dir.path().join("CLAUDE.md");
@@ -47,7 +47,7 @@ fn test_claude_uses_managed_blocks() {
         content: "Project context information".to_string(),
     }];
 
-    let integration = ClaudeIntegration::new();
+    let integration = claude_integration();
     integration.sync(&context, &rules).unwrap();
 
     let content = fs::read_to_string(temp_dir.path().join("CLAUDE.md")).unwrap();
@@ -79,7 +79,7 @@ fn test_claude_multiple_rules() {
         },
     ];
 
-    let integration = ClaudeIntegration::new();
+    let integration = claude_integration();
     integration.sync(&context, &rules).unwrap();
 
     let content = fs::read_to_string(temp_dir.path().join("CLAUDE.md")).unwrap();
@@ -99,7 +99,7 @@ fn test_claude_updates_existing_block() {
     let root = NormalizedPath::new(temp_dir.path());
 
     let context = SyncContext::new(root.clone());
-    let integration = ClaudeIntegration::new();
+    let integration = claude_integration();
 
     // First sync
     let rules = vec![Rule {
@@ -160,7 +160,7 @@ The codebase is organized into modules.
         content: "Managed content".to_string(),
     }];
 
-    let integration = ClaudeIntegration::new();
+    let integration = claude_integration();
     integration.sync(&context, &rules).unwrap();
 
     let content = fs::read_to_string(temp_dir.path().join("CLAUDE.md")).unwrap();
@@ -191,7 +191,7 @@ fn test_claude_empty_rules() {
     let context = SyncContext::new(root);
     let rules: Vec<Rule> = vec![];
 
-    let integration = ClaudeIntegration::new();
+    let integration = claude_integration();
     integration.sync(&context, &rules).unwrap();
 
     let content = fs::read_to_string(temp_dir.path().join("CLAUDE.md")).unwrap();
@@ -222,7 +222,7 @@ fn example() {
             .to_string(),
     }];
 
-    let integration = ClaudeIntegration::new();
+    let integration = claude_integration();
     integration.sync(&context, &rules).unwrap();
 
     let content = fs::read_to_string(temp_dir.path().join("CLAUDE.md")).unwrap();
@@ -245,7 +245,7 @@ fn test_claude_without_python_path() {
         content: "Test content".to_string(),
     }];
 
-    let integration = ClaudeIntegration::new();
+    let integration = claude_integration();
     let result = integration.sync(&context, &rules);
 
     assert!(result.is_ok());
