@@ -817,4 +817,307 @@ Some tools recognize each other's ignore files:
 
 ---
 
+---
+
+## Block Format Architecture Analysis
+
+> **Analysis Date:** January 27, 2026
+> **Purpose:** Verify alignment between `repo-blocks` UUID format and `repo-core` Intent/Projection architecture
+
+### 1. Current Block Format in `repo-blocks`
+
+**File:** `crates/repo-blocks/src/parser.rs`
+
+The block format uses HTML comment markers with a UUID identifier:
+
+**Regex Pattern:**
+```regex
+<!-- repo:block:([a-zA-Z0-9_-]+) -->
+```
+
+**Block Structure:**
+```text
+<!-- repo:block:UUID -->
+content here
+<!-- /repo:block:UUID -->
+```
+
+**Examples from tests:**
+```markdown
+<!-- repo:block:abc-123 -->
+hello world
+<!-- /repo:block:abc-123 -->
+```
+
+**Block Struct:**
+```rust
+pub struct Block {
+    pub uuid: String,       // The UUID identifying this block
+    pub content: String,    // Content between markers (trimmed)
+    pub start_line: usize,  // 1-based line number of opening marker
+    pub end_line: usize,    // 1-based line number of closing marker
+}
+```
+
+**Key observations:**
+- UUID in blocks is stored as `String`, not `uuid::Uuid`
+- Pattern allows alphanumeric characters, hyphens, and underscores
+- No strict UUID format validation (accepts any matching string like "abc-123")
+
+---
+
+### 2. Intent Structure in `repo-core`
+
+**File:** `crates/repo-core/src/ledger/intent.rs`
+
+```rust
+pub struct Intent {
+    pub id: String,                    // Rule identifier (e.g., "rule:python/style/snake-case")
+    pub uuid: Uuid,                    // Unique instance identifier (uuid::Uuid)
+    pub timestamp: DateTime<Utc>,      // Creation timestamp
+    pub args: Value,                   // Rule arguments/configuration (JSON)
+    projections: Vec<Projection>,      // Tool-specific projections
+}
+```
+
+**UUID Generation:**
+```rust
+// New intent generates UUID automatically
+Intent::new("rule:test".to_string(), json!({}))
+// uuid: Uuid::new_v4()
+
+// Or use a specific UUID
+Intent::with_uuid("rule:test".to_string(), fixed_uuid, json!({}))
+```
+
+**Key observations:**
+- Intent UUID is a proper `uuid::Uuid` type
+- Each Intent has one UUID identifying the rule instance
+- Projections are nested within the Intent
+
+---
+
+### 3. Projection Structure and TextBlock Reference
+
+**File:** `crates/repo-core/src/ledger/projection.rs`
+
+```rust
+pub struct Projection {
+    pub tool: String,              // Tool identifier (e.g., "cursor", "vscode")
+    pub file: PathBuf,             // Path to configuration file
+    pub kind: ProjectionKind,      // Type-specific data
+}
+
+pub enum ProjectionKind {
+    TextBlock {
+        marker: Uuid,              // UUID marker in the file (separate from Intent UUID!)
+        checksum: String,          // Content integrity verification
+    },
+    JsonKey {
+        path: String,              // JSON path (e.g., "editor.fontSize")
+        value: Value,              // Value at this path
+    },
+    FileManaged {
+        checksum: String,          // Entire file checksum
+    },
+}
+```
+
+**Key observations:**
+- `TextBlock::marker` is a separate `Uuid` from the Intent's `uuid`
+- The marker UUID is what gets written to tool config files
+- Each projection has its own marker, independent of the parent Intent
+
+---
+
+### 4. UUID Relationship: Intent vs Block Marker
+
+**Critical Finding:** The Intent UUID and TextBlock marker UUID are **separate UUIDs**.
+
+**Evidence from test code** (`crates/repo-core/tests/integration_tests.rs`):
+```rust
+let fixed_uuid = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();   // Intent UUID
+let marker_uuid = Uuid::parse_str("660e8400-e29b-41d4-a716-446655440001").unwrap();  // Block marker (different!)
+
+let mut intent = Intent::with_uuid(
+    "rule:python/style/snake-case".to_string(),
+    fixed_uuid,       // Intent's UUID
+    json!({...}),
+);
+
+intent.add_projection(Projection::text_block(
+    "cursor".to_string(),
+    PathBuf::from(".cursor/rules/python-style.mdc"),
+    marker_uuid,      // Block marker UUID (different from intent.uuid!)
+    "abc123def456".to_string(),
+));
+```
+
+**Writer implementation** (`crates/repo-core/src/projection/writer.rs`):
+```rust
+fn write_text_block(&self, path: &NormalizedPath, marker: Uuid, content: &str) -> Result<String> {
+    let marker_start = format!("<!-- repo:block:{} -->", marker);  // Uses marker, not intent.uuid
+    let marker_end = format!("<!-- /repo:block:{} -->", marker);
+    // ...
+}
+```
+
+---
+
+### 5. Architecture Gap Analysis
+
+| Aspect | Intent UUID | Block Marker UUID | Gap? |
+|--------|-------------|-------------------|------|
+| **Type** | `uuid::Uuid` | `uuid::Uuid` (in Projection) / `String` (in repo-blocks) | Type mismatch in parser |
+| **Source** | Auto-generated or specified | Independently generated | No traceability |
+| **Purpose** | Identify rule instance | Identify block in file | Separate concerns |
+| **Relationship** | Parent of Projection | Stored in ProjectionKind::TextBlock | No direct link |
+
+**Identified Gaps:**
+
+1. **No Intent-to-Block Traceability:**
+   - The block marker UUID is independent of the Intent UUID
+   - Reading a block from a file cannot directly identify which Intent owns it
+   - Reverse lookup requires iterating all Intents and their Projections
+
+2. **Type Inconsistency:**
+   - `repo-blocks` parser returns `uuid: String`
+   - `repo-core` Projection uses `marker: Uuid`
+   - Conversion needed when linking the two
+
+3. **Missing Validation:**
+   - `repo-blocks` accepts any alphanumeric string (e.g., "abc-123")
+   - Full UUID format (e.g., "550e8400-e29b-41d4-a716-446655440000") not enforced
+   - Could lead to conflicts with non-UUID identifiers
+
+4. **No Embedded Intent Reference:**
+   - The block markers don't contain the Intent UUID
+   - Cannot determine rule provenance from the config file alone
+
+---
+
+### 6. Recommendations for Alignment
+
+#### Option A: Use Intent UUID as Block Marker (Simplest)
+
+Use the Intent's UUID directly as the block marker:
+
+```rust
+// Instead of generating a new UUID for marker
+let marker = intent.uuid;  // Reuse Intent UUID
+
+intent.add_projection(Projection::text_block(
+    "cursor".to_string(),
+    file_path,
+    intent.uuid,  // Same UUID in both places
+    checksum,
+));
+```
+
+**Pros:** Direct traceability, simpler model
+**Cons:** One Intent can only have one TextBlock projection per file
+
+#### Option B: Embed Intent UUID in Block Comment (Recommended)
+
+Extend the block format to include the Intent reference:
+
+```markdown
+<!-- repo:block:MARKER_UUID intent:INTENT_UUID -->
+content here
+<!-- /repo:block:MARKER_UUID -->
+```
+
+**Pros:** Full traceability, supports multiple blocks per Intent
+**Cons:** Requires parser changes, more complex format
+
+#### Option C: Maintain Lookup Index
+
+Keep current architecture but add a reverse-lookup index:
+
+```rust
+struct BlockIndex {
+    marker_to_intent: HashMap<Uuid, Uuid>,
+}
+```
+
+**Pros:** No format changes, backward compatible
+**Cons:** Index must be kept in sync, adds complexity
+
+#### Option D: Enforce Strict UUID Format in Parser
+
+Update `repo-blocks` parser to use `uuid::Uuid`:
+
+```rust
+pub struct Block {
+    pub uuid: Uuid,        // Changed from String
+    // ...
+}
+
+// Regex pattern enforcing UUID format
+static OPEN_MARKER_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"<!-- repo:block:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) -->")
+        .expect("Invalid UUID regex")
+});
+```
+
+**Pros:** Type safety, consistent with repo-core
+**Cons:** Breaks existing blocks with short IDs
+
+---
+
+### 7. Current Workflow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Ledger                                  │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ Intent                                                   │   │
+│  │   id: "rule:python/style"                               │   │
+│  │   uuid: 550e8400-e29b-41d4-a716-446655440000 ──┐        │   │
+│  │   args: {...}                                   │        │   │
+│  │   projections:                                  │        │   │
+│  │     ┌────────────────────────────────────────┐ │        │   │
+│  │     │ Projection (TextBlock)                 │ │        │   │
+│  │     │   tool: "cursor"                       │ │        │   │
+│  │     │   file: ".cursor/rules/style.mdc"      │ │        │   │
+│  │     │   marker: 660e8400-...-446655440001 ───┼─┼─ (separate!)
+│  │     │   checksum: "abc123..."                │ │        │   │
+│  │     └────────────────────────────────────────┘ │        │   │
+│  └────────────────────────────────────────────────┼────────┘   │
+└───────────────────────────────────────────────────┼─────────────┘
+                                                    │
+                                                    ▼
+                              .cursor/rules/style.mdc
+                        ┌─────────────────────────────────┐
+                        │ <!-- repo:block:660e8400-... -->│
+                        │ # Python Style Rules            │
+                        │ Use snake_case for variables    │
+                        │ <!-- /repo:block:660e8400-... ->│
+                        └─────────────────────────────────┘
+                              ▲
+                              │ No reference back to
+                              │ Intent UUID 550e8400-...
+```
+
+---
+
+### 8. Summary
+
+The current architecture maintains **separation between Intent identity and block markers**. This design allows:
+- Multiple projections per Intent with unique markers
+- Independent block management per file
+
+However, it creates a **traceability gap** where:
+- Config files don't reference their source Intent
+- Reverse lookup requires ledger iteration
+- Type inconsistency between `repo-blocks` (String) and `repo-core` (Uuid)
+
+**Recommended next steps:**
+1. Decide if Intent-to-block traceability is required
+2. If yes, implement Option B (embed Intent UUID in block comment)
+3. Enforce strict UUID format in `repo-blocks` parser (Option D)
+4. Document the UUID relationship in architecture docs
+
+---
+
 *Last updated: January 27, 2026*
