@@ -1,4 +1,7 @@
-//! Markdown format handler using tree-sitter-md
+//! Markdown format handler
+//!
+//! Uses HTML comment markers for managed blocks, with markdown-specific
+//! normalization (collapsing multiple blank lines).
 
 use std::sync::LazyLock;
 
@@ -16,35 +19,13 @@ static MULTIPLE_BLANK_LINES: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\n{3,}").unwrap());
 
 /// Handler for Markdown files with HTML comment markers
-///
-/// Uses tree-sitter-md for parsing (available for advanced queries)
-/// and regex for block detection (since HTML comments work well with regex).
-#[derive(Default)]
-pub struct MarkdownHandler {
-    /// Tree-sitter parser for advanced markdown queries (optional, not used in basic operations)
-    #[allow(dead_code)]
-    parser_initialized: bool,
-}
-
-impl std::fmt::Debug for MarkdownHandler {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MarkdownHandler")
-            .field("parser_initialized", &self.parser_initialized)
-            .finish()
-    }
-}
+#[derive(Debug, Default)]
+pub struct MarkdownHandler;
 
 impl MarkdownHandler {
     /// Create a new MarkdownHandler
     pub fn new() -> Self {
-        // Initialize tree-sitter parser for potential future use
-        // The tree-sitter-md language is available via tree_sitter_md::LANGUAGE
-        let mut parser = tree_sitter::Parser::new();
-        let initialized = parser.set_language(&tree_sitter_md::LANGUAGE.into()).is_ok();
-
-        Self {
-            parser_initialized: initialized,
-        }
+        Self
     }
 }
 
@@ -54,8 +35,6 @@ impl FormatHandler for MarkdownHandler {
     }
 
     fn parse(&self, source: &str) -> Result<Box<dyn std::any::Any + Send + Sync>> {
-        // Store source as String for rendering
-        // tree-sitter parsing is available but not required for basic operations
         Ok(Box::new(source.to_string()))
     }
 
