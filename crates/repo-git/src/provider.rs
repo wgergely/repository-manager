@@ -47,4 +47,37 @@ pub trait LayoutProvider {
 
     /// Get the current branch name
     fn current_branch(&self) -> Result<String>;
+
+    /// Push the current branch to a remote repository.
+    ///
+    /// # Arguments
+    /// * `remote` - Remote name (defaults to "origin" if None)
+    /// * `branch` - Branch name to push (defaults to current branch if None)
+    ///
+    /// # Note
+    /// This method requires credentials for authenticated remotes.
+    /// Currently only supports remotes that don't require authentication
+    /// or use credential helpers configured in git config.
+    fn push(&self, remote: Option<&str>, branch: Option<&str>) -> Result<()>;
+
+    /// Pull changes from a remote repository.
+    ///
+    /// # Arguments
+    /// * `remote` - Remote name (defaults to "origin" if None)
+    /// * `branch` - Branch name to pull (defaults to current branch if None)
+    ///
+    /// # Note
+    /// Performs a fetch followed by a fast-forward merge.
+    /// Returns an error if fast-forward is not possible.
+    fn pull(&self, remote: Option<&str>, branch: Option<&str>) -> Result<()>;
+
+    /// Merge a branch into the current branch.
+    ///
+    /// # Arguments
+    /// * `source` - The branch name to merge from
+    ///
+    /// # Note
+    /// Attempts a fast-forward merge first. If that's not possible,
+    /// creates a merge commit. Returns an error if there are conflicts.
+    fn merge(&self, source: &str) -> Result<()>;
 }

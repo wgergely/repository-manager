@@ -32,4 +32,22 @@ pub enum Error {
 
     #[error("Invalid branch name: {name}")]
     InvalidBranchName { name: String },
+
+    #[error("Remote '{name}' not found")]
+    RemoteNotFound { name: String },
+
+    #[error("No upstream branch configured for '{branch}'")]
+    NoUpstreamBranch { branch: String },
+
+    #[error("Merge conflict: {message}")]
+    MergeConflict { message: String },
+
+    #[error("Cannot fast-forward: {message}")]
+    CannotFastForward { message: String },
+
+    #[error("Push failed: {message}")]
+    PushFailed { message: String },
+
+    #[error("Pull failed: {message}")]
+    PullFailed { message: String },
 }

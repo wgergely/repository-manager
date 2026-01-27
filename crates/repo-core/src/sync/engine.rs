@@ -11,6 +11,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::backend::{ModeBackend, StandardBackend, WorktreeBackend};
+use crate::config::Manifest;
 use crate::ledger::{Ledger, ProjectionKind};
 use crate::mode::Mode;
 use crate::Result;
@@ -361,19 +362,14 @@ impl SyncEngine {
             return Ok(report.with_action("No config.toml found - nothing to sync".to_string()));
         }
 
-        // Read config and sync tools
+        // Read config and sync tools using typed Manifest parsing
         let config_content = std::fs::read_to_string(config_path.as_ref())?;
-        if let Ok(config) = toml::from_str::<toml::Value>(&config_content)
-            && let Some(tools) = config.get("tools").and_then(|t| t.as_array())
-        {
+        if let Ok(manifest) = Manifest::parse(&config_content) {
             let tool_syncer = ToolSyncer::new(self.root.clone(), options.dry_run);
-            let tool_names: Vec<String> = tools
-                .iter()
-                .filter_map(|t| t.as_str().map(String::from))
-                .collect();
+            let tool_names = &manifest.tools;
 
             // Sync tool configurations
-            for tool_name in &tool_names {
+            for tool_name in tool_names {
                 match tool_syncer.sync_tool(tool_name, &mut ledger) {
                     Ok(actions) => {
                         for action in actions {
@@ -388,7 +384,7 @@ impl SyncEngine {
 
             // Sync rules to tool configurations
             let rule_syncer = RuleSyncer::new(self.root.clone(), options.dry_run);
-            match rule_syncer.sync_rules(&tool_names, &mut ledger) {
+            match rule_syncer.sync_rules(tool_names, &mut ledger) {
                 Ok(actions) => {
                     for action in actions {
                         report = report.with_action(action);

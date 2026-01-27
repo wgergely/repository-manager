@@ -17,19 +17,25 @@
 //! The `ToolDispatcher` routes requests to the appropriate integration,
 //! preferring built-in implementations when available.
 
+pub mod antigravity;
 pub mod claude;
 pub mod cursor;
 pub mod dispatcher;
 pub mod error;
+pub mod gemini;
 pub mod generic;
 pub mod integration;
 pub mod logging;
 pub mod vscode;
+pub mod windsurf;
 
+pub use antigravity::{antigravity_integration, AntigravityIntegration};
 pub use claude::{claude_integration, ClaudeIntegration};
 pub use cursor::{cursor_integration, CursorIntegration};
 pub use dispatcher::ToolDispatcher;
 pub use error::{Error, Result};
+pub use gemini::{gemini_integration, GeminiIntegration};
 pub use generic::GenericToolIntegration;
 pub use integration::{Rule, SyncContext, ToolIntegration};
 pub use vscode::VSCodeIntegration;
+pub use windsurf::{windsurf_integration, WindsurfIntegration};

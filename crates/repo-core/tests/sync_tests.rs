@@ -408,3 +408,45 @@ fn test_sync_engine_load_save_ledger() {
     let loaded = engine.load_ledger().unwrap();
     assert_eq!(loaded.intents().len(), 1);
 }
+
+#[test]
+fn test_sync_reads_tools_from_config_using_manifest() {
+    // GAP-021: SyncEngine should use typed Manifest parsing instead of raw toml::Value
+    // This test verifies that tools are correctly read from config.toml using Manifest::parse()
+    let temp = setup_git_repo();
+    let root = NormalizedPath::new(temp.path());
+
+    // Create .repository directory with config.toml containing tools
+    let repo_dir = temp.path().join(".repository");
+    fs::create_dir_all(&repo_dir).unwrap();
+
+    // Write a config.toml with tools - the Manifest struct expects tools at the top level
+    let config_content = r#"
+tools = ["claude", "cursor"]
+
+[core]
+mode = "standard"
+"#;
+    fs::write(repo_dir.join("config.toml"), config_content).unwrap();
+
+    // Run sync with dry_run to avoid triggering unrelated ledger serialization issues
+    let engine = SyncEngine::new(root, Mode::Standard).unwrap();
+    let options = repo_core::sync::SyncOptions { dry_run: true };
+    let report = engine.sync_with_options(options).unwrap();
+
+    // Sync should succeed (dry_run doesn't write, so no serialization issues)
+    assert!(report.success, "Sync should succeed");
+
+    // Verify that the tools were processed (they won't have actual configs,
+    // but the sync should not fail due to config parsing)
+    // The actions should reference the tool names if they were read correctly
+    let combined_output = format!("{:?}", report.actions);
+
+    // If tools were read correctly, we should see them mentioned in the dry-run output
+    // (e.g., "[dry-run] Would create .claude/config.json")
+    assert!(
+        combined_output.contains("claude") || combined_output.contains("cursor"),
+        "Tools should be read from config - got actions: {:?}",
+        report.actions
+    );
+}

@@ -11,4 +11,4 @@ pub mod python;
 pub use context::Context;
 pub use error::{Error, Result};
 pub use provider::{ActionType, ApplyReport, CheckReport, PresetProvider, PresetStatus};
-pub use python::UvProvider;
+pub use python::{UvProvider, VenvProvider};
