@@ -5,9 +5,9 @@
 //! and removing tool configurations in the filesystem and ledger.
 
 use crate::ledger::{Intent, Ledger, Projection, ProjectionKind};
+use crate::projection::compute_checksum;
 use crate::{Error, Result};
 use repo_fs::NormalizedPath;
-use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -81,7 +81,7 @@ impl ToolSyncer {
         // Create projections for each config file
         let mut projections = Vec::new();
         for (file_path, content) in &config_files {
-            let checksum = compute_checksum_from_content(content);
+            let checksum = compute_checksum(content);
             projections.push(Projection {
                 tool: tool_name.to_string(),
                 file: PathBuf::from(file_path),
@@ -220,20 +220,6 @@ impl ToolSyncer {
     }
 }
 
-/// Compute SHA-256 checksum from content string
-///
-/// # Arguments
-///
-/// * `content` - The string content to hash
-///
-/// # Returns
-///
-/// The hex-encoded SHA-256 checksum of the content.
-pub fn compute_checksum_from_content(content: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(content.as_bytes());
-    format!("{:x}", hasher.finalize())
-}
 
 #[cfg(test)]
 mod tests {
@@ -303,9 +289,9 @@ mod tests {
     }
 
     #[test]
-    fn test_compute_checksum_from_content() {
+    fn test_compute_checksum() {
         let content = "hello world";
-        let checksum = compute_checksum_from_content(content);
+        let checksum = compute_checksum(content);
 
         // Known SHA-256 of "hello world"
         assert_eq!(

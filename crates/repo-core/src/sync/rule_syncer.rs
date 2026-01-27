@@ -5,13 +5,11 @@
 //! that get combined and written to tool-specific config files.
 
 use crate::ledger::{Intent, Ledger, Projection, ProjectionKind};
-use crate::projection::ProjectionWriter;
+use crate::projection::{compute_checksum, ProjectionWriter};
 use crate::Result;
 use repo_fs::NormalizedPath;
 use std::fs;
 use std::path::PathBuf;
-
-use super::compute_checksum_from_content;
 
 /// A loaded rule file
 #[derive(Debug, Clone)]
@@ -120,7 +118,7 @@ impl RuleSyncer {
 
                 // Check if already synced with same checksum
                 let existing = ledger.find_by_rule(&intent_id);
-                let new_checksum = compute_checksum_from_content(&combined_rules);
+                let new_checksum = compute_checksum(&combined_rules);
 
                 // Check if content has changed
                 let needs_update = if let Some(existing_intent) = existing.first() {

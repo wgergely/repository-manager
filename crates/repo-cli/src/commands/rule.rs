@@ -282,7 +282,6 @@ mod tests {
 
     #[test]
     fn test_rule_id_validation_valid() {
-        let temp_dir = TempDir::new().unwrap();
         // Valid IDs should work
         assert!(validate_rule_id("valid-rule").is_ok());
         assert!(validate_rule_id("valid_rule").is_ok());
