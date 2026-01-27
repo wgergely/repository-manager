@@ -58,3 +58,23 @@ fn test_relative_path_sandboxing() {
     // a -> ..(pop a) -> ..(empty/ignored) -> b
     assert_eq!(path2.as_str(), "b");
 }
+
+#[test]
+#[cfg(unix)]
+fn test_write_atomic_rejects_symlink_in_path() {
+    use std::os::unix::fs::symlink;
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let real_dir = dir.path().join("real");
+    std::fs::create_dir(&real_dir).unwrap();
+
+    let link = dir.path().join("link");
+    symlink(&real_dir, &link).unwrap();
+
+    let file_through_link = link.join("file.txt");
+    let normalized_path = NormalizedPath::new(file_through_link.to_string_lossy());
+    let result = repo_fs::io::write_text(&normalized_path, "content");
+
+    assert!(result.is_err(), "Should reject writes through symlinks");
+}
