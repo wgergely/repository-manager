@@ -9,6 +9,7 @@ description = "Block parsing and writing for Repository Manager"
 repo-fs = { path = "../repo-fs" }
 uuid = { workspace = true }
 regex = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 

@@ -1471,6 +1471,7 @@ dependencies = [
  "regex",
  "repo-fs",
  "rstest",
+ "serde_json",
  "tempfile",
  "thiserror",
  "tracing",
