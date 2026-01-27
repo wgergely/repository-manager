@@ -15,6 +15,7 @@ repo-blocks = { path = "../../crates/repo-blocks" }
 tempfile = { workspace = true }
 tokio = { version = "1.42", features = ["rt-multi-thread", "macros"] }
 serde_json = { workspace = true }
+regex = "1"
 
 [[test]]
 name = "integration_test"
