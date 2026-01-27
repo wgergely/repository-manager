@@ -27,6 +27,9 @@ pub enum Error {
     #[error("uv not found. Install uv: https://docs.astral.sh/uv/")]
     UvNotFound,
 
+    #[error("Virtual environment creation failed at {path}")]
+    VenvCreationFailed { path: String },
+
     #[error("Preset check failed: {message}")]
     CheckFailed { message: String },
 }
