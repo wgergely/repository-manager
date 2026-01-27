@@ -677,8 +677,8 @@ fn test_mode_roundtrip() {
     assert_eq!("worktree".parse::<Mode>().unwrap(), Mode::Worktrees);
     assert_eq!("container".parse::<Mode>().unwrap(), Mode::Worktrees);
 
-    // Test default
-    assert_eq!(Mode::default(), Mode::Standard);
+    // Test default (worktrees per spec)
+    assert_eq!(Mode::default(), Mode::Worktrees);
 }
 
 /// Test that config resolution works when no config files exist
@@ -693,9 +693,9 @@ fn test_config_resolution_with_no_files() {
     assert!(!resolver.has_config());
     assert!(!resolver.has_local_overrides());
 
-    // resolve should return defaults
+    // resolve should return defaults (worktrees per spec)
     let config = resolver.resolve().expect("Should resolve with defaults");
-    assert_eq!(config.mode, "standard");
+    assert_eq!(config.mode, "worktrees");
     assert!(config.presets.is_empty());
     assert!(config.tools.is_empty());
     assert!(config.rules.is_empty());

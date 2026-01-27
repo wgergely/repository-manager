@@ -523,13 +523,14 @@ fn test_check_on_fresh_repo() {
 fn test_check_requires_git_repo() {
     let dir = tempdir().unwrap();
 
-    // Check without init or git - should fail (requires git repo)
+    // Check without init or git - should fail (requires proper repo layout)
+    // Default mode is worktrees, so it expects a worktree container
     let mut cmd = repo_cmd();
     cmd.current_dir(dir.path())
         .arg("check")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Not a git repository"));
+        .stderr(predicate::str::contains("Layout validation failed"));
 }
 
 // ============================================================================

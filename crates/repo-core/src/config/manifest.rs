@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 fn default_mode() -> String {
-    "standard".to_string()
+    "worktrees".to_string()
 }
 
 /// Core configuration section
@@ -175,13 +175,13 @@ mod tests {
 
     #[test]
     fn test_default_mode() {
-        assert_eq!(default_mode(), "standard");
+        assert_eq!(default_mode(), "worktrees");
     }
 
     #[test]
     fn test_empty_manifest() {
         let manifest = Manifest::empty();
-        assert_eq!(manifest.core.mode, "standard");
+        assert_eq!(manifest.core.mode, "worktrees");
     }
 
     #[test]
