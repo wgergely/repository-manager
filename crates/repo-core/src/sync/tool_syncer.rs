@@ -5,12 +5,19 @@
 //! and removing tool configurations in the filesystem and ledger.
 
 use crate::ledger::{Intent, Ledger, Projection, ProjectionKind};
-use crate::Result;
+use crate::{Error, Result};
 use repo_fs::NormalizedPath;
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
-#[allow(unused_imports)]
 use uuid::Uuid;
+
+/// Write content to a file safely (with symlink protection)
+fn safe_write(path: &NormalizedPath, content: &str) -> Result<()> {
+    repo_fs::io::write_text(path, content).map_err(|e| Error::Io(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        e.to_string(),
+    )))
+}
 
 /// Synchronizes tool configurations
 ///
@@ -84,12 +91,9 @@ impl ToolSyncer {
             if self.dry_run {
                 actions.push(format!("[dry-run] Would create {}", file_path));
             } else {
-                // Write the file
+                // Write the file using symlink-safe write
                 let full_path = self.root.join(file_path);
-                if let Some(parent) = full_path.as_ref().parent() {
-                    std::fs::create_dir_all(parent)?;
-                }
-                std::fs::write(full_path.as_ref(), content)?;
+                safe_write(&full_path, content)?;
                 actions.push(format!("Created {}", file_path));
             }
         }

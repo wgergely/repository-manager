@@ -1,4 +1,6 @@
 //! Writes projections to the filesystem
+//!
+//! Uses symlink-safe write operations to prevent path traversal attacks.
 
 use crate::ledger::{Projection, ProjectionKind};
 use crate::{Error, Result};
@@ -6,6 +8,14 @@ use repo_fs::NormalizedPath;
 use sha2::{Digest, Sha256};
 use std::fs;
 use uuid::Uuid;
+
+/// Write content to a file safely (with symlink protection)
+fn safe_write(path: &NormalizedPath, content: &str) -> Result<()> {
+    repo_fs::io::write_text(path, content).map_err(|e| Error::Io(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        e.to_string(),
+    )))
+}
 
 /// Writes projections to filesystem
 pub struct ProjectionWriter {
@@ -49,11 +59,7 @@ impl ProjectionWriter {
             return Ok(format!("[dry-run] Would create {}", path));
         }
 
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent.as_ref())?;
-        }
-
-        fs::write(path.as_ref(), content)?;
+        safe_write(path, content)?;
         Ok(format!("Created {}", path))
     }
 
@@ -80,7 +86,10 @@ impl ProjectionWriter {
             let end_idx = existing
                 .find(&marker_end)
                 .map(|i| i + marker_end.len())
-                .unwrap_or(existing.len());
+                .ok_or_else(|| Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("Malformed text block: start marker found but end marker missing for {}", marker),
+                )))?;
             format!(
                 "{}{}{}",
                 &existing[..start_idx],
@@ -100,10 +109,7 @@ impl ProjectionWriter {
             return Ok(format!("[dry-run] Would update block {} in {}", marker, path));
         }
 
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent.as_ref())?;
-        }
-        fs::write(path.as_ref(), new_content)?;
+        safe_write(path, &new_content)?;
         Ok(format!("Updated block {} in {}", marker, path))
     }
 
@@ -139,11 +145,8 @@ impl ProjectionWriter {
             return Ok(format!("[dry-run] Would set {} in {}", key_path, path));
         }
 
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent.as_ref())?;
-        }
         let output = serde_json::to_string_pretty(&json)?;
-        fs::write(path.as_ref(), output)?;
+        safe_write(path, &output)?;
         Ok(format!("Set {} in {}", key_path, path))
     }
 
@@ -177,7 +180,10 @@ impl ProjectionWriter {
         let end_idx = existing
             .find(&marker_end)
             .map(|i| i + marker_end.len())
-            .unwrap_or(existing.len());
+            .ok_or_else(|| Error::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Malformed text block: start marker found but end marker missing for {}", marker),
+            )))?;
 
         let new_content = format!("{}{}", &existing[..start_idx], &existing[end_idx..])
             .trim()
@@ -190,7 +196,7 @@ impl ProjectionWriter {
             ));
         }
 
-        fs::write(path.as_ref(), new_content)?;
+        safe_write(path, &new_content)?;
         Ok(format!("Removed block {} from {}", marker, path))
     }
 
@@ -214,7 +220,7 @@ impl ProjectionWriter {
         }
 
         let output = serde_json::to_string_pretty(&json)?;
-        fs::write(path.as_ref(), output)?;
+        safe_write(path, &output)?;
         Ok(format!("Removed {} from {}", key_path, path))
     }
 }
