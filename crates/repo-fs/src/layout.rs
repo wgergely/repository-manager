@@ -62,7 +62,7 @@ impl WorkspaceLayout {
     /// Attempt to detect layout at a specific directory.
     fn detect_at(dir: &Path) -> Result<Option<Self>> {
         let has_gt = dir.join(RepoPath::GtDir).is_dir();
-        let has_git = dir.join(RepoPath::GitDir).exists(); // Can be file or dir
+        let has_git = dir.join(RepoPath::GitDir).exists(); // Can be file (gitdir pointer) or dir
         let has_main = dir.join(RepoPath::MainWorktree).is_dir();
         let has_worktrees = dir.join(RepoPath::WorktreesDir).is_dir();
 
@@ -124,6 +124,7 @@ impl WorkspaceLayout {
                 }
             }
             LayoutMode::InRepoWorktrees | LayoutMode::Classic => {
+                // .git can be a directory OR a file (gitdir pointer for worktrees)
                 if !self.root.join(RepoPath::GitDir.as_str()).exists() {
                     return Err(Error::LayoutValidation {
                         message: "Not a git repository.".into(),

@@ -60,3 +60,18 @@ fn test_detect_fails_without_git() {
     let result = WorkspaceLayout::detect(root);
     assert!(result.is_err());
 }
+
+#[test]
+fn test_detect_accepts_git_file_as_gitdir_pointer() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    // Create .git as a FILE (gitdir pointer format used by Git worktrees)
+    // In real Git, this would be: "gitdir: /path/to/actual/.git"
+    fs::write(root.join(".git"), "gitdir: /some/path/.git").unwrap();
+
+    let result = WorkspaceLayout::detect(root);
+    // .git files ARE valid in Git (used for worktrees), so this should be detected
+    assert!(result.is_ok(), "Should detect .git file as valid repository");
+    assert_eq!(result.unwrap().mode, LayoutMode::Classic);
+}
