@@ -7,10 +7,11 @@ use std::path::Path;
 use colored::Colorize;
 use serde_json;
 
-use repo_core::Manifest;
+use repo_core::{Manifest, SyncEngine};
 use repo_fs::NormalizedPath;
 use repo_meta::{Registry, ToolRegistry};
 
+use crate::commands::sync::detect_mode;
 use crate::error::{CliError, Result};
 
 /// Path to config.toml within a repository
@@ -59,6 +60,10 @@ pub fn run_add_tool(path: &Path, name: &str) -> Result<()> {
     save_manifest(&config_path, &manifest)?;
 
     println!("{} Tool {} added.", "OK".green().bold(), name.cyan());
+
+    // Trigger sync to apply tool configuration
+    trigger_sync_and_report(path)?;
+
     Ok(())
 }
 
@@ -82,6 +87,9 @@ pub fn run_remove_tool(path: &Path, name: &str) -> Result<()> {
         manifest.tools.remove(pos);
         save_manifest(&config_path, &manifest)?;
         println!("{} Tool {} removed.", "OK".green().bold(), name.cyan());
+
+        // Trigger sync to apply configuration changes
+        trigger_sync_and_report(path)?;
     } else {
         println!(
             "{} Tool {} not found in configuration.",
@@ -207,6 +215,45 @@ pub fn save_manifest(path: &NormalizedPath, manifest: &Manifest) -> Result<()> {
     Ok(())
 }
 
+/// Trigger sync after tool/preset changes and print the results
+///
+/// This function runs the sync engine to apply any configuration changes
+/// resulting from adding or removing tools/presets.
+fn trigger_sync_and_report(path: &Path) -> Result<()> {
+    let root = NormalizedPath::new(path);
+    let mode = detect_mode(&root)?;
+    let engine = SyncEngine::new(root, mode)?;
+
+    match engine.sync() {
+        Ok(report) => {
+            if !report.actions.is_empty() {
+                for action in &report.actions {
+                    println!("   {} {}", "+".green(), action);
+                }
+            }
+            if !report.success {
+                for error in &report.errors {
+                    eprintln!(
+                        "   {} {}",
+                        "!".red(),
+                        error
+                    );
+                }
+            }
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!(
+                "{} Sync failed: {}",
+                "warning:".yellow().bold(),
+                e
+            );
+            // Don't fail the overall operation - the config change succeeded
+            Ok(())
+        }
+    }
+}
+
 /// Generate TOML content from a manifest
 ///
 /// Produces a clean, readable TOML representation of the manifest.
@@ -289,8 +336,12 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    /// Helper to create a test config.toml
+    /// Helper to create a test config.toml and .git directory
     fn create_test_config(dir: &Path, content: &str) {
+        // Create .git directory to simulate git repo (required for sync)
+        let git_dir = dir.join(".git");
+        std::fs::create_dir_all(&git_dir).unwrap();
+
         let repo_dir = dir.join(".repository");
         std::fs::create_dir_all(&repo_dir).unwrap();
         std::fs::write(repo_dir.join("config.toml"), content).unwrap();
