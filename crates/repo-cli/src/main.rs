@@ -4,7 +4,9 @@
 
 mod cli;
 mod commands;
+mod context;
 mod error;
+mod interactive;
 
 use clap::Parser;
 use colored::Colorize;
@@ -87,17 +89,24 @@ fn cmd_init(
     tools: Vec<String>,
     presets: Vec<String>,
     remote: Option<String>,
-    interactive: bool,
+    interactive_flag: bool,
 ) -> Result<()> {
     let cwd = std::env::current_dir()?;
-    let config = commands::init::InitConfig {
-        name,
-        mode,
-        tools,
-        presets,
-        remote,
-        interactive,
+
+    // Use interactive mode if requested
+    let config = if interactive_flag {
+        interactive::interactive_init(&name)?
+    } else {
+        commands::init::InitConfig {
+            name,
+            mode,
+            tools,
+            presets,
+            remote,
+            interactive: false,
+        }
     };
+
     commands::run_init(&cwd, config)?;
     Ok(())
 }

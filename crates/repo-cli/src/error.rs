@@ -19,6 +19,10 @@ pub enum CliError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
+    /// Interactive prompt error
+    #[error("Interactive prompt error: {0}")]
+    Dialoguer(#[from] dialoguer::Error),
+
     /// User-facing error with a message
     #[error("{message}")]
     User { message: String },
