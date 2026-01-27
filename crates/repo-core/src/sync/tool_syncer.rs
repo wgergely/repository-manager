@@ -3,7 +3,10 @@
 //! This module provides the `ToolSyncer` for coordinating the syncing of
 //! tool configurations using projections. It handles creating, updating,
 //! and removing tool configurations in the filesystem and ledger.
+//!
+//! Includes backup/restore functionality for tool configurations.
 
+use crate::backup::BackupManager;
 use crate::ledger::{Intent, Ledger, Projection, ProjectionKind};
 use crate::projection::compute_checksum;
 use crate::{Error, Result};
@@ -21,11 +24,15 @@ fn safe_write(path: &NormalizedPath, content: &str) -> Result<()> {
 /// The `ToolSyncer` coordinates the creation, update, and removal of tool
 /// configurations. It uses the ledger to track what tools have been synced
 /// and their projections.
+///
+/// Features backup/restore for tool configurations when tools are removed/re-added.
 pub struct ToolSyncer {
     /// Root path for the repository
     root: NormalizedPath,
     /// Whether to run in dry-run mode (simulate changes without writing)
     dry_run: bool,
+    /// Backup manager for tool configuration backup/restore
+    backup_manager: BackupManager,
 }
 
 impl ToolSyncer {
@@ -36,7 +43,17 @@ impl ToolSyncer {
     /// * `root` - The root path of the repository
     /// * `dry_run` - If true, simulate changes without modifying the filesystem
     pub fn new(root: NormalizedPath, dry_run: bool) -> Self {
-        Self { root, dry_run }
+        let backup_manager = BackupManager::new(root.clone());
+        Self {
+            root,
+            dry_run,
+            backup_manager,
+        }
+    }
+
+    /// Check if a backup exists for a tool
+    pub fn has_backup(&self, tool_name: &str) -> bool {
+        self.backup_manager.has_backup(tool_name)
     }
 
     /// Sync a tool, creating/updating its projections in the ledger
@@ -113,8 +130,9 @@ impl ToolSyncer {
     ///
     /// This method:
     /// 1. Finds all intents for the specified tool
-    /// 2. Deletes the files associated with each projection
-    /// 3. Removes the intents from the ledger
+    /// 2. Creates a backup of the tool's config files
+    /// 3. Deletes the files associated with each projection
+    /// 4. Removes the intents from the ledger
     ///
     /// # Arguments
     ///
@@ -125,6 +143,73 @@ impl ToolSyncer {
     ///
     /// A list of action descriptions taken during removal.
     pub fn remove_tool(&self, tool_name: &str, ledger: &mut Ledger) -> Result<Vec<String>> {
+        let mut actions = Vec::new();
+        let intent_id = format!("tool:{}", tool_name);
+
+        let intents: Vec<Uuid> = self
+            .get_intents_by_id(ledger, &intent_id)
+            .iter()
+            .map(|i| i.uuid)
+            .collect();
+
+        if intents.is_empty() {
+            actions.push(format!("Tool {} not found in ledger", tool_name));
+            return Ok(actions);
+        }
+
+        // Collect files to backup before deleting
+        let mut files_to_backup = Vec::new();
+        for uuid in &intents {
+            if let Some(intent) = ledger.get_intent(*uuid) {
+                for projection in intent.projections() {
+                    files_to_backup.push(projection.file.clone());
+                }
+            }
+        }
+
+        // Create backup before deleting (unless dry-run)
+        if !self.dry_run && !files_to_backup.is_empty() {
+            match self.backup_manager.create_backup(tool_name, &files_to_backup) {
+                Ok(backup) => {
+                    actions.push(format!(
+                        "Created backup for {} ({} files)",
+                        tool_name,
+                        backup.metadata.files.len()
+                    ));
+                }
+                Err(e) => {
+                    // Log warning but continue with removal
+                    tracing::warn!("Failed to create backup for {}: {}", tool_name, e);
+                }
+            }
+        }
+
+        // Now delete the files
+        for uuid in intents {
+            if let Some(intent) = ledger.get_intent(uuid) {
+                for projection in intent.projections() {
+                    let file_path = self.root.join(projection.file.to_string_lossy().as_ref());
+
+                    if self.dry_run {
+                        actions.push(format!("[dry-run] Would delete {}", file_path));
+                    } else if file_path.exists() {
+                        std::fs::remove_file(file_path.as_ref())?;
+                        actions.push(format!("Deleted {}", file_path));
+                    }
+                }
+            }
+
+            if !self.dry_run {
+                ledger.remove_intent(uuid);
+                actions.push(format!("Removed intent for {}", tool_name));
+            }
+        }
+
+        Ok(actions)
+    }
+
+    /// Remove a tool with option to skip backup
+    pub fn remove_tool_no_backup(&self, tool_name: &str, ledger: &mut Ledger) -> Result<Vec<String>> {
         let mut actions = Vec::new();
         let intent_id = format!("tool:{}", tool_name);
 
@@ -160,6 +245,32 @@ impl ToolSyncer {
         }
 
         Ok(actions)
+    }
+
+    /// Restore a tool from backup
+    ///
+    /// Returns the list of restored file paths.
+    pub fn restore_from_backup(&self, tool_name: &str) -> Result<Vec<PathBuf>> {
+        if self.dry_run {
+            if self.backup_manager.has_backup(tool_name) {
+                tracing::info!("[dry-run] Would restore backup for {}", tool_name);
+            }
+            return Ok(Vec::new());
+        }
+
+        self.backup_manager.restore_backup(tool_name)
+    }
+
+    /// Delete a tool's backup
+    pub fn delete_backup(&self, tool_name: &str) -> Result<()> {
+        if self.dry_run {
+            if self.backup_manager.has_backup(tool_name) {
+                tracing::info!("[dry-run] Would delete backup for {}", tool_name);
+            }
+            return Ok(());
+        }
+
+        self.backup_manager.delete_backup(tool_name)
     }
 
     /// Get intents by ID from the ledger

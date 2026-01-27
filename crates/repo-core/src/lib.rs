@@ -34,6 +34,7 @@
 //! ```
 
 pub mod backend;
+pub mod backup;
 pub mod config;
 pub mod error;
 pub mod ledger;
@@ -43,6 +44,7 @@ pub mod rules;
 pub mod sync;
 
 pub use backend::{BranchInfo, ModeBackend, StandardBackend, WorktreeBackend};
+pub use backup::{BackupManager, BackupMetadata, ToolBackup};
 pub use config::{ConfigResolver, Manifest, ResolvedConfig, RuntimeContext};
 pub use error::{Error, Result};
 pub use ledger::{Intent, Ledger, Projection, ProjectionKind};
