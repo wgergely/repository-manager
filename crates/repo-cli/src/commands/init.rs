@@ -2,34 +2,106 @@
 //!
 //! Initializes a new repository with Repository Manager configuration.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use colored::Colorize;
 
 use crate::error::{CliError, Result};
 
+/// Configuration for init command
+pub struct InitConfig {
+    pub name: String,
+    pub mode: String,
+    pub tools: Vec<String>,
+    pub presets: Vec<String>,
+    pub remote: Option<String>,
+    pub interactive: bool,
+}
+
 /// Run the init command
 ///
 /// Initializes a repository with the specified mode, tools, and presets.
-pub fn run_init(path: &Path, mode: &str, tools: &[String], presets: &[String]) -> Result<()> {
+/// If name is not ".", creates a new folder with the sanitized name.
+pub fn run_init(cwd: &Path, config: InitConfig) -> Result<PathBuf> {
+    // Determine target path
+    let target_path = if config.name == "." {
+        cwd.to_path_buf()
+    } else {
+        let sanitized = sanitize_project_name(&config.name);
+        let path = cwd.join(&sanitized);
+
+        // Create the folder
+        if !path.exists() {
+            std::fs::create_dir_all(&path)?;
+            println!(
+                "{} Created project folder: {}",
+                "=>".blue().bold(),
+                sanitized.cyan()
+            );
+        }
+        path
+    };
+
     println!(
         "{} Initializing repository in {} mode...",
         "=>".blue().bold(),
-        mode.cyan()
+        config.mode.cyan()
     );
 
-    if !tools.is_empty() {
-        println!("   Tools: {}", tools.join(", ").yellow());
+    if !config.tools.is_empty() {
+        println!("   Tools: {}", config.tools.join(", ").yellow());
     }
-    if !presets.is_empty() {
-        println!("   Presets: {}", presets.join(", ").yellow());
+    if !config.presets.is_empty() {
+        println!("   Presets: {}", config.presets.join(", ").yellow());
     }
 
-    init_repository(path, mode, tools, presets)?;
+    init_repository(&target_path, &config.mode, &config.tools, &config.presets)?;
+
+    // Add remote if specified
+    if let Some(remote_url) = &config.remote {
+        add_git_remote(&target_path, remote_url)?;
+        println!("   Remote: {}", remote_url.yellow());
+    }
 
     println!("{} Repository initialized!", "OK".green().bold());
-    Ok(())
+    Ok(target_path)
+}
+
+/// Sanitize a project name to a valid folder name
+///
+/// - Converts to lowercase
+/// - Replaces spaces and underscores with hyphens
+/// - Removes special characters
+/// - Collapses multiple hyphens
+pub fn sanitize_project_name(name: &str) -> String {
+    let mut result = String::with_capacity(name.len());
+    let mut last_was_hyphen = false;
+
+    for c in name.chars() {
+        if c.is_ascii_alphanumeric() {
+            result.push(c.to_ascii_lowercase());
+            last_was_hyphen = false;
+        } else if c == ' ' || c == '_' || c == '-' {
+            if !last_was_hyphen && !result.is_empty() {
+                result.push('-');
+                last_was_hyphen = true;
+            }
+        }
+        // Other characters are dropped
+    }
+
+    // Remove trailing hyphen
+    if result.ends_with('-') {
+        result.pop();
+    }
+
+    // Fallback if empty
+    if result.is_empty() {
+        result = "project".to_string();
+    }
+
+    result
 }
 
 /// Initialize a repository with the given configuration
@@ -124,10 +196,117 @@ fn init_git(path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Add a git remote to the repository
+fn add_git_remote(path: &Path, remote_url: &str) -> Result<()> {
+    let output = Command::new("git")
+        .args(["remote", "add", "origin", remote_url])
+        .current_dir(path)
+        .output()?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        // Ignore error if remote already exists
+        if !stderr.contains("already exists") {
+            return Err(CliError::user(format!("Failed to add remote: {}", stderr)));
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn test_sanitize_project_name_basic() {
+        assert_eq!(sanitize_project_name("my-project"), "my-project");
+        assert_eq!(sanitize_project_name("MyProject"), "myproject");
+        assert_eq!(sanitize_project_name("my_project"), "my-project");
+        assert_eq!(sanitize_project_name("my project"), "my-project");
+    }
+
+    #[test]
+    fn test_sanitize_project_name_special_chars() {
+        assert_eq!(sanitize_project_name("My Project Name!"), "my-project-name");
+        assert_eq!(sanitize_project_name("project@2024"), "project2024");
+        assert_eq!(sanitize_project_name("hello--world"), "hello-world");
+        assert_eq!(sanitize_project_name("  leading  "), "leading");
+    }
+
+    #[test]
+    fn test_sanitize_project_name_edge_cases() {
+        assert_eq!(sanitize_project_name("!!!"), "project");
+        assert_eq!(sanitize_project_name(""), "project");
+        assert_eq!(sanitize_project_name("a"), "a");
+    }
+
+    #[test]
+    fn test_run_init_creates_project_folder() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let config = InitConfig {
+            name: "my-project".to_string(),
+            mode: "standard".to_string(),
+            tools: vec![],
+            presets: vec![],
+            remote: None,
+            interactive: false,
+        };
+
+        let result = run_init(temp_dir.path(), config);
+        assert!(result.is_ok());
+
+        let project_path = result.unwrap();
+        assert!(project_path.exists());
+        assert!(project_path.join(".repository").exists());
+        assert_eq!(project_path.file_name().unwrap(), "my-project");
+    }
+
+    #[test]
+    fn test_run_init_sanitizes_name() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let config = InitConfig {
+            name: "My Project Name!".to_string(),
+            mode: "standard".to_string(),
+            tools: vec![],
+            presets: vec![],
+            remote: None,
+            interactive: false,
+        };
+
+        let result = run_init(temp_dir.path(), config);
+        assert!(result.is_ok());
+
+        // Check sanitized folder exists
+        let sanitized_path = temp_dir.path().join("my-project-name");
+        assert!(sanitized_path.exists());
+        assert!(sanitized_path.join(".repository").exists());
+    }
+
+    #[test]
+    fn test_run_init_current_dir() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let config = InitConfig {
+            name: ".".to_string(),
+            mode: "standard".to_string(),
+            tools: vec![],
+            presets: vec![],
+            remote: None,
+            interactive: false,
+        };
+
+        let result = run_init(temp_dir.path(), config);
+        assert!(result.is_ok());
+
+        // Should init in current directory
+        let project_path = result.unwrap();
+        assert_eq!(project_path, temp_dir.path());
+        assert!(temp_dir.path().join(".repository").exists());
+    }
 
     #[test]
     fn test_init_creates_repository_structure() {

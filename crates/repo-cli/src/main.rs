@@ -54,10 +54,13 @@ fn run() -> Result<()> {
 fn execute_command(cmd: Commands) -> Result<()> {
     match cmd {
         Commands::Init {
+            name,
             mode,
             tools,
             presets,
-        } => cmd_init(&mode, &tools, &presets),
+            remote,
+            interactive,
+        } => cmd_init(name, mode, tools, presets, remote, interactive),
         Commands::Check => cmd_check(),
         Commands::Sync { dry_run } => cmd_sync(dry_run),
         Commands::Fix { dry_run } => cmd_fix(dry_run),
@@ -76,11 +79,27 @@ fn execute_command(cmd: Commands) -> Result<()> {
     }
 }
 
-// Stub implementations - these will be replaced with actual logic
+// Command implementations
 
-fn cmd_init(mode: &str, tools: &[String], presets: &[String]) -> Result<()> {
+fn cmd_init(
+    name: String,
+    mode: String,
+    tools: Vec<String>,
+    presets: Vec<String>,
+    remote: Option<String>,
+    interactive: bool,
+) -> Result<()> {
     let cwd = std::env::current_dir()?;
-    commands::run_init(&cwd, mode, tools, presets)
+    let config = commands::init::InitConfig {
+        name,
+        mode,
+        tools,
+        presets,
+        remote,
+        interactive,
+    };
+    commands::run_init(&cwd, config)?;
+    Ok(())
 }
 
 fn cmd_check() -> Result<()> {

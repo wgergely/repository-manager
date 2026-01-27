@@ -21,7 +21,11 @@ pub struct Cli {
 pub enum Commands {
     /// Initialize a new repository configuration
     Init {
-        /// Repository mode (standard or worktree)
+        /// Project name (creates folder if not ".")
+        #[arg(default_value = ".")]
+        name: String,
+
+        /// Repository mode (standard or worktrees)
         #[arg(short, long, default_value = "worktrees")]
         mode: String,
 
@@ -32,6 +36,14 @@ pub enum Commands {
         /// Presets to apply
         #[arg(short, long)]
         presets: Vec<String>,
+
+        /// Remote repository URL
+        #[arg(short, long)]
+        remote: Option<String>,
+
+        /// Interactive mode for guided setup
+        #[arg(short, long)]
+        interactive: bool,
     },
 
     /// Check repository configuration for drift
@@ -164,28 +176,58 @@ mod tests {
         assert!(matches!(
             cli.command,
             Some(Commands::Init {
+                name,
                 mode,
                 tools,
-                presets
-            }) if mode == "worktrees" && tools.is_empty() && presets.is_empty()
+                presets,
+                ..
+            }) if name == "." && mode == "worktrees" && tools.is_empty() && presets.is_empty()
         ));
+    }
+
+    #[test]
+    fn parse_init_command_with_name() {
+        let cli = Cli::parse_from(["repo", "init", "my-project"]);
+        match cli.command {
+            Some(Commands::Init { name, .. }) => {
+                assert_eq!(name, "my-project");
+            }
+            _ => panic!("Expected Init command"),
+        }
     }
 
     #[test]
     fn parse_init_command_with_options() {
         let cli = Cli::parse_from([
-            "repo", "init", "--mode", "worktree", "--tools", "eslint", "--tools", "prettier",
-            "--presets", "typescript",
+            "repo", "init", "project", "--mode", "worktree", "--tools", "eslint", "--tools", "prettier",
+            "--presets", "typescript", "--remote", "https://github.com/user/repo.git",
         ]);
         match cli.command {
             Some(Commands::Init {
+                name,
                 mode,
                 tools,
                 presets,
+                remote,
+                interactive,
             }) => {
+                assert_eq!(name, "project");
                 assert_eq!(mode, "worktree");
                 assert_eq!(tools, vec!["eslint", "prettier"]);
                 assert_eq!(presets, vec!["typescript"]);
+                assert_eq!(remote, Some("https://github.com/user/repo.git".to_string()));
+                assert!(!interactive);
+            }
+            _ => panic!("Expected Init command"),
+        }
+    }
+
+    #[test]
+    fn parse_init_command_interactive() {
+        let cli = Cli::parse_from(["repo", "init", "--interactive"]);
+        match cli.command {
+            Some(Commands::Init { interactive, .. }) => {
+                assert!(interactive);
             }
             _ => panic!("Expected Init command"),
         }
