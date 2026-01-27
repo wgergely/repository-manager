@@ -75,6 +75,27 @@ pub enum Commands {
         name: String,
     },
 
+    /// Add a rule to the repository
+    AddRule {
+        /// Rule identifier (e.g., "python-style")
+        id: String,
+        /// Rule instruction text
+        #[arg(short, long)]
+        instruction: String,
+        /// Optional tags
+        #[arg(short, long)]
+        tags: Vec<String>,
+    },
+
+    /// Remove a rule from the repository
+    RemoveRule {
+        /// Rule ID to remove
+        id: String,
+    },
+
+    /// List all active rules
+    ListRules,
+
     /// Manage branches (worktree mode)
     Branch {
         /// Branch action to perform
@@ -234,6 +255,71 @@ mod tests {
             Some(Commands::RemovePreset { name }) => assert_eq!(name, "typescript"),
             _ => panic!("Expected RemovePreset command"),
         }
+    }
+
+    #[test]
+    fn parse_add_rule_command() {
+        let cli = Cli::parse_from([
+            "repo",
+            "add-rule",
+            "python-style",
+            "--instruction",
+            "Use snake_case for variables.",
+        ]);
+        match cli.command {
+            Some(Commands::AddRule {
+                id,
+                instruction,
+                tags,
+            }) => {
+                assert_eq!(id, "python-style");
+                assert_eq!(instruction, "Use snake_case for variables.");
+                assert!(tags.is_empty());
+            }
+            _ => panic!("Expected AddRule command"),
+        }
+    }
+
+    #[test]
+    fn parse_add_rule_command_with_tags() {
+        let cli = Cli::parse_from([
+            "repo",
+            "add-rule",
+            "naming-conventions",
+            "-i",
+            "Follow consistent naming.",
+            "-t",
+            "style",
+            "-t",
+            "python",
+        ]);
+        match cli.command {
+            Some(Commands::AddRule {
+                id,
+                instruction,
+                tags,
+            }) => {
+                assert_eq!(id, "naming-conventions");
+                assert_eq!(instruction, "Follow consistent naming.");
+                assert_eq!(tags, vec!["style", "python"]);
+            }
+            _ => panic!("Expected AddRule command"),
+        }
+    }
+
+    #[test]
+    fn parse_remove_rule_command() {
+        let cli = Cli::parse_from(["repo", "remove-rule", "python-style"]);
+        match cli.command {
+            Some(Commands::RemoveRule { id }) => assert_eq!(id, "python-style"),
+            _ => panic!("Expected RemoveRule command"),
+        }
+    }
+
+    #[test]
+    fn parse_list_rules_command() {
+        let cli = Cli::parse_from(["repo", "list-rules"]);
+        assert!(matches!(cli.command, Some(Commands::ListRules)));
     }
 
     #[test]

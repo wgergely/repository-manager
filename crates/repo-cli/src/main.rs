@@ -65,6 +65,13 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::RemoveTool { name } => cmd_remove_tool(&name),
         Commands::AddPreset { name } => cmd_add_preset(&name),
         Commands::RemovePreset { name } => cmd_remove_preset(&name),
+        Commands::AddRule {
+            id,
+            instruction,
+            tags,
+        } => cmd_add_rule(&id, &instruction, tags),
+        Commands::RemoveRule { id } => cmd_remove_rule(&id),
+        Commands::ListRules => cmd_list_rules(),
         Commands::Branch { action } => cmd_branch(action),
     }
 }
@@ -109,6 +116,21 @@ fn cmd_add_preset(name: &str) -> Result<()> {
 fn cmd_remove_preset(name: &str) -> Result<()> {
     let cwd = std::env::current_dir()?;
     commands::run_remove_preset(&cwd, name)
+}
+
+fn cmd_add_rule(id: &str, instruction: &str, tags: Vec<String>) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::run_add_rule(&cwd, id, instruction, tags)
+}
+
+fn cmd_remove_rule(id: &str) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::run_remove_rule(&cwd, id)
+}
+
+fn cmd_list_rules() -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::run_list_rules(&cwd)
 }
 
 fn cmd_branch(action: BranchAction) -> Result<()> {
@@ -182,6 +204,63 @@ mod tests {
         commands::run_add_preset(temp_dir.path(), "typescript").unwrap();
         // Then remove it
         let result = commands::run_remove_preset(temp_dir.path(), "typescript");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_add_rule_with_temp_repo() {
+        let temp_dir = TempDir::new().unwrap();
+        create_minimal_repo(temp_dir.path(), "standard");
+
+        let result = commands::run_add_rule(
+            temp_dir.path(),
+            "python-style",
+            "Use snake_case for variables.",
+            vec![],
+        );
+        assert!(result.is_ok());
+
+        // Verify rule file was created
+        let rule_path = temp_dir.path().join(".repository/rules/python-style.md");
+        assert!(rule_path.exists());
+    }
+
+    #[test]
+    fn test_remove_rule_with_temp_repo() {
+        let temp_dir = TempDir::new().unwrap();
+        create_minimal_repo(temp_dir.path(), "standard");
+
+        // First add the rule
+        commands::run_add_rule(
+            temp_dir.path(),
+            "test-rule",
+            "Test instruction.",
+            vec![],
+        )
+        .unwrap();
+        // Then remove it
+        let result = commands::run_remove_rule(temp_dir.path(), "test-rule");
+        assert!(result.is_ok());
+
+        // Verify rule file was removed
+        let rule_path = temp_dir.path().join(".repository/rules/test-rule.md");
+        assert!(!rule_path.exists());
+    }
+
+    #[test]
+    fn test_list_rules_with_temp_repo() {
+        let temp_dir = TempDir::new().unwrap();
+        create_minimal_repo(temp_dir.path(), "standard");
+
+        // List rules when none exist
+        let result = commands::run_list_rules(temp_dir.path());
+        assert!(result.is_ok());
+
+        // Add a rule
+        commands::run_add_rule(temp_dir.path(), "my-rule", "A rule.", vec![]).unwrap();
+
+        // List rules again
+        let result = commands::run_list_rules(temp_dir.path());
         assert!(result.is_ok());
     }
 
