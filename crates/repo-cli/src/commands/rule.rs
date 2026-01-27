@@ -95,7 +95,7 @@ pub fn run_list_rules(path: &Path) -> Result<()> {
     for entry in fs::read_dir(&rules_dir)? {
         let entry = entry?;
         let path = entry.path();
-        if path.extension().map_or(false, |e| e == "md") {
+        if path.extension().is_some_and(|e| e == "md") {
             let id = path.file_stem().unwrap().to_string_lossy();
             println!("   {} {}", "-".cyan(), id);
             found = true;

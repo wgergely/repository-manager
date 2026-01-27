@@ -62,7 +62,7 @@ impl RuleSyncer {
         for entry in fs::read_dir(&native_path)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |e| e == "md") {
+            if path.extension().is_some_and(|e| e == "md") {
                 let id = path
                     .file_stem()
                     .unwrap_or_default()

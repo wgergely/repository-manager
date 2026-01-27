@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn test_uv_provider_default() {
-        let provider = UvProvider::default();
+        let provider = UvProvider;
         assert_eq!(provider.id(), "env:python");
     }
 }

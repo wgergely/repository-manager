@@ -66,9 +66,7 @@ fn test_unicode_and_emoji_support() {
     for wt in &worktrees {
         println!(
             " - Name: '{}', Branch: '{}', Path: '{}'",
-            wt.name,
-            wt.branch,
-            wt.path.to_string()
+            wt.name, wt.branch, wt.path
         );
     }
 

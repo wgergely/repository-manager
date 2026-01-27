@@ -13,10 +13,7 @@ use uuid::Uuid;
 
 /// Write content to a file safely (with symlink protection)
 fn safe_write(path: &NormalizedPath, content: &str) -> Result<()> {
-    repo_fs::io::write_text(path, content).map_err(|e| Error::Io(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        e.to_string(),
-    )))
+    repo_fs::io::write_text(path, content).map_err(|e| Error::Io(std::io::Error::other(e.to_string())))
 }
 
 /// Synchronizes tool configurations
