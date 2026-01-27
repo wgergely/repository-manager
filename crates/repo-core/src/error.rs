@@ -32,6 +32,10 @@ pub enum Error {
     #[error("Sync error: {message}")]
     SyncError { message: String },
 
+    /// Resource not found
+    #[error("Not found: {0}")]
+    NotFound(String),
+
     // Transparent wrappers for underlying crate errors
     /// Filesystem error from repo-fs
     #[error(transparent)]

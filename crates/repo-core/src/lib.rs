@@ -39,6 +39,7 @@ pub mod error;
 pub mod ledger;
 pub mod mode;
 pub mod projection;
+pub mod rules;
 pub mod sync;
 
 pub use backend::{BranchInfo, ModeBackend, StandardBackend, WorktreeBackend};
@@ -47,6 +48,7 @@ pub use error::{Error, Result};
 pub use ledger::{Intent, Ledger, Projection, ProjectionKind};
 pub use mode::Mode;
 pub use projection::{compute_checksum, ProjectionWriter};
+pub use rules::{Rule, RuleRegistry};
 pub use sync::{
     CheckReport, CheckStatus, DriftItem, RuleFile, RuleSyncer, SyncEngine, SyncOptions, SyncReport,
 };
