@@ -7,7 +7,25 @@ use std::path::Path;
 
 use colored::Colorize;
 
-use crate::error::Result;
+use crate::error::{CliError, Result};
+
+/// Validate a rule ID to prevent path traversal and invalid filenames
+fn validate_rule_id(id: &str) -> Result<()> {
+    if id.is_empty() {
+        return Err(CliError::user("Rule ID cannot be empty"));
+    }
+    if id.len() > 64 {
+        return Err(CliError::user("Rule ID cannot exceed 64 characters"));
+    }
+    if id.contains('/') || id.contains('\\') || id.contains("..") {
+        return Err(CliError::user("Rule ID cannot contain path separators or '..'"));
+    }
+    // Only allow alphanumeric, hyphens, and underscores
+    if !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+        return Err(CliError::user("Rule ID can only contain alphanumeric characters, hyphens, and underscores"));
+    }
+    Ok(())
+}
 
 /// Path to rules directory within a repository
 const RULES_DIR: &str = ".repository/rules";
@@ -16,6 +34,9 @@ const RULES_DIR: &str = ".repository/rules";
 ///
 /// Adds a rule to the repository's rules directory as a markdown file.
 pub fn run_add_rule(path: &Path, id: &str, instruction: &str, tags: Vec<String>) -> Result<()> {
+    // Validate rule ID to prevent path traversal
+    validate_rule_id(id)?;
+
     println!("{} Adding rule: {}", "=>".blue().bold(), id.cyan());
 
     let rules_dir = path.join(RULES_DIR);
@@ -40,6 +61,9 @@ pub fn run_add_rule(path: &Path, id: &str, instruction: &str, tags: Vec<String>)
 ///
 /// Removes a rule from the repository's rules directory.
 pub fn run_remove_rule(path: &Path, id: &str) -> Result<()> {
+    // Validate rule ID to prevent path traversal
+    validate_rule_id(id)?;
+
     println!("{} Removing rule: {}", "=>".blue().bold(), id.cyan());
 
     let rule_path = path.join(RULES_DIR).join(format!("{}.md", id));
@@ -233,5 +257,35 @@ mod tests {
         let content = fs::read_to_string(&rule_path).unwrap();
         assert!(content.contains("Updated content."));
         assert!(!content.contains("Original content."));
+    }
+
+    #[test]
+    fn test_rule_id_validation_empty() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = run_add_rule(temp_dir.path(), "", "content", vec![]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_rule_id_validation_path_traversal() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = run_add_rule(temp_dir.path(), "../../../etc/passwd", "content", vec![]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_rule_id_validation_special_chars() {
+        let temp_dir = TempDir::new().unwrap();
+        let result = run_add_rule(temp_dir.path(), "rule with spaces", "content", vec![]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_rule_id_validation_valid() {
+        let temp_dir = TempDir::new().unwrap();
+        // Valid IDs should work
+        assert!(validate_rule_id("valid-rule").is_ok());
+        assert!(validate_rule_id("valid_rule").is_ok());
+        assert!(validate_rule_id("ValidRule123").is_ok());
     }
 }
