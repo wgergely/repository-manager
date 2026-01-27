@@ -5,10 +5,10 @@
 //! tools to be added without writing Rust code.
 
 use crate::error::Result;
-use crate::integration::{Rule, SyncContext, ToolIntegration};
+use crate::integration::{ConfigLocation, ConfigType, Rule, SyncContext, ToolIntegration};
 use repo_blocks::upsert_block;
 use repo_fs::{NormalizedPath, io};
-use repo_meta::schema::{ConfigType, ToolDefinition};
+use repo_meta::schema::ToolDefinition;
 use serde_json::{Value, json};
 
 /// Generic tool integration driven by ToolDefinition schema.
@@ -147,12 +147,24 @@ impl ToolIntegration for GenericToolIntegration {
         &self.definition.meta.slug
     }
 
-    fn config_paths(&self) -> Vec<&str> {
-        let mut paths = vec![self.definition.integration.config_path.as_str()];
+    fn config_locations(&self) -> Vec<ConfigLocation> {
+        let config_type = self.definition.integration.config_type;
+        let mut locations = vec![ConfigLocation::file(
+            &self.definition.integration.config_path,
+            config_type,
+        )];
+
         for path in &self.definition.integration.additional_paths {
-            paths.push(path.as_str());
+            // Paths ending with / are directories
+            let is_dir = path.ends_with('/');
+            if is_dir {
+                locations.push(ConfigLocation::directory(path, config_type));
+            } else {
+                locations.push(ConfigLocation::file(path, config_type));
+            }
         }
-        paths
+
+        locations
     }
 
     fn sync(&self, context: &SyncContext, rules: &[Rule]) -> Result<()> {
@@ -200,14 +212,20 @@ mod tests {
     }
 
     #[test]
-    fn test_config_paths() {
+    fn test_config_locations() {
         let mut def = create_text_definition();
         def.integration.additional_paths = vec![".test/rules/".to_string()];
 
         let integration = GenericToolIntegration::new(def);
-        let paths = integration.config_paths();
+        let locations = integration.config_locations();
 
-        assert_eq!(paths, vec![".testrules", ".test/rules/"]);
+        assert_eq!(locations.len(), 2);
+        assert_eq!(locations[0].path, ".testrules");
+        assert_eq!(locations[0].config_type, ConfigType::Text);
+        assert!(!locations[0].is_directory);
+
+        assert_eq!(locations[1].path, ".test/rules/");
+        assert!(locations[1].is_directory);
     }
 
     #[test]

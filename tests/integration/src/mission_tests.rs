@@ -464,28 +464,31 @@ mod m3_sync {
 mod m4_tools {
     use super::*;
 
-    /// M4.1: VSCode integration name and paths
+    /// M4.1: VSCode integration name and locations
     #[test]
     fn m4_1_vscode_integration_info() {
         let vscode = VSCodeIntegration::new();
         assert_eq!(vscode.name(), "vscode");
-        assert!(vscode.config_paths().contains(&".vscode/settings.json"));
+        let paths: Vec<_> = vscode.config_locations().into_iter().map(|l| l.path).collect();
+        assert!(paths.contains(&".vscode/settings.json".to_string()));
     }
 
-    /// M4.2: Cursor integration name and paths
+    /// M4.2: Cursor integration name and locations
     #[test]
     fn m4_2_cursor_integration_info() {
         let cursor = cursor_integration();
         assert_eq!(cursor.name(), "cursor");
-        assert!(cursor.config_paths().contains(&".cursorrules"));
+        let paths: Vec<_> = cursor.config_locations().into_iter().map(|l| l.path).collect();
+        assert!(paths.contains(&".cursorrules".to_string()));
     }
 
-    /// M4.3: Claude integration name and paths
+    /// M4.3: Claude integration name and locations
     #[test]
     fn m4_3_claude_integration_info() {
         let claude = claude_integration();
         assert_eq!(claude.name(), "claude");
-        assert!(claude.config_paths().contains(&"CLAUDE.md"));
+        let paths: Vec<_> = claude.config_locations().into_iter().map(|l| l.path).collect();
+        assert!(paths.contains(&"CLAUDE.md".to_string()));
     }
 
     /// M4.4: VSCode settings include python path when context has it

@@ -58,10 +58,11 @@ mod tests {
     }
 
     #[test]
-    fn test_config_paths() {
+    fn test_config_locations() {
         let integration = antigravity_integration();
-        let paths = integration.config_paths();
-        assert_eq!(paths, vec![".agent/rules.md"]);
+        let locations = integration.config_locations();
+        assert_eq!(locations.len(), 1);
+        assert_eq!(locations[0].path, ".agent/rules.md");
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! Integration tests for Cursor integration.
 
 use repo_fs::NormalizedPath;
-use repo_tools::{cursor_integration, Rule, SyncContext, ToolIntegration};
+use repo_tools::{cursor_integration, ConfigType, Rule, SyncContext, ToolIntegration};
 use std::fs;
 use tempfile::TempDir;
 
@@ -12,10 +12,12 @@ fn test_cursor_name() {
 }
 
 #[test]
-fn test_cursor_config_paths() {
+fn test_cursor_config_locations() {
     let integration = cursor_integration();
-    let paths = integration.config_paths();
-    assert_eq!(paths, vec![".cursorrules"]);
+    let locations = integration.config_locations();
+    assert_eq!(locations.len(), 1);
+    assert_eq!(locations[0].path, ".cursorrules");
+    assert_eq!(locations[0].config_type, ConfigType::Text);
 }
 
 #[test]

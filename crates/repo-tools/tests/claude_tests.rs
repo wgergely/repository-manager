@@ -1,7 +1,7 @@
 //! Integration tests for Claude integration.
 
 use repo_fs::NormalizedPath;
-use repo_tools::{claude_integration, Rule, SyncContext, ToolIntegration};
+use repo_tools::{claude_integration, ConfigType, Rule, SyncContext, ToolIntegration};
 use std::fs;
 use tempfile::TempDir;
 
@@ -12,10 +12,15 @@ fn test_claude_name() {
 }
 
 #[test]
-fn test_claude_config_paths() {
+fn test_claude_config_locations() {
     let integration = claude_integration();
-    let paths = integration.config_paths();
-    assert_eq!(paths, vec!["CLAUDE.md", ".claude/rules/"]);
+    let locations = integration.config_locations();
+    assert_eq!(locations.len(), 2);
+    assert_eq!(locations[0].path, "CLAUDE.md");
+    assert_eq!(locations[0].config_type, ConfigType::Markdown);
+    assert!(!locations[0].is_directory);
+    assert_eq!(locations[1].path, ".claude/rules/");
+    assert!(locations[1].is_directory);
 }
 
 #[test]

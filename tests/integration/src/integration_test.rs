@@ -219,16 +219,17 @@ fn test_registry_builtin_providers() {
 }
 
 #[test]
-fn test_tool_integration_names_and_paths() {
+fn test_tool_integration_names_and_locations() {
     let vscode = VSCodeIntegration::new();
     assert_eq!(vscode.name(), "vscode");
-    assert_eq!(vscode.config_paths(), vec![".vscode/settings.json"]);
+    assert_eq!(vscode.config_locations()[0].path, ".vscode/settings.json");
 
     let cursor = cursor_integration();
     assert_eq!(cursor.name(), "cursor");
-    assert_eq!(cursor.config_paths(), vec![".cursorrules"]);
+    assert_eq!(cursor.config_locations()[0].path, ".cursorrules");
 
     let claude = claude_integration();
     assert_eq!(claude.name(), "claude");
-    assert_eq!(claude.config_paths(), vec!["CLAUDE.md", ".claude/rules/"]);
+    assert_eq!(claude.config_locations()[0].path, "CLAUDE.md");
+    assert_eq!(claude.config_locations()[1].path, ".claude/rules/");
 }

@@ -1,7 +1,7 @@
 //! Integration tests for VSCode integration.
 
 use repo_fs::NormalizedPath;
-use repo_tools::{Rule, SyncContext, ToolIntegration, VSCodeIntegration};
+use repo_tools::{ConfigType, Rule, SyncContext, ToolIntegration, VSCodeIntegration};
 use serde_json::Value;
 use std::fs;
 use tempfile::TempDir;
@@ -13,10 +13,12 @@ fn test_vscode_name() {
 }
 
 #[test]
-fn test_vscode_config_paths() {
+fn test_vscode_config_locations() {
     let integration = VSCodeIntegration::new();
-    let paths = integration.config_paths();
-    assert_eq!(paths, vec![".vscode/settings.json"]);
+    let locations = integration.config_locations();
+    assert_eq!(locations.len(), 1);
+    assert_eq!(locations[0].path, ".vscode/settings.json");
+    assert_eq!(locations[0].config_type, ConfigType::Json);
 }
 
 #[test]

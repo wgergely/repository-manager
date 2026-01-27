@@ -4,7 +4,7 @@
 //! and other workspace settings.
 
 use crate::error::Result;
-use crate::integration::{Rule, SyncContext, ToolIntegration};
+use crate::integration::{ConfigLocation, ConfigType, Rule, SyncContext, ToolIntegration};
 use repo_fs::{NormalizedPath, io};
 use serde_json::{Value, json};
 
@@ -45,8 +45,8 @@ impl ToolIntegration for VSCodeIntegration {
         "vscode"
     }
 
-    fn config_paths(&self) -> Vec<&str> {
-        vec![".vscode/settings.json"]
+    fn config_locations(&self) -> Vec<ConfigLocation> {
+        vec![ConfigLocation::file(".vscode/settings.json", ConfigType::Json)]
     }
 
     fn sync(&self, context: &SyncContext, _rules: &[Rule]) -> Result<()> {
@@ -85,10 +85,13 @@ mod tests {
     }
 
     #[test]
-    fn test_config_paths() {
+    fn test_config_locations() {
         let integration = VSCodeIntegration::new();
-        let paths = integration.config_paths();
-        assert_eq!(paths, vec![".vscode/settings.json"]);
+        let locations = integration.config_locations();
+        assert_eq!(locations.len(), 1);
+        assert_eq!(locations[0].path, ".vscode/settings.json");
+        assert_eq!(locations[0].config_type, ConfigType::Json);
+        assert!(!locations[0].is_directory);
     }
 
     #[test]

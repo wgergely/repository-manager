@@ -59,10 +59,14 @@ mod tests {
     }
 
     #[test]
-    fn test_config_paths() {
+    fn test_config_locations() {
         let integration = claude_integration();
-        let paths = integration.config_paths();
-        assert_eq!(paths, vec!["CLAUDE.md", ".claude/rules/"]);
+        let locations = integration.config_locations();
+        assert_eq!(locations.len(), 2);
+        assert_eq!(locations[0].path, "CLAUDE.md");
+        assert!(!locations[0].is_directory);
+        assert_eq!(locations[1].path, ".claude/rules/");
+        assert!(locations[1].is_directory);
     }
 
     #[test]

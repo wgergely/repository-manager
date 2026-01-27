@@ -378,7 +378,7 @@ fn test_generic_integration_markdown_type() {
 }
 
 #[test]
-fn test_config_paths_with_additional() {
+fn test_config_locations_with_additional() {
     let definition = ToolDefinition {
         meta: ToolMeta {
             name: "Multi Path Tool".to_string(),
@@ -395,10 +395,14 @@ fn test_config_paths_with_additional() {
     };
 
     let integration = GenericToolIntegration::new(definition);
-    let paths = integration.config_paths();
+    let locations = integration.config_locations();
 
-    assert_eq!(paths.len(), 3);
-    assert_eq!(paths[0], ".tool/config.json");
-    assert_eq!(paths[1], ".tool/rules/");
-    assert_eq!(paths[2], ".tool/presets/");
+    assert_eq!(locations.len(), 3);
+    assert_eq!(locations[0].path, ".tool/config.json");
+    assert_eq!(locations[0].config_type, ConfigType::Json);
+    assert!(!locations[0].is_directory);
+    assert_eq!(locations[1].path, ".tool/rules/");
+    assert!(locations[1].is_directory);
+    assert_eq!(locations[2].path, ".tool/presets/");
+    assert!(locations[2].is_directory);
 }

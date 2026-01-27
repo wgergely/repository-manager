@@ -36,6 +36,6 @@ pub use dispatcher::ToolDispatcher;
 pub use error::{Error, Result};
 pub use gemini::{gemini_integration, GeminiIntegration};
 pub use generic::GenericToolIntegration;
-pub use integration::{Rule, SyncContext, ToolIntegration};
+pub use integration::{ConfigLocation, ConfigType, Rule, SyncContext, ToolIntegration};
 pub use vscode::VSCodeIntegration;
 pub use windsurf::{windsurf_integration, WindsurfIntegration};
