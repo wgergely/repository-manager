@@ -34,6 +34,7 @@ pub mod loader;
 pub mod registry;
 pub mod schema;
 pub mod tools;
+pub mod validation;
 
 pub use config::{
     ActiveConfig, CoreConfig, RepositoryConfig, RepositoryMode, SyncConfig, get_preset_config,
@@ -43,4 +44,4 @@ pub use error::{Error, Result};
 pub use loader::DefinitionLoader;
 pub use registry::Registry;
 pub use schema::{PresetDefinition, RuleDefinition, ToolDefinition};
-pub use tools::ToolRegistry;
+pub use validation::{ToolRegistry, PresetRegistry};
