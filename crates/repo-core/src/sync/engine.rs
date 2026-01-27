@@ -17,6 +17,7 @@ use crate::Result;
 use repo_fs::NormalizedPath;
 
 use super::check::{CheckReport, CheckStatus, DriftItem};
+use super::tool_syncer::ToolSyncer;
 
 /// Report from a sync or fix operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -339,10 +340,11 @@ impl SyncEngine {
     ///
     /// When `options.dry_run` is true, simulates changes without writing.
     pub fn sync_with_options(&self, options: SyncOptions) -> Result<SyncReport> {
-        let ledger = self.load_ledger()?;
-        let ledger_path = self.ledger_path();
+        let mut ledger = self.load_ledger()?;
         let mut report = SyncReport::success();
 
+        // Create ledger if it doesn't exist
+        let ledger_path = self.ledger_path();
         if !ledger_path.exists() {
             if options.dry_run {
                 report = report.with_action("[dry-run] Would create ledger file".to_string());
@@ -352,9 +354,41 @@ impl SyncEngine {
             }
         }
 
-        // TODO: Full sync implementation - apply configuration changes
-        // For now, we just ensure the ledger exists
+        // Load config to get active tools
+        let config_path = self.backend.config_root().join("config.toml");
+        if !config_path.exists() {
+            return Ok(report.with_action("No config.toml found - nothing to sync".to_string()));
+        }
 
+        // Read config and sync tools
+        let config_content = std::fs::read_to_string(config_path.as_ref())?;
+        if let Ok(config) = toml::from_str::<toml::Value>(&config_content)
+            && let Some(tools) = config.get("tools").and_then(|t| t.as_array())
+        {
+            let tool_syncer = ToolSyncer::new(self.root.clone(), options.dry_run);
+
+            for tool_value in tools {
+                if let Some(tool_name) = tool_value.as_str() {
+                    match tool_syncer.sync_tool(tool_name, &mut ledger) {
+                        Ok(actions) => {
+                            for action in actions {
+                                report = report.with_action(action);
+                            }
+                        }
+                        Err(e) => {
+                            report.errors.push(format!("Failed to sync {}: {}", tool_name, e));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Save ledger
+        if !options.dry_run {
+            self.save_ledger(&ledger)?;
+        }
+
+        report.success = report.errors.is_empty();
         Ok(report)
     }
 
@@ -376,9 +410,37 @@ impl SyncEngine {
     ///
     /// When `options.dry_run` is true, simulates fixes without applying.
     pub fn fix_with_options(&self, options: SyncOptions) -> Result<SyncReport> {
-        // For now, fix just re-runs sync
-        // In the future, this would also repair drifted/missing projections
-        self.sync_with_options(options)
+        // Check first to identify issues
+        let check_report = self.check()?;
+
+        let mut report = SyncReport::success();
+
+        if check_report.status == CheckStatus::Healthy {
+            return Ok(report.with_action("No fixes needed".to_string()));
+        }
+
+        // Re-sync will fix drift and recreate missing files
+        let sync_report = self.sync_with_options(options)?;
+
+        report.actions = sync_report.actions;
+        report.errors = sync_report.errors;
+        report.success = sync_report.success;
+
+        if !check_report.drifted.is_empty() {
+            report = report.with_action(format!(
+                "Fixed {} drifted projections",
+                check_report.drifted.len()
+            ));
+        }
+
+        if !check_report.missing.is_empty() {
+            report = report.with_action(format!(
+                "Recreated {} missing projections",
+                check_report.missing.len()
+            ));
+        }
+
+        Ok(report)
     }
 
     /// Fix synchronization issues

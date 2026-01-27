@@ -38,6 +38,7 @@ pub mod config;
 pub mod error;
 pub mod ledger;
 pub mod mode;
+pub mod projection;
 pub mod sync;
 
 pub use backend::{BranchInfo, ModeBackend, StandardBackend, WorktreeBackend};
@@ -45,6 +46,7 @@ pub use config::{ConfigResolver, Manifest, ResolvedConfig, RuntimeContext};
 pub use error::{Error, Result};
 pub use ledger::{Intent, Ledger, Projection, ProjectionKind};
 pub use mode::Mode;
+pub use projection::{compute_checksum, ProjectionWriter};
 pub use sync::{CheckReport, CheckStatus, DriftItem, SyncEngine, SyncOptions, SyncReport};
 
 #[cfg(test)]
