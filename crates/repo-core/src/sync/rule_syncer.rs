@@ -1,22 +1,37 @@
 //! Rule synchronization logic
 //!
 //! This module provides the `RuleSyncer` for synchronizing rules from
-//! `.repository/rules/` to tool configurations. Rules are markdown files
-//! that get combined and written to tool-specific config files.
+//! the central rule registry to tool configurations. Rules are stored
+//! in `.repository/rules/registry.toml` with UUID-based identification.
+//!
+//! The rule UUID becomes the managed block marker in tool config files,
+//! enabling bidirectional traceability between registry and projections.
 
 use crate::ledger::{Intent, Ledger, Projection, ProjectionKind};
 use crate::projection::{compute_checksum, ProjectionWriter};
+use crate::rules::RuleRegistry;
 use crate::Result;
 use repo_fs::NormalizedPath;
 use std::fs;
 use std::path::PathBuf;
 
-/// A loaded rule file
+/// A loaded rule file (legacy format from markdown files)
 #[derive(Debug, Clone)]
 pub struct RuleFile {
     /// The rule identifier (filename without extension)
     pub id: String,
     /// The content of the rule file
+    pub content: String,
+}
+
+/// A rule loaded from the registry (preferred format with UUID)
+#[derive(Debug, Clone)]
+pub struct RegistryRule {
+    /// UUID for the rule (used as block marker)
+    pub uuid: uuid::Uuid,
+    /// Human-readable identifier
+    pub id: String,
+    /// The rule content
     pub content: String,
 }
 
@@ -42,7 +57,40 @@ impl RuleSyncer {
         Self { root, dry_run }
     }
 
-    /// Load all rules from the rules directory
+    /// Load all rules from the rule registry
+    ///
+    /// Reads rules from `.repository/rules/registry.toml` and returns them
+    /// as `RegistryRule` structs with UUIDs for block markers.
+    ///
+    /// # Returns
+    ///
+    /// A vector of `RegistryRule` structs, empty if the registry doesn't exist.
+    pub fn load_registry_rules(&self) -> Result<Vec<RegistryRule>> {
+        let registry_path = self.root.join(".repository/rules/registry.toml");
+        let native_path = registry_path.to_native();
+
+        if !native_path.exists() {
+            return Ok(Vec::new());
+        }
+
+        let registry = RuleRegistry::load(native_path)?;
+        let mut rules: Vec<RegistryRule> = registry
+            .all_rules()
+            .iter()
+            .map(|r| RegistryRule {
+                uuid: r.uuid,
+                id: r.id.clone(),
+                content: r.content.clone(),
+            })
+            .collect();
+
+        // Sort by ID for consistent output
+        rules.sort_by(|a, b| a.id.cmp(&b.id));
+
+        Ok(rules)
+    }
+
+    /// Load all rules from the rules directory (legacy format)
     ///
     /// Reads all `.md` files from `.repository/rules/` and returns them
     /// as `RuleFile` structs sorted by filename.
@@ -82,10 +130,11 @@ impl RuleSyncer {
     /// Sync all rules to applicable tool configurations
     ///
     /// This method:
-    /// 1. Loads all rules from `.repository/rules/`
-    /// 2. Combines them into a single content block
-    /// 3. Writes to each tool's rules file (e.g., `.cursorrules`)
-    /// 4. Updates the ledger with the projection
+    /// 1. Loads all rules from the rule registry (`.repository/rules/registry.toml`)
+    /// 2. Falls back to legacy markdown files if registry is empty
+    /// 3. Combines rules into content with UUID-based block markers
+    /// 4. Writes to each tool's rules file (e.g., `.cursorrules`)
+    /// 5. Updates the ledger with the projection
     ///
     /// # Arguments
     ///
@@ -97,15 +146,23 @@ impl RuleSyncer {
     /// A list of action descriptions taken during the sync.
     pub fn sync_rules(&self, tools: &[String], ledger: &mut Ledger) -> Result<Vec<String>> {
         let mut actions = Vec::new();
-        let rules = self.load_rules()?;
 
-        if rules.is_empty() {
-            actions.push("No rules found in .repository/rules/".to_string());
-            return Ok(actions);
-        }
+        // Try to load from registry first (preferred)
+        let registry_rules = self.load_registry_rules()?;
 
-        // Combine all rules into a single content block
-        let combined_rules = self.combine_rules(&rules);
+        // Determine combined content based on available rules
+        let combined_rules = if !registry_rules.is_empty() {
+            // Use registry rules with UUID markers
+            self.combine_registry_rules(&registry_rules)
+        } else {
+            // Fall back to legacy markdown files
+            let legacy_rules = self.load_rules()?;
+            if legacy_rules.is_empty() {
+                actions.push("No rules found in .repository/rules/".to_string());
+                return Ok(actions);
+            }
+            self.combine_rules(&legacy_rules)
+        };
 
         let writer = ProjectionWriter::new(self.root.clone(), self.dry_run);
 
@@ -151,7 +208,7 @@ impl RuleSyncer {
                 actions.push(action);
 
                 // Create intent with updated checksum
-                let mut intent = Intent::new(intent_id.clone(), serde_json::Value::Null);
+                let mut intent = Intent::new(intent_id.clone(), serde_json::json!({}));
                 intent.add_projection(Projection::file_managed(
                     tool.clone(),
                     PathBuf::from(&file),
@@ -187,7 +244,38 @@ impl RuleSyncer {
         }
     }
 
-    /// Combine multiple rules into a single content block
+    /// Combine multiple registry rules into a single content block with UUID markers
+    ///
+    /// Each rule is wrapped in managed block markers using its UUID,
+    /// enabling bidirectional traceability between registry and output.
+    ///
+    /// Format:
+    /// ```text
+    /// <!-- repo:block:UUID -->
+    /// ## rule-id
+    /// rule content
+    /// <!-- /repo:block:UUID -->
+    /// ```
+    fn combine_registry_rules(&self, rules: &[RegistryRule]) -> String {
+        let header = "# Repository Rules\n\n\
+            # This file is auto-generated by repository-manager.\n\
+            # Do not edit directly - modify rules in .repository/rules/registry.toml instead.\n";
+
+        let rule_content = rules
+            .iter()
+            .map(|r| {
+                format!(
+                    "<!-- repo:block:{} -->\n## {}\n\n{}\n<!-- /repo:block:{} -->",
+                    r.uuid, r.id, r.content.trim(), r.uuid
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n---\n\n");
+
+        format!("{}\n\n{}", header, rule_content)
+    }
+
+    /// Combine multiple rules into a single content block (legacy format)
     ///
     /// Each rule is formatted with its ID as a header and separated by
     /// horizontal rules for readability.

@@ -410,6 +410,53 @@ fn test_sync_engine_load_save_ledger() {
 }
 
 #[test]
+fn test_sync_uses_rule_registry_uuids() {
+    // Task 1.3: Verify that sync uses rule UUIDs from the registry as block markers
+    let temp = setup_git_repo();
+    let root = NormalizedPath::new(temp.path());
+
+    // Create .repository directory structure
+    let repo_dir = temp.path().join(".repository");
+    let rules_dir = repo_dir.join("rules");
+    fs::create_dir_all(&rules_dir).unwrap();
+
+    // Create a rule registry with a test rule
+    let registry_path = rules_dir.join("registry.toml");
+    let mut registry = repo_core::RuleRegistry::new(registry_path.clone());
+    let rule_uuid = registry
+        .add_rule("test-rule", "Test rule content", vec!["test".to_string()])
+        .unwrap()
+        .uuid;
+
+    // Create config.toml with cursor tool enabled
+    let config_content = r#"
+tools = ["cursor"]
+
+[core]
+mode = "standard"
+"#;
+    fs::write(repo_dir.join("config.toml"), config_content).unwrap();
+
+    // Run sync
+    let engine = SyncEngine::new(root.clone(), Mode::Standard).unwrap();
+    let report = engine.sync().unwrap();
+    assert!(report.success, "Sync should succeed: {:?}", report.errors);
+
+    // Verify .cursorrules contains block with rule UUID
+    let cursorrules_path = temp.path().join(".cursorrules");
+    assert!(cursorrules_path.exists(), ".cursorrules should be created");
+
+    let content = fs::read_to_string(&cursorrules_path).unwrap();
+    let uuid_str = rule_uuid.to_string();
+    assert!(
+        content.contains(&uuid_str),
+        ".cursorrules should contain rule UUID {}: got content:\n{}",
+        uuid_str,
+        content
+    );
+}
+
+#[test]
 fn test_sync_reads_tools_from_config_using_manifest() {
     // GAP-021: SyncEngine should use typed Manifest parsing instead of raw toml::Value
     // This test verifies that tools are correctly read from config.toml using Manifest::parse()

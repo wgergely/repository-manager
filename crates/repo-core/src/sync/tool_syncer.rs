@@ -96,7 +96,7 @@ impl ToolSyncer {
         }
 
         // Create intent with projections
-        let mut intent = Intent::new(intent_id.clone(), serde_json::Value::Null);
+        let mut intent = Intent::new(intent_id.clone(), serde_json::json!({}));
         for projection in projections {
             intent.add_projection(projection);
         }
