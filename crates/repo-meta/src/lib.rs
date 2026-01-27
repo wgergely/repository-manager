@@ -33,8 +33,9 @@ pub mod error;
 pub mod loader;
 pub mod registry;
 pub mod schema;
-pub mod tools;
 pub mod validation;
+
+// Note: tools.rs was removed - ToolRegistry is now only in validation.rs
 
 pub use config::{
     ActiveConfig, CoreConfig, RepositoryConfig, RepositoryMode, SyncConfig, get_preset_config,
