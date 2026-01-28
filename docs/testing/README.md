@@ -17,7 +17,7 @@ The framework is built on **spec-driven testing**:
 
 | File | Purpose |
 |------|---------|
-| `CONCEPTUAL_TESTING_FRAMEWORK.md` | Full framework documentation with mission-based test scenarios |
+| `framework.md` | Full testing framework documentation with mission-based test scenarios |
 | `GAP_TRACKING.md` | Registry of discovered implementation gaps with priorities |
 | `README.md` | This file |
 
