@@ -11,8 +11,9 @@ pub use intent::Intent;
 pub use projection::{Projection, ProjectionKind};
 
 use crate::Result;
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::fs::{self, File, OpenOptions};
 use std::path::Path;
 use uuid::Uuid;
 
@@ -37,7 +38,7 @@ impl Ledger {
         }
     }
 
-    /// Load a ledger from a TOML file
+    /// Load a ledger from a TOML file with shared lock
     ///
     /// # Arguments
     ///
@@ -45,14 +46,22 @@ impl Ledger {
     ///
     /// # Errors
     ///
-    /// Returns an error if the file cannot be read or parsed.
+    /// Returns an error if the file cannot be read, locked, or parsed.
     pub fn load(path: &Path) -> Result<Self> {
+        let file = File::open(path)?;
+        file.lock_shared()?;
+
         let content = fs::read_to_string(path)?;
         let ledger: Ledger = toml::from_str(&content)?;
+
+        // Lock released when file is dropped
         Ok(ledger)
     }
 
-    /// Save the ledger to a TOML file
+    /// Save the ledger to a TOML file atomically with exclusive lock
+    ///
+    /// Uses write-to-temp-then-rename pattern with file locking to prevent
+    /// corruption and race conditions.
     ///
     /// # Arguments
     ///
@@ -60,10 +69,28 @@ impl Ledger {
     ///
     /// # Errors
     ///
-    /// Returns an error if the file cannot be written.
+    /// Returns an error if the file cannot be written or locked.
     pub fn save(&self, path: &Path) -> Result<()> {
         let content = toml::to_string_pretty(self)?;
-        fs::write(path, content)?;
+
+        // Create or open the target file for locking
+        let lock_file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(path)?;
+
+        // Acquire exclusive lock (blocks if another process holds lock)
+        lock_file.lock_exclusive()?;
+
+        // Write to temporary file first
+        let temp_path = path.with_extension("toml.tmp");
+        fs::write(&temp_path, &content)?;
+
+        // Atomically rename to target
+        fs::rename(&temp_path, path)?;
+
+        // Lock released when lock_file is dropped
         Ok(())
     }
 
@@ -126,6 +153,28 @@ mod tests {
     fn ledger_new_has_correct_version() {
         let ledger = Ledger::new();
         assert_eq!(ledger.version, "1.0");
+    }
+
+    #[test]
+    fn ledger_save_is_atomic() {
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("ledger.toml");
+
+        let mut ledger = Ledger::new();
+        ledger.add_intent(Intent::new("rule:test".to_string(), json!({})));
+
+        // Save ledger
+        ledger.save(&path).unwrap();
+
+        // Verify no temp file left behind
+        let temp_path = path.with_extension("toml.tmp");
+        assert!(!temp_path.exists(), "Temporary file should be cleaned up");
+
+        // Verify content is valid
+        let loaded = Ledger::load(&path).unwrap();
+        assert_eq!(loaded.intents().len(), 1);
     }
 
     #[test]
