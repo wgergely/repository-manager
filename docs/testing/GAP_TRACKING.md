@@ -23,11 +23,11 @@ This document tracks implementation gaps discovered by attempting to test spec c
 
 | ID | Feature | Spec Source | Current State | Priority |
 |----|---------|-------------|---------------|----------|
-| GAP-004 | `sync()` applies projections | config-ledger.md | Partially implemented - see GAP-022 | **CRITICAL** |
+| ~~GAP-004~~ | ~~`sync()` applies projections~~ | ~~config-ledger.md~~ | **CLOSED** - ToolSyncer now uses repo-tools | ~~CRITICAL~~ |
 | GAP-005 | `fix()` repairs drift | spec-cli.md | Calls sync (functional) | **CRITICAL** |
 | ~~GAP-018~~ | ~~MCP Server crate~~ | ~~spec-mcp-server.md~~ | **CLOSED** - Skeleton implemented | ~~CRITICAL~~ |
 | ~~GAP-021~~ | ~~Config parsing bug~~ | ~~architecture-core.md~~ | **CLOSED** - Was not actually a bug | ~~CRITICAL~~ |
-| GAP-022 | Tool integration mismatch | spec-tools.md | ToolSyncer vs repo-tools have different file paths | **CRITICAL** |
+| ~~GAP-022~~ | ~~Tool integration mismatch~~ | ~~spec-tools.md~~ | **CLOSED** - ToolSyncer wired to ToolDispatcher | ~~CRITICAL~~ |
 
 ### High Gaps (Important Functionality)
 
@@ -70,22 +70,23 @@ This document tracks implementation gaps discovered by attempting to test spec c
 | GAP-001 | `repo push` command | 2026-01-27 | `LayoutProvider::push()` in all layouts |
 | GAP-002 | `repo pull` command | 2026-01-27 | `LayoutProvider::pull()` in all layouts |
 | GAP-003 | `repo merge` command | 2026-01-27 | `LayoutProvider::merge()` in all layouts |
+| GAP-004 | sync() projections | 2026-01-28 | ToolSyncer wired to repo-tools via ToolDispatcher |
 | GAP-006 | Antigravity tool | 2026-01-27 | `crates/repo-tools/src/antigravity.rs` |
 | GAP-007 | Windsurf tool | 2026-01-27 | `crates/repo-tools/src/windsurf.rs` |
 | GAP-008 | Gemini CLI tool | 2026-01-27 | `crates/repo-tools/src/gemini.rs` |
 | GAP-010 | Python venv provider | 2026-01-27 | `crates/repo-presets/src/python/venv.rs` |
 | GAP-018 | MCP Server crate | 2026-01-27 | `crates/repo-mcp/` skeleton |
 | GAP-021 | Config parsing | 2026-01-27 | Was not a bug - format is correct |
+| GAP-022 | Tool unification | 2026-01-28 | ToolSyncer now uses ToolDispatcher from repo-tools |
 
 ---
 
 ## Remaining Open Gaps
 
-### Still Open (11 gaps)
+### Still Open (9 gaps)
 
 | ID | Feature | Priority | Notes |
 |----|---------|----------|-------|
-| GAP-004 | sync() projections | CRITICAL | Needs repo-tools wiring |
 | GAP-005 | fix() drift repair | CRITICAL | Works via sync, could be enhanced |
 | GAP-009 | JetBrains tool | MEDIUM | .idea/ integration |
 | GAP-011 | Conda provider | MEDIUM | conda environment support |
@@ -95,7 +96,6 @@ This document tracks implementation gaps discovered by attempting to test spec c
 | GAP-015 | GitIgnore | LOW | .gitignore templates |
 | GAP-016 | tool:ruff | LOW | ruff.toml configuration |
 | GAP-017 | tool:pytest | LOW | pytest.ini configuration |
-| GAP-022 | Tool unification | CRITICAL | ToolSyncer should use repo-tools |
 
 ### Re-evaluated (Not Gaps)
 
@@ -109,7 +109,7 @@ This document tracks implementation gaps discovered by attempting to test spec c
 ## Dashboard
 
 ```
-Gap Status (2026-01-27 Updated):
+Gap Status (2026-01-28 Final):
 ================================
 
 Before Background Agents:
@@ -119,7 +119,7 @@ Before Background Agents:
   Low:       4 open
   Total:    22 open, 0 closed
 
-After Background Agents:
+After Background Agents (2026-01-27):
   Critical:  3 open  |  ████████░░░░░░░░░░░░ 40%
   High:      0 open  |  ░░░░░░░░░░░░░░░░░░░░ 0%
   Medium:    4 open  |  ██████████░░░░░░░░░░ 50%
@@ -127,9 +127,17 @@ After Background Agents:
   ------------------------
   Total:    11 open  |  9 closed
 
-Production Readiness: 60%
+After Gap Closure (2026-01-28):
+  Critical:  1 open  |  ██░░░░░░░░░░░░░░░░░░ 10%
+  High:      0 open  |  ░░░░░░░░░░░░░░░░░░░░ 0%
+  Medium:    4 open  |  ██████████░░░░░░░░░░ 50%
+  Low:       4 open  |  ████████████████████ 100%
+  ------------------------
+  Total:     9 open  |  11 closed
+
+Production Readiness: 90%
   - Init/Branch: Ready
-  - Sync/Fix: Partial (needs GAP-004, GAP-022)
+  - Sync/Fix: READY (GAP-004, GAP-022 closed)
   - Tools: 6/7 implemented (missing JetBrains)
   - Presets: 2/9 implemented (uv, venv)
   - Git Ops: Ready (push/pull/merge implemented)
@@ -140,26 +148,24 @@ Production Readiness: 60%
 
 ## Gap Details
 
-### GAP-004: sync() Doesn't Apply Projections
+### GAP-004: sync() Applies Projections (CLOSED)
 
-**Status:** Open - needs GAP-022 resolution first
+**Status:** CLOSED (2026-01-28)
 
-**Fix Required:**
-Wire repo-tools integrations into SyncEngine via ToolSyncer.
+**Resolution:**
+ToolSyncer now uses ToolDispatcher from repo-tools to get proper tool integrations.
+The `get_tool_config_files()` method delegates to repo-tools which uses managed blocks.
 
 ---
 
-### GAP-022: Tool Integration Mismatch
+### GAP-022: Tool Integration Mismatch (CLOSED)
 
-**Status:** Open - blocking GAP-004
+**Status:** CLOSED (2026-01-28)
 
-**Issue:**
-- `ToolSyncer` generates hardcoded content
-- `repo-tools` has proper integrations with managed blocks
-- Need to unify so SyncEngine uses repo-tools
-
-**Fix Required:**
-Refactor `ToolSyncer::get_tool_config_files()` to delegate to repo-tools integrations.
+**Resolution:**
+Refactored `ToolSyncer` to include a `ToolDispatcher` field and use it in
+`get_tool_config_files()`. All 6 built-in tools (cursor, vscode, claude,
+windsurf, antigravity, gemini) are now properly supported via repo-tools.
 
 ---
 
