@@ -43,3 +43,4 @@ pub mod tools;
 
 pub use error::{Error, Result};
 pub use server::RepoMcpServer;
+pub use tools::{get_tool_definitions, ToolContent, ToolDefinition, ToolResult};
