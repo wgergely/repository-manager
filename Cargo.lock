@@ -1543,6 +1543,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "fs2",
  "pretty_assertions",
  "repo-content",
  "repo-fs",
