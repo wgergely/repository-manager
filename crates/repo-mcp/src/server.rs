@@ -5,6 +5,8 @@
 
 use std::path::PathBuf;
 
+use crate::resources::{get_resource_definitions, ResourceDefinition};
+use crate::tools::{get_tool_definitions, ToolDefinition};
 use crate::{Error, Result};
 
 /// MCP Server for Repository Manager
@@ -32,6 +34,12 @@ pub struct RepoMcpServer {
 
     /// Whether the server has been initialized
     initialized: bool,
+
+    /// Available MCP tools
+    tools: Vec<ToolDefinition>,
+
+    /// Available MCP resources
+    resources: Vec<ResourceDefinition>,
 }
 
 impl RepoMcpServer {
@@ -44,6 +52,8 @@ impl RepoMcpServer {
         Self {
             root,
             initialized: false,
+            tools: Vec::new(),
+            resources: Vec::new(),
         }
     }
 
@@ -56,6 +66,10 @@ impl RepoMcpServer {
 
         // TODO: Load repository configuration
         // TODO: Validate repository structure
+
+        // Load tool and resource definitions
+        self.tools = get_tool_definitions();
+        self.resources = get_resource_definitions();
 
         self.initialized = true;
         Ok(())
@@ -87,6 +101,16 @@ impl RepoMcpServer {
     pub fn is_initialized(&self) -> bool {
         self.initialized
     }
+
+    /// Get available tools
+    pub fn tools(&self) -> &[ToolDefinition] {
+        &self.tools
+    }
+
+    /// Get available resources
+    pub fn resources(&self) -> &[ResourceDefinition] {
+        &self.resources
+    }
 }
 
 #[cfg(test)]
@@ -98,6 +122,9 @@ mod tests {
         let server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
         assert_eq!(server.root(), &PathBuf::from("/tmp/test"));
         assert!(!server.is_initialized());
+        // Tools and resources should be empty before initialization
+        assert!(server.tools().is_empty());
+        assert!(server.resources().is_empty());
     }
 
     #[tokio::test]
@@ -106,5 +133,37 @@ mod tests {
         let result = server.initialize().await;
         assert!(result.is_ok());
         assert!(server.is_initialized());
+    }
+
+    #[tokio::test]
+    async fn server_loads_tools_on_initialize() {
+        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
+        server.initialize().await.unwrap();
+
+        // Should have loaded tools
+        assert!(!server.tools().is_empty());
+        assert_eq!(server.tools().len(), 14); // 4 repo + 3 branch + 3 git + 4 config
+
+        // Verify some expected tools
+        let tool_names: Vec<&str> = server.tools().iter().map(|t| t.name.as_str()).collect();
+        assert!(tool_names.contains(&"repo_init"));
+        assert!(tool_names.contains(&"git_push"));
+        assert!(tool_names.contains(&"branch_create"));
+    }
+
+    #[tokio::test]
+    async fn server_loads_resources_on_initialize() {
+        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
+        server.initialize().await.unwrap();
+
+        // Should have loaded resources
+        assert!(!server.resources().is_empty());
+        assert_eq!(server.resources().len(), 3);
+
+        // Verify expected resources
+        let resource_uris: Vec<&str> = server.resources().iter().map(|r| r.uri.as_str()).collect();
+        assert!(resource_uris.contains(&"repo://config"));
+        assert!(resource_uris.contains(&"repo://state"));
+        assert!(resource_uris.contains(&"repo://rules"));
     }
 }

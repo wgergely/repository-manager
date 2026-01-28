@@ -114,6 +114,34 @@ pub enum Commands {
         #[command(subcommand)]
         action: BranchAction,
     },
+
+    /// Push current branch to remote
+    Push {
+        /// Remote name (defaults to origin)
+        #[arg(short, long)]
+        remote: Option<String>,
+
+        /// Branch to push (defaults to current branch)
+        #[arg(short, long)]
+        branch: Option<String>,
+    },
+
+    /// Pull changes from remote
+    Pull {
+        /// Remote name (defaults to origin)
+        #[arg(short, long)]
+        remote: Option<String>,
+
+        /// Branch to pull (defaults to current branch)
+        #[arg(short, long)]
+        branch: Option<String>,
+    },
+
+    /// Merge a branch into current branch
+    Merge {
+        /// Branch to merge from
+        source: String,
+    },
 }
 
 /// Branch management actions
@@ -425,5 +453,46 @@ mod tests {
         let cli = Cli::parse_from(["repo", "check", "--verbose"]);
         assert!(cli.verbose);
         assert!(matches!(cli.command, Some(Commands::Check)));
+    }
+
+    #[test]
+    fn parse_push_command_defaults() {
+        let cli = Cli::parse_from(["repo", "push"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Push { remote: None, branch: None })
+        ));
+    }
+
+    #[test]
+    fn parse_push_command_with_remote() {
+        let cli = Cli::parse_from(["repo", "push", "--remote", "upstream"]);
+        match cli.command {
+            Some(Commands::Push { remote, branch }) => {
+                assert_eq!(remote, Some("upstream".to_string()));
+                assert_eq!(branch, None);
+            }
+            _ => panic!("Expected Push command"),
+        }
+    }
+
+    #[test]
+    fn parse_pull_command_defaults() {
+        let cli = Cli::parse_from(["repo", "pull"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Pull { remote: None, branch: None })
+        ));
+    }
+
+    #[test]
+    fn parse_merge_command() {
+        let cli = Cli::parse_from(["repo", "merge", "feature-x"]);
+        match cli.command {
+            Some(Commands::Merge { source }) => {
+                assert_eq!(source, "feature-x");
+            }
+            _ => panic!("Expected Merge command"),
+        }
     }
 }

@@ -38,9 +38,13 @@ impl Registry {
     ///
     /// Currently registers:
     /// - `env:python` -> `uv`
+    /// - `env:node` -> `node`
+    /// - `env:rust` -> `rust`
     pub fn with_builtins() -> Self {
         let mut registry = Self::new();
         registry.register("env:python", "uv");
+        registry.register("env:node", "node");
+        registry.register("env:rust", "rust");
         registry
     }
 
@@ -123,6 +127,10 @@ mod tests {
         assert!(!registry.is_empty());
         assert!(registry.has_provider("env:python"));
         assert_eq!(registry.get_provider("env:python"), Some(&"uv".to_string()));
+        assert!(registry.has_provider("env:node"));
+        assert_eq!(registry.get_provider("env:node"), Some(&"node".to_string()));
+        assert!(registry.has_provider("env:rust"));
+        assert_eq!(registry.get_provider("env:rust"), Some(&"rust".to_string()));
     }
 
     #[test]

@@ -78,6 +78,9 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::RemoveRule { id } => cmd_remove_rule(&id),
         Commands::ListRules => cmd_list_rules(),
         Commands::Branch { action } => cmd_branch(action),
+        Commands::Push { remote, branch } => cmd_push(remote, branch),
+        Commands::Pull { remote, branch } => cmd_pull(remote, branch),
+        Commands::Merge { source } => cmd_merge(&source),
     }
 }
 
@@ -174,6 +177,21 @@ fn cmd_branch(action: BranchAction) -> Result<()> {
             commands::run_branch_list(&cwd)
         }
     }
+}
+
+fn cmd_push(remote: Option<String>, branch: Option<String>) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::run_push(&cwd, remote.as_deref(), branch.as_deref())
+}
+
+fn cmd_pull(remote: Option<String>, branch: Option<String>) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::run_pull(&cwd, remote.as_deref(), branch.as_deref())
+}
+
+fn cmd_merge(source: &str) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::run_merge(&cwd, source)
 }
 
 #[cfg(test)]
