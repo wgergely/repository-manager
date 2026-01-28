@@ -1,7 +1,7 @@
 # Implementation Gap Tracking
 
 **Generated:** 2026-01-27
-**Updated:** 2026-01-27 (after background agent implementation)
+**Updated:** 2026-01-28 (after modern AI tools implementation)
 **Method:** Spec-driven test discovery
 
 ---
@@ -47,7 +47,7 @@ This document tracks implementation gaps discovered by attempting to test spec c
 | ~~GAP-006~~ | ~~Antigravity tool~~ | ~~spec-tools.md~~ | **CLOSED** - antigravity.rs implemented | ~~MEDIUM~~ |
 | ~~GAP-007~~ | ~~Windsurf tool~~ | ~~spec-tools.md~~ | **CLOSED** - windsurf.rs implemented | ~~MEDIUM~~ |
 | ~~GAP-008~~ | ~~Gemini CLI tool~~ | ~~spec-tools.md~~ | **CLOSED** - gemini.rs implemented | ~~MEDIUM~~ |
-| GAP-009 | JetBrains tool | spec-tools.md | Not implemented | MEDIUM |
+| ~~GAP-009~~ | ~~JetBrains tool~~ | ~~spec-tools.md~~ | **CLOSED** - jetbrains.rs implemented | ~~MEDIUM~~ |
 | ~~GAP-010~~ | ~~Python venv provider~~ | ~~spec-presets.md~~ | **CLOSED** - venv.rs implemented | ~~MEDIUM~~ |
 | GAP-011 | Python conda provider | spec-presets.md | Not implemented | MEDIUM |
 | ~~GAP-012~~ | ~~Node env provider~~ | ~~spec-presets.md~~ | **CLOSED** - Implemented in repo-presets | ~~MEDIUM~~ |
@@ -79,17 +79,23 @@ This document tracks implementation gaps discovered by attempting to test spec c
 | GAP-018 | MCP Server crate | 2026-01-27 | `crates/repo-mcp/` skeleton |
 | GAP-021 | Config parsing | 2026-01-27 | Was not a bug - format is correct |
 | GAP-022 | Tool unification | 2026-01-28 | ToolSyncer now uses ToolDispatcher from repo-tools |
+| GAP-009 | JetBrains tool | 2026-01-28 | `crates/repo-tools/src/jetbrains.rs` |
+| - | GitHub Copilot | 2026-01-28 | `crates/repo-tools/src/copilot.rs` |
+| - | Cline | 2026-01-28 | `crates/repo-tools/src/cline.rs` |
+| - | Roo Code | 2026-01-28 | `crates/repo-tools/src/roo.rs` |
+| - | Zed | 2026-01-28 | `crates/repo-tools/src/zed.rs` |
+| - | Aider | 2026-01-28 | `crates/repo-tools/src/aider.rs` |
+| - | Amazon Q | 2026-01-28 | `crates/repo-tools/src/amazonq.rs` |
 
 ---
 
 ## Remaining Open Gaps
 
-### Still Open (9 gaps)
+### Still Open (8 gaps)
 
 | ID | Feature | Priority | Notes |
 |----|---------|----------|-------|
 | GAP-005 | fix() drift repair | CRITICAL | Works via sync, could be enhanced |
-| GAP-009 | JetBrains tool | MEDIUM | .idea/ integration |
 | GAP-011 | Conda provider | MEDIUM | conda environment support |
 | GAP-012 | Node provider | MEDIUM | npm/node_modules support |
 | GAP-013 | Rust provider | MEDIUM | Cargo.toml/rust-analyzer |
@@ -131,15 +137,17 @@ After Background Agents (2026-01-27):
 After Gap Closure (2026-01-28):
   Critical:  1 open  |  ██░░░░░░░░░░░░░░░░░░ 10%
   High:      0 open  |  ░░░░░░░░░░░░░░░░░░░░ 0%
-  Medium:    4 open  |  ██████████░░░░░░░░░░ 50%
+  Medium:    3 open  |  ██████░░░░░░░░░░░░░░ 38%
   Low:       4 open  |  ████████████████████ 100%
   ------------------------
-  Total:     9 open  |  11 closed
+  Total:     8 open  |  18 closed (includes 7 new tool integrations)
 
-Production Readiness: 90%
+Production Readiness: 95%
   - Init/Branch: Ready
   - Sync/Fix: READY (GAP-004, GAP-022 closed)
-  - Tools: 6/7 implemented (missing JetBrains)
+  - Tools: 13/13 implemented
+    - Original: vscode, cursor, claude, windsurf, antigravity, gemini
+    - New: copilot, cline, roo, jetbrains, zed, aider, amazonq
   - Presets: 2/9 implemented (uv, venv)
   - Git Ops: Ready (push/pull/merge implemented)
   - MCP: Skeleton ready (needs tool implementations)
@@ -165,8 +173,9 @@ The `get_tool_config_files()` method delegates to repo-tools which uses managed 
 
 **Resolution:**
 Refactored `ToolSyncer` to include a `ToolDispatcher` field and use it in
-`get_tool_config_files()`. All 6 built-in tools (cursor, vscode, claude,
-windsurf, antigravity, gemini) are now properly supported via repo-tools.
+`get_tool_config_files()`. All 13 built-in tools are now properly supported via repo-tools:
+- Original (6): vscode, cursor, claude, windsurf, antigravity, gemini
+- New (7): copilot, cline, roo, jetbrains, zed, aider, amazonq
 
 ---
 

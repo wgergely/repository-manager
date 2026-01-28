@@ -5,15 +5,22 @@
 //! known tools (vscode, cursor, claude) and falls back to schema-driven generic
 //! integrations for other tools.
 
+use crate::aider::aider_integration;
+use crate::amazonq::amazonq_integration;
 use crate::antigravity::antigravity_integration;
 use crate::claude::claude_integration;
+use crate::cline::cline_integration;
+use crate::copilot::copilot_integration;
 use crate::cursor::cursor_integration;
 use crate::error::Result;
 use crate::gemini::gemini_integration;
 use crate::generic::GenericToolIntegration;
 use crate::integration::{Rule, SyncContext, ToolIntegration};
+use crate::jetbrains::jetbrains_integration;
+use crate::roo::roo_integration;
 use crate::vscode::VSCodeIntegration;
 use crate::windsurf::windsurf_integration;
+use crate::zed::zed_integration;
 use repo_meta::schema::ToolDefinition;
 use std::collections::HashMap;
 
@@ -60,6 +67,14 @@ impl ToolDispatcher {
             "windsurf" => return Some(Box::new(windsurf_integration())),
             "antigravity" => return Some(Box::new(antigravity_integration())),
             "gemini" => return Some(Box::new(gemini_integration())),
+            // New integrations
+            "copilot" => return Some(Box::new(copilot_integration())),
+            "cline" => return Some(Box::new(cline_integration())),
+            "roo" => return Some(Box::new(roo_integration())),
+            "jetbrains" => return Some(Box::new(jetbrains_integration())),
+            "zed" => return Some(Box::new(zed_integration())),
+            "aider" => return Some(Box::new(aider_integration())),
+            "amazonq" => return Some(Box::new(amazonq_integration())),
             _ => {}
         }
 
@@ -74,6 +89,7 @@ impl ToolDispatcher {
         matches!(
             tool_name,
             "vscode" | "cursor" | "claude" | "windsurf" | "antigravity" | "gemini"
+                | "copilot" | "cline" | "roo" | "jetbrains" | "zed" | "aider" | "amazonq"
         ) || self.schema_tools.contains_key(tool_name)
     }
 
@@ -107,6 +123,14 @@ impl ToolDispatcher {
             "windsurf".to_string(),
             "antigravity".to_string(),
             "gemini".to_string(),
+            // New integrations
+            "copilot".to_string(),
+            "cline".to_string(),
+            "roo".to_string(),
+            "jetbrains".to_string(),
+            "zed".to_string(),
+            "aider".to_string(),
+            "amazonq".to_string(),
         ];
 
         for slug in self.schema_tools.keys() {
@@ -136,15 +160,15 @@ mod tests {
     use super::*;
     use repo_meta::schema::{ConfigType, ToolCapabilities, ToolIntegrationConfig, ToolMeta};
 
-    fn create_zed_definition() -> ToolDefinition {
+    fn create_custom_tool_definition() -> ToolDefinition {
         ToolDefinition {
             meta: ToolMeta {
-                name: "Zed".to_string(),
-                slug: "zed".to_string(),
-                description: Some("Zed code editor".to_string()),
+                name: "CustomTool".to_string(),
+                slug: "customtool".to_string(),
+                description: Some("A custom tool for testing".to_string()),
             },
             integration: ToolIntegrationConfig {
-                config_path: ".zed/rules.md".to_string(),
+                config_path: ".customtool/rules.md".to_string(),
                 config_type: ConfigType::Markdown,
                 additional_paths: vec![],
             },
@@ -173,11 +197,19 @@ mod tests {
         assert!(dispatcher.get_integration("windsurf").is_some());
         assert!(dispatcher.get_integration("antigravity").is_some());
         assert!(dispatcher.get_integration("gemini").is_some());
+        // New integrations
+        assert!(dispatcher.get_integration("copilot").is_some());
+        assert!(dispatcher.get_integration("cline").is_some());
+        assert!(dispatcher.get_integration("roo").is_some());
+        assert!(dispatcher.get_integration("jetbrains").is_some());
+        assert!(dispatcher.get_integration("zed").is_some());
+        assert!(dispatcher.get_integration("aider").is_some());
+        assert!(dispatcher.get_integration("amazonq").is_some());
     }
 
     #[test]
     fn test_has_tool() {
-        let mut dispatcher = ToolDispatcher::new();
+        let dispatcher = ToolDispatcher::new();
 
         // Built-in tools
         assert!(dispatcher.has_tool("vscode"));
@@ -186,40 +218,44 @@ mod tests {
         assert!(dispatcher.has_tool("windsurf"));
         assert!(dispatcher.has_tool("antigravity"));
         assert!(dispatcher.has_tool("gemini"));
+        // New integrations
+        assert!(dispatcher.has_tool("copilot"));
+        assert!(dispatcher.has_tool("cline"));
+        assert!(dispatcher.has_tool("roo"));
+        assert!(dispatcher.has_tool("jetbrains"));
+        assert!(dispatcher.has_tool("zed"));
+        assert!(dispatcher.has_tool("aider"));
+        assert!(dispatcher.has_tool("amazonq"));
 
         // Unknown tool
-        assert!(!dispatcher.has_tool("zed"));
-
-        // Register and check again
-        dispatcher.register(create_zed_definition());
-        assert!(dispatcher.has_tool("zed"));
+        assert!(!dispatcher.has_tool("unknown_tool"));
     }
 
     #[test]
     fn test_register_schema_tool() {
         let mut dispatcher = ToolDispatcher::new();
-        dispatcher.register(create_zed_definition());
+        dispatcher.register(create_custom_tool_definition());
 
-        let integration = dispatcher.get_integration("zed");
+        let integration = dispatcher.get_integration("customtool");
         assert!(integration.is_some());
-        assert_eq!(integration.unwrap().name(), "zed");
+        assert_eq!(integration.unwrap().name(), "customtool");
     }
 
     #[test]
     fn test_with_definitions() {
         let mut definitions = HashMap::new();
-        definitions.insert("zed".to_string(), create_zed_definition());
+        definitions.insert("customtool".to_string(), create_custom_tool_definition());
 
         let dispatcher = ToolDispatcher::with_definitions(definitions);
 
-        assert!(dispatcher.get_integration("zed").is_some());
+        assert!(dispatcher.get_integration("customtool").is_some());
         assert_eq!(dispatcher.schema_tool_count(), 1);
     }
 
     #[test]
     fn test_list_available() {
         let mut dispatcher = ToolDispatcher::new();
-        dispatcher.register(create_zed_definition());
+        dispatcher.register(create_custom_tool_definition());
 
         let available = dispatcher.list_available();
 
@@ -230,10 +266,11 @@ mod tests {
         assert!(available.contains(&"windsurf".to_string()));
         assert!(available.contains(&"antigravity".to_string()));
         assert!(available.contains(&"gemini".to_string()));
-        assert!(available.contains(&"zed".to_string()));
+        assert!(available.contains(&"zed".to_string())); // Now a built-in
+        assert!(available.contains(&"customtool".to_string())); // Schema-defined
 
-        // First item should be "antigravity" (alphabetically first)
-        assert_eq!(available[0], "antigravity");
+        // First item should be "aider" (alphabetically first now)
+        assert_eq!(available[0], "aider");
     }
 
     #[test]

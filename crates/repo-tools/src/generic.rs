@@ -149,10 +149,14 @@ impl ToolIntegration for GenericToolIntegration {
 
     fn config_locations(&self) -> Vec<ConfigLocation> {
         let config_type = self.definition.integration.config_type;
-        let mut locations = vec![ConfigLocation::file(
-            &self.definition.integration.config_path,
-            config_type,
-        )];
+        let primary_path = &self.definition.integration.config_path;
+
+        // Check if primary path is a directory (ends with /)
+        let mut locations = if primary_path.ends_with('/') {
+            vec![ConfigLocation::directory(primary_path, config_type)]
+        } else {
+            vec![ConfigLocation::file(primary_path, config_type)]
+        };
 
         for path in &self.definition.integration.additional_paths {
             // Paths ending with / are directories
