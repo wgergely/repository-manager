@@ -925,11 +925,14 @@ dependencies = [
 name = "integration-tests"
 version = "0.1.0"
 dependencies = [
+ "assert_cmd",
+ "predicates",
  "regex",
  "repo-blocks",
  "repo-core",
  "repo-fs",
  "repo-git",
+ "repo-mcp",
  "repo-meta",
  "repo-presets",
  "repo-tools",
@@ -1505,6 +1508,7 @@ dependencies = [
  "predicates",
  "repo-core",
  "repo-fs",
+ "repo-git",
  "repo-meta",
  "serde_json",
  "tempfile",
