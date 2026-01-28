@@ -15,6 +15,10 @@ pub enum CliError {
     #[error(transparent)]
     Fs(#[from] repo_fs::Error),
 
+    /// Error from repo-git
+    #[error(transparent)]
+    Git(#[from] repo_git::Error),
+
     /// Standard I/O error
     #[error(transparent)]
     Io(#[from] std::io::Error),
