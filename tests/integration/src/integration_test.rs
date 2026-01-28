@@ -213,9 +213,16 @@ fn test_registry_builtin_providers() {
     assert!(registry.has_provider("env:python"));
     assert_eq!(registry.get_provider("env:python"), Some(&"uv".to_string()));
 
+    // env:node and env:rust are now implemented
+    assert!(registry.has_provider("env:node"));
+    assert_eq!(registry.get_provider("env:node"), Some(&"node".to_string()));
+
+    assert!(registry.has_provider("env:rust"));
+    assert_eq!(registry.get_provider("env:rust"), Some(&"rust".to_string()));
+
     // Unknown presets should return None
-    assert!(!registry.has_provider("env:node"));
-    assert_eq!(registry.get_provider("env:node"), None);
+    assert!(!registry.has_provider("env:nonexistent"));
+    assert_eq!(registry.get_provider("env:nonexistent"), None);
 }
 
 #[test]
