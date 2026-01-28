@@ -92,14 +92,14 @@ impl FormatHandler for TomlFormatHandler {
         };
 
         // Get the managed table
-        if let Some(managed) = table.get_mut(MANAGED_TABLE) {
-            if let Some(managed_table) = managed.as_table_mut() {
-                managed_table.remove(&uuid.to_string());
+        if let Some(managed) = table.get_mut(MANAGED_TABLE)
+            && let Some(managed_table) = managed.as_table_mut()
+        {
+            managed_table.remove(&uuid.to_string());
 
-                // If managed table is now empty, remove it entirely
-                if managed_table.is_empty() {
-                    table.remove(MANAGED_TABLE);
-                }
+            // If managed table is now empty, remove it entirely
+            if managed_table.is_empty() {
+                table.remove(MANAGED_TABLE);
             }
         }
 

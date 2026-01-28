@@ -16,6 +16,7 @@ pub struct InitConfig {
     pub tools: Vec<String>,
     pub presets: Vec<String>,
     pub remote: Option<String>,
+    #[allow(dead_code)]
     pub interactive: bool,
 }
 
@@ -82,11 +83,9 @@ pub fn sanitize_project_name(name: &str) -> String {
         if c.is_ascii_alphanumeric() {
             result.push(c.to_ascii_lowercase());
             last_was_hyphen = false;
-        } else if c == ' ' || c == '_' || c == '-' {
-            if !last_was_hyphen && !result.is_empty() {
-                result.push('-');
-                last_was_hyphen = true;
-            }
+        } else if (c == ' ' || c == '_' || c == '-') && !last_was_hyphen && !result.is_empty() {
+            result.push('-');
+            last_was_hyphen = true;
         }
         // Other characters are dropped
     }

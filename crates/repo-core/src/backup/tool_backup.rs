@@ -203,12 +203,11 @@ impl BackupManager {
             let entry = entry?;
             let path = entry.path();
 
-            if path.is_dir() {
-                if let Some(tool_name) = path.file_name().and_then(|n| n.to_str()) {
-                    if let Ok(Some(backup)) = self.get_backup(tool_name) {
-                        backups.push(backup);
-                    }
-                }
+            if path.is_dir()
+                && let Some(tool_name) = path.file_name().and_then(|n| n.to_str())
+                && let Ok(Some(backup)) = self.get_backup(tool_name)
+            {
+                backups.push(backup);
             }
         }
 

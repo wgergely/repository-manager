@@ -27,6 +27,7 @@ pub enum RepoContext {
     NotARepo,
 }
 
+#[allow(dead_code)]
 impl RepoContext {
     /// Get the repository root path (container root for worktrees, repo root for standard)
     pub fn root_path(&self) -> Option<&Path> {
@@ -93,23 +94,23 @@ pub fn detect_context(cwd: &Path) -> RepoContext {
             let parent_repo = parent.join(".repository");
             let parent_config = parent_repo.join("config.toml");
 
-            if parent_config.exists() {
-                if let Ok(content) = std::fs::read_to_string(&parent_config) {
-                    let mode = parse_mode(&content);
+            if parent_config.exists()
+                && let Ok(content) = std::fs::read_to_string(&parent_config)
+            {
+                let mode = parse_mode(&content);
 
-                    if mode == "worktrees" || mode == "worktree" {
-                        // We're in a worktree
-                        let worktree_name = current
-                            .file_name()
-                            .and_then(|n| n.to_str())
-                            .unwrap_or("unknown")
-                            .to_string();
+                if mode == "worktrees" || mode == "worktree" {
+                    // We're in a worktree
+                    let worktree_name = current
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown")
+                        .to_string();
 
-                        return RepoContext::Worktree {
-                            container: parent.to_path_buf(),
-                            worktree: worktree_name,
-                        };
-                    }
+                    return RepoContext::Worktree {
+                        container: parent.to_path_buf(),
+                        worktree: worktree_name,
+                    };
                 }
             }
         }
@@ -133,10 +134,10 @@ fn parse_mode(content: &str) -> String {
         let line = line.trim();
         if line.starts_with("mode") {
             // Extract value between quotes
-            if let Some(start) = line.find('"') {
-                if let Some(end) = line[start + 1..].find('"') {
-                    return line[start + 1..start + 1 + end].to_string();
-                }
+            if let Some(start) = line.find('"')
+                && let Some(end) = line[start + 1..].find('"')
+            {
+                return line[start + 1..start + 1 + end].to_string();
             }
         }
     }
