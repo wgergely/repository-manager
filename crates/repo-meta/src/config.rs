@@ -8,6 +8,9 @@ use repo_fs::{NormalizedPath, RepoPath};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Maximum configuration file size (10 MB)
+const MAX_CONFIG_SIZE: u64 = 10 * 1024 * 1024;
+
 /// Repository operation mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -116,6 +119,21 @@ pub fn load_config(root: &NormalizedPath) -> Result<RepositoryConfig> {
         });
     }
 
+    // Check file size before reading to prevent OOM attacks
+    let metadata = std::fs::metadata(config_path.to_native())
+        .map_err(|e| Error::Fs(repo_fs::Error::io(config_path.to_native(), e)))?;
+
+    if metadata.len() > MAX_CONFIG_SIZE {
+        return Err(Error::InvalidConfig {
+            path: config_path.to_native(),
+            message: format!(
+                "Configuration file too large ({} bytes, max {} bytes)",
+                metadata.len(),
+                MAX_CONFIG_SIZE
+            ),
+        });
+    }
+
     let content = std::fs::read_to_string(config_path.to_native())
         .map_err(|e| Error::Fs(repo_fs::Error::io(config_path.to_native(), e)))?;
 
@@ -216,5 +234,30 @@ version = "20"
 
         let python_config = get_preset_config(&config, "env:python").unwrap();
         assert_eq!(python_config.get("version").unwrap().as_str(), Some("3.11"));
+    }
+
+    #[test]
+    fn test_load_rejects_oversized_config() {
+        use std::io::Write;
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let root = NormalizedPath::new(dir.path());
+
+        // Create .repository directory
+        let config_dir = dir.path().join(".repository");
+        std::fs::create_dir_all(&config_dir).unwrap();
+
+        // Create oversized config file (11 MB of 'a')
+        let config_path = config_dir.join("config.toml");
+        let mut file = std::fs::File::create(&config_path).unwrap();
+        for _ in 0..11 {
+            file.write_all(&[b'a'; 1024 * 1024]).unwrap();
+        }
+
+        // Should reject oversized file
+        let result = load_config(&root);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("too large"));
     }
 }
