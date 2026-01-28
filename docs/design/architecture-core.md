@@ -33,7 +33,7 @@ The system operates in two distinct modes. The chosen mode determines how files,
 
 * **Config Strategy**: Tool configurations can exist at the container level (shared) or within specific worktrees. The manager handles syncing or referencing these configs.
 
-### 2. The Repository Manager Crate (`repo-manager`)
+### 2. The Repository Core Crate (`repo-core`)
 
 Technical backend implemented as a separated Rust crate.
 

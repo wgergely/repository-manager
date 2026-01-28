@@ -102,6 +102,6 @@ pub async fn branch_create(state: State<RepoMcpServer>, args: BranchCreateArgs) 
 
 ### Dependencies
 
-- `repo-manager`: The core logic crate.
+- `repo-core`: The core logic crate.
 - `mcp-sdk`: For protocol implementation.
 - `tokio`: For async runtime.

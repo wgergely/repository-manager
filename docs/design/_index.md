@@ -6,7 +6,7 @@ This directory contains the design specifications and architectural documents fo
 
 High-level overview of the system and its core components.
 
-- **[Core Architecture](architecture-core.md)**: Overview of the system modes (Normal vs. Worktrees) and the `repo-manager` crate responsibilities.
+- **[Core Architecture](architecture-core.md)**: Overview of the system modes (Normal vs. Worktrees) and the `repo-core` crate responsibilities.
 - **[Preset System Architecture](architecture-presets.md)**: Deep dive into the "Meta-System" pattern, decomposing capabilities into Presets and Providers.
 
 ## 2. Configuration System

@@ -9,6 +9,7 @@
 ## Overview
 
 This document tracks implementation gaps discovered by attempting to test spec claims. Each gap has:
+
 - **ID**: Unique identifier for tracking
 - **Spec Source**: Where the feature is documented
 - **Current State**: What actually exists
@@ -49,8 +50,8 @@ This document tracks implementation gaps discovered by attempting to test spec c
 | GAP-009 | JetBrains tool | spec-tools.md | Not implemented | MEDIUM |
 | ~~GAP-010~~ | ~~Python venv provider~~ | ~~spec-presets.md~~ | **CLOSED** - venv.rs implemented | ~~MEDIUM~~ |
 | GAP-011 | Python conda provider | spec-presets.md | Not implemented | MEDIUM |
-| GAP-012 | Node env provider | spec-presets.md | Not implemented | MEDIUM |
-| GAP-013 | Rust env provider | spec-presets.md | Not implemented | MEDIUM |
+| ~~GAP-012~~ | ~~Node env provider~~ | ~~spec-presets.md~~ | **CLOSED** - Implemented in repo-presets | ~~MEDIUM~~ |
+| ~~GAP-013~~ | ~~Rust env provider~~ | ~~spec-presets.md~~ | **CLOSED** - Implemented in repo-presets | ~~MEDIUM~~ |
 
 ### Low Gaps (Nice to Have)
 

@@ -5,6 +5,7 @@ Research documentation for the `repo-manager` project - a Rust CLI tool for orch
 ## Research Scope
 
 This research covers:
+
 - **Agentic coding tools** - Claude Code, Cursor, Windsurf, Copilot, Gemini, Amazon Q, Zed, and others
 - **Emerging standards** - AGENTS.md (universal rules), MCP (tool integration protocol)
 - **Development patterns** - Git worktrees, hooks integration, cross-platform interoperability
@@ -59,7 +60,7 @@ This research covers:
 | [rust-cli-frameworks.md](rust-cli-frameworks.md) | clap, argh, dialoguer, indicatif |
 | [rust-config-libraries.md](rust-config-libraries.md) | figment, config-rs, serde patterns |
 | [rust-git-libraries.md](rust-git-libraries.md) | gix (gitoxide) and git2 comparison |
-| [rust-testing.md](rust-testing.md) | Testing strategies and crates |
+| [rust-testing-2026.md](2026-01-28-rust-testing-standards.md) | Testing strategies and crates |
 
 ## Key Findings (January 2026)
 
@@ -89,5 +90,5 @@ This research covers:
 
 ---
 
-*Last updated: 2026-01-23*
+*Last updated: 2026-01-28*
 *Branch: research-docs*

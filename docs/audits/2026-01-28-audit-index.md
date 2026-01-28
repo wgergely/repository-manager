@@ -25,13 +25,13 @@
 
 ## Previous Audits (2026-01-23)
 
-- [repo-fs-audit.md](./repo-fs-audit.md) - Original repo-fs audit
-- [repo-git-security.md](./repo-git-security.md) - repo-git security audit
-- [repo-git-performance.md](./repo-git-performance.md) - repo-git performance audit
-- [repo-git-robustness.md](./repo-git-robustness.md) - repo-git robustness audit
-- [security_findings.md](./security_findings.md) - Cross-crate security findings
-- [performance_findings.md](./performance_findings.md) - Performance benchmark setup
-- [robustness_findings.md](./robustness_findings.md) - Robustness findings
+- [repo-fs-audit.md](./archive/repo-fs-audit.md) - Original repo-fs audit
+- [repo-git-security.md](./archive/repo-git-security.md) - repo-git security audit
+- [repo-git-performance.md](./archive/repo-git-performance.md) - repo-git performance audit
+- [repo-git-robustness.md](./archive/repo-git-robustness.md) - repo-git robustness audit
+- [security_findings.md](./archive/security_findings.md) - Cross-crate security findings
+- [performance_findings.md](./archive/performance_findings.md) - Performance benchmark setup
+- [robustness_findings.md](./archive/robustness_findings.md) - Robustness findings
 
 ---
 
@@ -42,6 +42,7 @@
 ### Critical Issues
 
 None identified. Previous critical issues have been addressed:
+
 - Symlink attacks in repo-fs: **FIXED**
 - validate() using exists() instead of is_dir(): **FIXED**
 
@@ -148,18 +149,21 @@ Each crate audit covers:
 ## Recommendations Summary
 
 ### Immediate Actions (This Sprint)
+
 1. Add file locking for ledger operations in repo-core
 2. Implement atomic ledger writes (temp file + rename)
 3. Fix JSON root expect() panic in repo-blocks
 4. Add recursion depth limits in repo-content
 
 ### Near-Term Actions (Next Sprint)
+
 1. Add input size limits to repo-meta config loading
 2. Validate Python version format in repo-presets
 3. Add Windows reserved name validation in repo-git
 4. Replace expect() with proper error handling in repo-cli
 
 ### CI/CD Recommendations
+
 1. Integrate `cargo audit` for dependency vulnerability scanning
 2. Add property-based fuzzing for parsing functions
 3. Set up benchmark regression testing
