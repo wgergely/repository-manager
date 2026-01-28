@@ -32,8 +32,9 @@ fn run() -> Result<()> {
             .with_max_level(Level::DEBUG)
             .with_target(true)
             .finish();
-        tracing::subscriber::set_global_default(subscriber)
-            .expect("Failed to set tracing subscriber");
+        if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
+            eprintln!("Warning: Could not set tracing subscriber: {}", e);
+        }
         tracing::debug!("Verbose mode enabled");
     }
 
