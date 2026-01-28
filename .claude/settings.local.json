@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git worktree:*)",
+      "Bash(git -C \"Y:\\\\code\\\\repository-manager-worktrees\\\\main\" log --oneline -20)",
+      "Bash(git -C \"Y:\\\\code\\\\repository-manager-worktrees\\\\main\" log --oneline --since=\"2026-01-28\")",
+      "Bash(cargo test:*)",
+      "Bash(cargo run:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(git push:*)",
+      "Bash(cargo check:*)",
+      "Bash(git restore:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: reorganize docs and clean up artifacts\n\n- Archive completed plans to docs/plans/archive/\n- Add consolidated daily summaries \\(2026-01-23, 26, 27\\)\n- Add historical summary document\n- Add design decisions and research docs\n- Remove temporary superpowers artifacts\n- Update snapshot test\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: update test snapshots\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "WebSearch",
+      "WebFetch(domain:docs.github.com)",
+      "WebFetch(domain:code.visualstudio.com)",
+      "WebFetch(domain:docs.cline.bot)",
+      "WebFetch(domain:docs.roocode.com)",
+      "WebFetch(domain:www.jetbrains.com)",
+      "WebFetch(domain:zed.dev)",
+      "WebFetch(domain:aider.chat)",
+      "WebFetch(domain:docs.continue.dev)",
+      "WebFetch(domain:github.com)"
+    ]
+  }
+}
