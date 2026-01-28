@@ -311,12 +311,11 @@ impl ToolSyncer {
             };
 
             // Sync the tool - this creates the config file with managed blocks
-            if !self.dry_run {
-                if let Err(e) = integration.sync(&context, &[initial_rule]) {
+            if !self.dry_run
+                && let Err(e) = integration.sync(&context, &[initial_rule]) {
                     tracing::warn!("Failed to sync tool {}: {}", tool_name, e);
                     return vec![];
                 }
-            }
 
             // Return the config locations for ledger tracking
             integration
