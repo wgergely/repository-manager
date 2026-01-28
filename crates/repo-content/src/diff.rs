@@ -4,6 +4,9 @@ use serde_json::Value;
 use similar::TextDiff;
 use uuid::Uuid;
 
+/// Maximum recursion depth for diff operations
+const MAX_DIFF_DEPTH: usize = 128;
+
 /// Result of comparing two documents semantically
 #[derive(Debug, Clone, PartialEq)]
 pub struct SemanticDiff {
@@ -137,6 +140,29 @@ pub enum SemanticChange {
 
 /// Recursively diff two JSON values, collecting changes with path tracking
 fn diff_values(old: &Value, new: &Value, path: String, changes: &mut Vec<SemanticChange>) {
+    diff_values_with_depth(old, new, path, changes, 0);
+}
+
+/// Internal recursive diff with depth tracking
+fn diff_values_with_depth(
+    old: &Value,
+    new: &Value,
+    path: String,
+    changes: &mut Vec<SemanticChange>,
+    depth: usize,
+) {
+    // Depth limit: treat deeply nested differences as a single modification
+    if depth > MAX_DIFF_DEPTH {
+        if old != new {
+            changes.push(SemanticChange::Modified {
+                path,
+                old: old.clone(),
+                new: new.clone(),
+            });
+        }
+        return;
+    }
+
     match (old, new) {
         // Both are objects - compare keys
         (Value::Object(old_obj), Value::Object(new_obj)) => {
@@ -151,7 +177,7 @@ fn diff_values(old: &Value, new: &Value, path: String, changes: &mut Vec<Semanti
                 match new_obj.get(key) {
                     Some(new_value) => {
                         // Key exists in both - recurse
-                        diff_values(old_value, new_value, child_path, changes);
+                        diff_values_with_depth(old_value, new_value, child_path, changes, depth + 1);
                     }
                     None => {
                         // Key removed
@@ -191,7 +217,7 @@ fn diff_values(old: &Value, new: &Value, path: String, changes: &mut Vec<Semanti
 
                 match (old_arr.get(i), new_arr.get(i)) {
                     (Some(old_val), Some(new_val)) => {
-                        diff_values(old_val, new_val, child_path, changes);
+                        diff_values_with_depth(old_val, new_val, child_path, changes, depth + 1);
                     }
                     (Some(old_val), None) => {
                         changes.push(SemanticChange::Removed {
@@ -347,5 +373,44 @@ mod tests {
         assert!(diff.changes.iter().any(|c| matches!(c,
             SemanticChange::BlockRemoved { content, .. } if content.contains("line2")
         )));
+    }
+
+    #[test]
+    fn test_compute_handles_deep_nesting() {
+        // Create deeply nested JSON (deeper than stack can handle without limit)
+        fn create_nested(depth: usize) -> Value {
+            let mut current = json!({"leaf": "value"});
+            for _ in 0..depth {
+                current = json!({"nested": current});
+            }
+            current
+        }
+
+        // 200 levels should work fine with depth limiting
+        let old = create_nested(200);
+        let new = create_nested(200);
+
+        // Should not stack overflow
+        let diff = SemanticDiff::compute(&old, &new);
+        assert!(diff.is_equivalent);
+    }
+
+    #[test]
+    fn test_compute_truncates_at_max_depth() {
+        fn create_nested(depth: usize, leaf_value: &str) -> Value {
+            let mut current = json!({"leaf": leaf_value});
+            for _ in 0..depth {
+                current = json!({"nested": current});
+            }
+            current
+        }
+
+        // Create structures deeper than MAX_DIFF_DEPTH
+        let old = create_nested(150, "old");
+        let new = create_nested(150, "new");
+
+        // Should detect difference without stack overflow
+        let diff = SemanticDiff::compute(&old, &new);
+        assert!(!diff.is_equivalent);
     }
 }
