@@ -70,7 +70,10 @@ impl FormatHandler for JsonFormatHandler {
             .unwrap_or(Value::String(block_content.to_string()));
 
         // Get or create the managed section
-        let obj = json.as_object_mut().expect("Root must be object");
+        let Some(obj) = json.as_object_mut() else {
+            // Cannot add managed section to non-object JSON (e.g., array)
+            return content.to_string();
+        };
         let managed = obj
             .entry(MANAGED_KEY)
             .or_insert_with(|| Value::Object(Map::new()));
@@ -94,14 +97,14 @@ impl FormatHandler for JsonFormatHandler {
         };
 
         // Get the managed section
-        if let Some(managed) = obj.get_mut(MANAGED_KEY) {
-            if let Some(managed_obj) = managed.as_object_mut() {
-                managed_obj.remove(&uuid.to_string());
+        if let Some(managed) = obj.get_mut(MANAGED_KEY)
+            && let Some(managed_obj) = managed.as_object_mut()
+        {
+            managed_obj.remove(&uuid.to_string());
 
-                // If managed section is now empty, remove it entirely
-                if managed_obj.is_empty() {
-                    obj.remove(MANAGED_KEY);
-                }
+            // If managed section is now empty, remove it entirely
+            if managed_obj.is_empty() {
+                obj.remove(MANAGED_KEY);
             }
         }
 
@@ -293,6 +296,19 @@ mod tests {
 
         assert!(block.is_some());
         assert!(block.unwrap().contains("setting"));
+    }
+
+    #[test]
+    fn test_write_block_to_array_returns_unchanged() {
+        let handler = JsonFormatHandler::new();
+        let array_content = r#"[1, 2, 3]"#;
+        let uuid = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+
+        // Should NOT panic, should return content unchanged
+        let result = handler.write_block(array_content, uuid, r#"{"setting": true}"#);
+
+        // Content should be unchanged since we can't add managed section to array
+        assert_eq!(result, array_content);
     }
 
     #[test]
