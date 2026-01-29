@@ -4,5 +4,7 @@
 //! formats, respecting each tool's declared capabilities.
 
 mod content;
+mod rules;
 
 pub use content::TranslatedContent;
+pub use rules::RuleTranslator;

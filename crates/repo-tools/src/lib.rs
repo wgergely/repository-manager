@@ -60,4 +60,4 @@ pub use zed::zed_integration;
 pub use registry::{builtin_registrations, ToolCategory, ToolRegistration, ToolRegistry, BUILTIN_COUNT};
 
 // Translator types
-pub use translator::TranslatedContent;
+pub use translator::{RuleTranslator, TranslatedContent};
