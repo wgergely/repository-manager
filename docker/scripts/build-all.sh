@@ -20,5 +20,11 @@ docker build -f cli/aider/Dockerfile -t repo-test/aider:latest .
 echo ">>> Building Gemini CLI image..."
 docker build -f cli/gemini/Dockerfile -t repo-test/gemini:latest .
 
+echo ">>> Building Cursor CLI image..."
+docker build -f cli/cursor/Dockerfile -t repo-test/cursor:latest .
+
+echo ">>> Building VS Code base image..."
+docker build -f base/Dockerfile.vscode -t repo-test/vscode-base:latest .
+
 echo "=== All images built successfully ==="
 docker images | grep repo-test
