@@ -12,8 +12,9 @@ RESULTS_DIR="${DOCKER_DIR}/test-results/builds"
 # Create results directory
 mkdir -p "$RESULTS_DIR"
 
-# Track failed builds
+# Track builds
 FAILED_BUILDS=()
+TOTAL_BUILDS=0
 
 # Color output (if terminal supports it)
 RED='\033[0;31m'
@@ -29,6 +30,7 @@ build_image() {
     local log_file="${RESULTS_DIR}/${name}.log"
 
     echo -n "Building ${name}... "
+    ((TOTAL_BUILDS++)) || true
 
     if docker build -f "${DOCKER_DIR}/${dockerfile}" -t "${tag}" "${DOCKER_DIR}" > "$log_file" 2>&1; then
         echo -e "${GREEN}✓ SUCCESS${NC}"
@@ -67,12 +69,11 @@ echo ""
 
 # Summary
 echo "=== Build Summary ==="
-total_builds=9
 failed_count=${#FAILED_BUILDS[@]}
-passed_count=$((total_builds - failed_count))
+passed_count=$((TOTAL_BUILDS - failed_count))
 
-echo "Passed: ${passed_count}/${total_builds}"
-echo "Failed: ${failed_count}/${total_builds}"
+echo "Passed: ${passed_count}/${TOTAL_BUILDS}"
+echo "Failed: ${failed_count}/${TOTAL_BUILDS}"
 
 if [ ${#FAILED_BUILDS[@]} -gt 0 ]; then
     echo ""
