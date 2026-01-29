@@ -56,4 +56,4 @@ pub use windsurf::{windsurf_integration, WindsurfIntegration};
 pub use zed::zed_integration;
 
 // Registry types
-pub use registry::{ToolCategory, ToolRegistration, ToolRegistry};
+pub use registry::{builtin_registrations, ToolCategory, ToolRegistration, ToolRegistry, BUILTIN_COUNT};
