@@ -87,13 +87,13 @@ impl RuleTranslator {
         }
 
         // Add file patterns if present
-        if let Some(ref targets) = rule.targets {
-            if !targets.file_patterns.is_empty() {
-                out.push_str(&format!(
-                    "\n\n**Applies to:** {}",
-                    targets.file_patterns.join(", ")
-                ));
-            }
+        if let Some(ref targets) = rule.targets
+            && !targets.file_patterns.is_empty()
+        {
+            out.push_str(&format!(
+                "\n\n**Applies to:** {}",
+                targets.file_patterns.join(", ")
+            ));
         }
 
         out

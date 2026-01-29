@@ -41,17 +41,17 @@ impl JsonWriter {
         };
 
         // Merge instructions if key specified
-        if let (Some(instructions), Some(k)) = (&content.instructions, keys) {
-            if let Some(ref key) = k.instruction_key {
-                obj.insert(key.clone(), json!(instructions));
-            }
+        if let (Some(instructions), Some(k)) = (&content.instructions, keys)
+            && let Some(ref key) = k.instruction_key
+        {
+            obj.insert(key.clone(), json!(instructions));
         }
 
         // Merge MCP servers if key specified
-        if let (Some(mcp), Some(k)) = (&content.mcp_servers, keys) {
-            if let Some(ref key) = k.mcp_key {
-                obj.insert(key.clone(), mcp.clone());
-            }
+        if let (Some(mcp), Some(k)) = (&content.mcp_servers, keys)
+            && let Some(ref key) = k.mcp_key
+        {
+            obj.insert(key.clone(), mcp.clone());
         }
 
         // Merge additional data
