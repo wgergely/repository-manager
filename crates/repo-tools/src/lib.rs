@@ -30,6 +30,7 @@ pub mod gemini;
 pub mod generic;
 pub mod integration;
 pub mod jetbrains;
+pub mod registry;
 pub mod logging;
 pub mod roo;
 pub mod vscode;
@@ -53,3 +54,6 @@ pub use roo::roo_integration;
 pub use vscode::VSCodeIntegration;
 pub use windsurf::{windsurf_integration, WindsurfIntegration};
 pub use zed::zed_integration;
+
+// Registry types
+pub use registry::{ToolCategory, ToolRegistration};
