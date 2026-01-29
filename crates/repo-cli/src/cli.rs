@@ -118,6 +118,9 @@ pub enum Commands {
     /// List available presets
     ListPresets,
 
+    /// Show repository status
+    Status,
+
     /// Manage branches (worktree mode)
     Branch {
         /// Branch action to perform
@@ -527,5 +530,11 @@ mod tests {
     fn parse_list_presets_command() {
         let cli = Cli::parse_from(["repo", "list-presets"]);
         assert!(matches!(cli.command, Some(Commands::ListPresets)));
+    }
+
+    #[test]
+    fn parse_status_command() {
+        let cli = Cli::parse_from(["repo", "status"]);
+        assert!(matches!(cli.command, Some(Commands::Status)));
     }
 }
