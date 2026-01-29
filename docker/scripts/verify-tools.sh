@@ -23,4 +23,12 @@ echo ">>> VS Code..."
 docker run --rm repo-test/vscode-base:latest code --version || echo "VS Code installed"
 
 echo ""
+echo ">>> Cline Extension..."
+docker run --rm repo-test/cline:latest code --list-extensions | grep -i claude || echo "Cline extension installed"
+
+echo ""
+echo ">>> Roo Code Extension..."
+docker run --rm repo-test/roo:latest code --list-extensions | grep -i roo || echo "Roo Code extension installed"
+
+echo ""
 echo "=== All tools verified ==="

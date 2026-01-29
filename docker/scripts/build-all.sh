@@ -26,5 +26,11 @@ docker build -f cli/cursor/Dockerfile -t repo-test/cursor:latest .
 echo ">>> Building VS Code base image..."
 docker build -f base/Dockerfile.vscode -t repo-test/vscode-base:latest .
 
+echo ">>> Building Cline extension image..."
+docker build -f vscode/cline/Dockerfile -t repo-test/cline:latest .
+
+echo ">>> Building Roo Code extension image..."
+docker build -f vscode/roo/Dockerfile -t repo-test/roo:latest .
+
 echo "=== All images built successfully ==="
 docker images | grep repo-test
