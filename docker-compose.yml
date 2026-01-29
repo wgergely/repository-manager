@@ -118,3 +118,18 @@ services:
       - "8080:8080"
     profiles: ["mock", "ci"]
     command: ["--verbose"]
+
+  # ============================================
+  # Repository Manager (for config generation)
+  # ============================================
+  repo-manager:
+    build:
+      context: .
+      dockerfile: docker/repo-manager/Dockerfile
+    image: repo-test/repo-manager:latest
+    volumes:
+      - ./test-fixtures:/fixtures
+      - ./test-results:/results
+      - ./crates:/workspace/crates:ro
+    working_dir: /workspace/test-project
+    profiles: ["integration", "all"]
