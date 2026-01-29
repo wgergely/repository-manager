@@ -66,6 +66,8 @@ repo-test/base              Ubuntu 22.04 + Node.js + Python + Rust
 - `test-drift-detection.sh` - Configuration drift monitoring (16 tests)
 - `test-developer-workflow.sh` - Developer scenario simulation (22 tests)
 - `test-all-tools.sh` - Per-tool integration tests (118 tests)
+- `test-provider-compatibility.sh` - API provider tests (30 tests)
+- `test-error-scenarios.sh` - Error handling tests (25 tests)
 
 ### Per-Tool Integration Tests (No Docker Required)
 - `test-tool-claude.sh` - Claude CLI workflows (16 tests)
@@ -141,6 +143,20 @@ Run all integration tests:
    ```
    Tests all 6 supported AI tools: Claude CLI, Cursor, Aider, Gemini,
    Cline, and Roo Code. Generates `test-results/tools/TEST-MATRIX.md`.
+
+9. **Provider Compatibility** - API provider configuration:
+   ```bash
+   ./docker/scripts/test-provider-compatibility.sh
+   ```
+   Tests 6 providers: Anthropic, OpenAI, Google, OpenRouter, Ollama, Bedrock.
+   Verifies cross-tool consistency and mock API support.
+
+10. **Error Scenarios** - Error handling and edge cases:
+    ```bash
+    ./docker/scripts/test-error-scenarios.sh
+    ```
+    Tests: Missing configs, malformed files, invalid YAML, missing API keys,
+    file permissions, large files, circular references, special characters.
 
 ### Continuous Monitoring
 
