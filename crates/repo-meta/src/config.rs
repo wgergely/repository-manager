@@ -8,8 +8,8 @@ use repo_fs::{NormalizedPath, RepoPath};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Maximum configuration file size (10 MB)
-const MAX_CONFIG_SIZE: u64 = 10 * 1024 * 1024;
+/// Maximum configuration file size (1 MB should be plenty)
+const MAX_CONFIG_SIZE: u64 = 1024 * 1024;
 
 /// Repository operation mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -124,13 +124,10 @@ pub fn load_config(root: &NormalizedPath) -> Result<RepositoryConfig> {
         .map_err(|e| Error::Fs(repo_fs::Error::io(config_path.to_native(), e)))?;
 
     if metadata.len() > MAX_CONFIG_SIZE {
-        return Err(Error::InvalidConfig {
+        return Err(Error::ConfigTooLarge {
             path: config_path.to_native(),
-            message: format!(
-                "Configuration file too large ({} bytes, max {} bytes)",
-                metadata.len(),
-                MAX_CONFIG_SIZE
-            ),
+            size: metadata.len(),
+            max: MAX_CONFIG_SIZE,
         });
     }
 
@@ -248,16 +245,22 @@ version = "20"
         let config_dir = dir.path().join(".repository");
         std::fs::create_dir_all(&config_dir).unwrap();
 
-        // Create oversized config file (11 MB of 'a')
+        // Create oversized config file (2 MB, above 1 MB limit)
         let config_path = config_dir.join("config.toml");
         let mut file = std::fs::File::create(&config_path).unwrap();
-        for _ in 0..11 {
+        for _ in 0..2 {
             file.write_all(&[b'a'; 1024 * 1024]).unwrap();
         }
 
         // Should reject oversized file
         let result = load_config(&root);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("too large"));
+        let err = result.unwrap_err();
+        let err_string = err.to_string();
+        assert!(
+            err_string.contains("too large") || err_string.contains("size"),
+            "Error message should mention size: {}",
+            err_string
+        );
     }
 }

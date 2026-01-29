@@ -15,6 +15,9 @@ pub enum Error {
     #[error("Invalid configuration at {path}: {message}")]
     InvalidConfig { path: PathBuf, message: String },
 
+    #[error("Config file too large: {path} is {size} bytes (max {max})")]
+    ConfigTooLarge { path: PathBuf, size: u64, max: u64 },
+
     #[error("Preset not found: {id}")]
     PresetNotFound { id: String },
 
