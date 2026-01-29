@@ -18,6 +18,15 @@ impl ToolRegistry {
         }
     }
 
+    /// Create a registry pre-populated with all built-in tools.
+    pub fn with_builtins() -> Self {
+        let mut registry = Self::new();
+        for reg in super::builtins::builtin_registrations() {
+            registry.register(reg);
+        }
+        registry
+    }
+
     /// Register a tool.
     pub fn register(&mut self, reg: ToolRegistration) {
         self.tools.insert(reg.slug.clone(), reg);
@@ -181,5 +190,18 @@ mod tests {
 
         let count = registry.iter().count();
         assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_with_builtins() {
+        let registry = ToolRegistry::with_builtins();
+
+        // Should have all 13 built-in tools
+        assert_eq!(registry.len(), crate::registry::BUILTIN_COUNT);
+
+        // Spot check a few tools
+        assert!(registry.contains("vscode"));
+        assert!(registry.contains("claude"));
+        assert!(registry.contains("copilot"));
     }
 }
