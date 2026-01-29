@@ -32,6 +32,7 @@ pub mod integration;
 pub mod jetbrains;
 pub mod registry;
 pub mod translator;
+pub mod writer;
 pub mod logging;
 pub mod roo;
 pub mod vscode;
@@ -61,3 +62,6 @@ pub use registry::{builtin_registrations, ToolCategory, ToolRegistration, ToolRe
 
 // Translator types
 pub use translator::{CapabilityTranslator, RuleTranslator, TranslatedContent};
+
+// Writer types
+pub use writer::{ConfigWriter, SchemaKeys};
