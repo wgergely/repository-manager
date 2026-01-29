@@ -1,0 +1,160 @@
+# Docker Integration Tests
+# Runs integration tests against AI coding tools using mock APIs
+name: Docker Integration Tests
+
+on:
+  push:
+    branches: [main, registry-architecture]
+    paths:
+      - 'docker/**'
+      - 'test-fixtures/**'
+      - 'docker-compose*.yml'
+      - '.github/workflows/docker-integration.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docker/**'
+      - 'test-fixtures/**'
+      - 'docker-compose*.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  TEST_MODE: mock
+
+jobs:
+  build-base-images:
+    name: Build Base Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build base image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker
+          file: ./docker/base/Dockerfile.base
+          tags: repo-test/base:latest
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build CLI base image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker
+          file: ./docker/base/Dockerfile.cli
+          tags: repo-test/cli-base:latest
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Save images
+        run: |
+          docker save repo-test/base:latest repo-test/cli-base:latest | gzip > base-images.tar.gz
+
+      - name: Upload base images
+        uses: actions/upload-artifact@v4
+        with:
+          name: base-images
+          path: base-images.tar.gz
+          retention-days: 1
+
+  build-tool-images:
+    name: Build Tool Images
+    runs-on: ubuntu-latest
+    needs: build-base-images
+    strategy:
+      matrix:
+        tool: [claude, aider, gemini]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download base images
+        uses: actions/download-artifact@v4
+        with:
+          name: base-images
+
+      - name: Load base images
+        run: |
+          gunzip -c base-images.tar.gz | docker load
+
+      - name: Build ${{ matrix.tool }} image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker
+          file: ./docker/cli/${{ matrix.tool }}/Dockerfile
+          tags: repo-test/${{ matrix.tool }}:latest
+          load: true
+
+      - name: Save tool image
+        run: |
+          docker save repo-test/${{ matrix.tool }}:latest | gzip > ${{ matrix.tool }}-image.tar.gz
+
+      - name: Upload tool image
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.tool }}-image
+          path: ${{ matrix.tool }}-image.tar.gz
+          retention-days: 1
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build-tool-images
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all images
+        uses: actions/download-artifact@v4
+        with:
+          path: images
+
+      - name: Load all images
+        run: |
+          for f in images/*/*.tar.gz; do
+            echo "Loading $f..."
+            gunzip -c "$f" | docker load
+          done
+          docker images | grep repo-test
+
+      - name: Start mock API server
+        run: |
+          docker compose --profile mock up -d mock-api
+          sleep 3
+          curl -f http://localhost:8080/__admin/mappings || exit 1
+          echo "Mock API server is healthy"
+
+      - name: Test Claude CLI container
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            run --rm claude sh -c "ls /fixtures/repos/simple-project/ && echo 'Claude container OK'"
+
+      - name: Test Aider container
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            run --rm aider sh -c "ls /fixtures/repos/simple-project/ && echo 'Aider container OK'"
+
+      - name: Test Gemini container
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml \
+            run --rm gemini sh -c "ls /fixtures/repos/simple-project/ && echo 'Gemini container OK'"
+
+      - name: Test mock API connectivity
+        run: |
+          curl -X POST http://localhost:8080/v1/messages \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: mock-key" \
+            -d '{"model":"claude-3","messages":[{"role":"user","content":"test"}]}' \
+            | jq .
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose --profile mock down
+          docker compose down
