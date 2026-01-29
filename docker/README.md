@@ -52,8 +52,93 @@ repo-test/base              Ubuntu 22.04 + Node.js + Python + Rust
 ## Scripts
 
 - `build-all.sh` - Build all Docker images
+- `build-verify.sh` - Build with logging and verification
 - `verify-tools.sh` - Verify tool installations
-- `run-tests.sh <mode> <profile>` - Run integration tests
+- `smoke-test.sh` - Basic tool functionality tests
+- `test-config-generation.sh` - Repository Manager config tests
+- `test-tool-reads-config.sh` - Tool config reading tests
+- `test-e2e.sh` - End-to-end tests with mock API
+- `test-all.sh` - Run all test suites
+- `run-tests.sh <mode> <profile>` - Legacy test runner
+
+## Running Tests
+
+### Full Test Suite
+
+Run all integration tests:
+
+```bash
+./docker/scripts/test-all.sh
+```
+
+### Individual Test Suites
+
+1. **Build Verification** - Ensure all images build:
+   ```bash
+   ./docker/scripts/build-verify.sh
+   ```
+
+2. **Smoke Tests** - Basic tool functionality:
+   ```bash
+   ./docker/scripts/smoke-test.sh
+   ```
+
+3. **Config Generation** - Repository Manager generates valid configs:
+   ```bash
+   ./docker/scripts/test-config-generation.sh
+   ```
+
+4. **Tool Config Reading** - Tools can read generated configs:
+   ```bash
+   ./docker/scripts/test-tool-reads-config.sh
+   ```
+
+5. **End-to-End** - Full workflow with mock API:
+   ```bash
+   ./docker/scripts/test-e2e.sh
+   ```
+
+## Test Results
+
+Results are saved to `test-results/`:
+
+```
+test-results/
+├── builds/          # Build logs per image
+├── smoke/           # Smoke test output
+├── config-gen/      # Generated config files
+├── tool-reads/      # Tool reading verification
+└── e2e/             # End-to-end test logs
+```
+
+## Test Fixtures
+
+Test fixtures are in `test-fixtures/`:
+
+```
+test-fixtures/
+├── repos/
+│   ├── simple-project/     # Basic test project
+│   └── config-test/        # Config generation test
+│       └── .repository/    # Repository Manager config
+└── expected/               # Expected output for validation
+    ├── cursor/
+    ├── claude/
+    └── aider/
+```
+
+## CI/CD
+
+GitHub Actions runs tests on:
+- Push to `main` or `registry-architecture`
+- Pull requests affecting `docker/`, `crates/`, or `test-fixtures/`
+
+Pipeline stages:
+1. Build base images
+2. Build tool images (parallel matrix)
+3. Build Repository Manager image
+4. Run smoke tests
+5. Run integration tests with mock API
 
 ## Architecture
 
