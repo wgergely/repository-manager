@@ -99,31 +99,6 @@ pub fn run_list_presets() -> Result<()> {
     Ok(())
 }
 
-/// Run the status command
-pub fn run_status(cwd: &std::path::Path) -> Result<()> {
-    println!("{}", "Repository Status".bold());
-    println!();
-
-    // Check if .repository directory exists
-    let repo_dir = cwd.join(".repository");
-    if !repo_dir.exists() {
-        println!("{} No repository configuration found.", "Status:".yellow());
-        println!("Run {} to initialize.", "repo init".cyan());
-        return Ok(());
-    }
-
-    // Read config if available
-    let config_path = repo_dir.join("config.toml");
-    if config_path.exists() {
-        println!("{} Repository is configured", "Status:".green());
-        println!("  {}: {}", "Config".dimmed(), config_path.display());
-    } else {
-        println!("{} Repository directory exists but no config found.", "Status:".yellow());
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
