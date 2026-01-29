@@ -8,7 +8,10 @@ mod context;
 mod error;
 mod interactive;
 
-use clap::Parser;
+use std::io;
+
+use clap::{CommandFactory, Parser};
+use clap_complete::{generate, Shell};
 use colored::Colorize;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
@@ -56,6 +59,8 @@ fn run() -> Result<()> {
 
 fn execute_command(cmd: Commands) -> Result<()> {
     match cmd {
+        Commands::Status { json } => cmd_status(json),
+        Commands::Diff { json } => cmd_diff(json),
         Commands::Init {
             name,
             mode,
@@ -65,7 +70,7 @@ fn execute_command(cmd: Commands) -> Result<()> {
             interactive,
         } => cmd_init(name, mode, tools, presets, remote, interactive),
         Commands::Check => cmd_check(),
-        Commands::Sync { dry_run } => cmd_sync(dry_run),
+        Commands::Sync { dry_run, json } => cmd_sync(dry_run, json),
         Commands::Fix { dry_run } => cmd_fix(dry_run),
         Commands::AddTool { name } => cmd_add_tool(&name),
         Commands::RemoveTool { name } => cmd_remove_tool(&name),
@@ -82,10 +87,28 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::Push { remote, branch } => cmd_push(remote, branch),
         Commands::Pull { remote, branch } => cmd_pull(remote, branch),
         Commands::Merge { source } => cmd_merge(&source),
+        Commands::Completions { shell } => cmd_completions(shell),
     }
 }
 
 // Command implementations
+
+fn cmd_completions(shell: Shell) -> Result<()> {
+    let mut cmd = Cli::command();
+    let name = cmd.get_name().to_string();
+    generate(shell, &mut cmd, name, &mut io::stdout());
+    Ok(())
+}
+
+fn cmd_status(json: bool) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::run_status(&cwd, json)
+}
+
+fn cmd_diff(json: bool) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::run_diff(&cwd, json)
+}
 
 fn cmd_init(
     name: String,
@@ -120,9 +143,9 @@ fn cmd_check() -> Result<()> {
     commands::run_check(&cwd)
 }
 
-fn cmd_sync(dry_run: bool) -> Result<()> {
+fn cmd_sync(dry_run: bool, json: bool) -> Result<()> {
     let cwd = std::env::current_dir()?;
-    commands::run_sync(&cwd, dry_run)
+    commands::run_sync(&cwd, dry_run, json)
 }
 
 fn cmd_fix(dry_run: bool) -> Result<()> {
@@ -176,6 +199,9 @@ fn cmd_branch(action: BranchAction) -> Result<()> {
         }
         BranchAction::List => {
             commands::run_branch_list(&cwd)
+        }
+        BranchAction::Checkout { name } => {
+            commands::run_branch_checkout(&cwd, &name)
         }
     }
 }
@@ -337,7 +363,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         create_minimal_repo(temp_dir.path(), "standard");
 
-        let result = commands::run_sync(temp_dir.path(), false);
+        let result = commands::run_sync(temp_dir.path(), false, false);
         assert!(result.is_ok());
     }
 

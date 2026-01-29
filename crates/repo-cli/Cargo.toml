@@ -16,6 +16,7 @@ repo-git = { path = "../repo-git" }
 repo-meta = { path = "../repo-meta" }
 
 clap = { version = "4", features = ["derive", "env"] }
+clap_complete = "4"
 colored = "2"
 dialoguer = "0.11"
 serde_json = { workspace = true }

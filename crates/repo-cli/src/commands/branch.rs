@@ -106,6 +106,50 @@ pub fn run_branch_remove(path: &Path, name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Run the branch checkout command.
+///
+/// Switches to a branch. In Standard mode, performs a git checkout.
+/// In Worktrees mode, returns the path to the worktree.
+pub fn run_branch_checkout(path: &Path, name: &str) -> Result<()> {
+    let root = NormalizedPath::new(path);
+    let mode = detect_mode(&root)?;
+    let backend = create_backend(&root, mode)?;
+
+    println!(
+        "{} Switching to branch {}...",
+        "=>".blue().bold(),
+        name.cyan()
+    );
+
+    let working_dir = backend.switch_branch(name)?;
+
+    match mode {
+        Mode::Worktrees => {
+            println!(
+                "{} Worktree for {} is at:\n   {}",
+                "OK".green().bold(),
+                name.cyan(),
+                working_dir.as_str().yellow()
+            );
+            println!();
+            println!(
+                "  {} {}",
+                "cd".dimmed(),
+                working_dir.as_str().cyan()
+            );
+        }
+        Mode::Standard => {
+            println!(
+                "{} Switched to branch {}.",
+                "OK".green().bold(),
+                name.cyan()
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// Run the branch list command.
 ///
 /// Lists all branches. Shows branch names with markers for current and main branches.

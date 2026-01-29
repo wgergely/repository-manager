@@ -5,6 +5,7 @@
 use std::path::Path;
 
 use colored::Colorize;
+use serde_json::json;
 
 use repo_core::{CheckStatus, ConfigResolver, Mode, SyncEngine, SyncOptions};
 use repo_fs::NormalizedPath;
@@ -136,45 +137,98 @@ pub fn run_check(path: &Path) -> Result<()> {
 /// Run the sync command
 ///
 /// Synchronizes configuration from the ledger to the filesystem.
-pub fn run_sync(path: &Path, dry_run: bool) -> Result<()> {
-    if dry_run {
-        println!(
-            "{} Previewing sync (dry-run)...",
-            "=>".blue().bold()
-        );
-    } else {
-        println!(
-            "{} Synchronizing tool configurations...",
-            "=>".blue().bold()
-        );
-    }
-
+pub fn run_sync(path: &Path, dry_run: bool, json_output: bool) -> Result<()> {
     let root = resolve_root(path)?;
     let mode = detect_mode(&root)?;
-    let engine = SyncEngine::new(root, mode)?;
+    let engine = SyncEngine::new(root.clone(), mode)?;
 
     let options = SyncOptions { dry_run };
     let report = engine.sync_with_options(options)?;
 
-    if report.success {
-        if report.actions.is_empty() {
-            println!("{} Already synchronized. No changes needed.", "OK".green().bold());
-        } else {
-            let prefix = if dry_run { "Would take actions" } else { "Synchronization complete" };
-            println!("{} {}:", "OK".green().bold(), prefix);
-            for action in &report.actions {
-                println!("   {} {}", "+".green(), action);
-            }
-        }
+    if json_output {
+        // JSON output for CI/CD integration
+        let output = json!({
+            "dry_run": dry_run,
+            "success": report.success,
+            "has_changes": !report.actions.is_empty(),
+            "changes": report.actions.iter()
+                .map(|a| {
+                    let clean = a.strip_prefix("[dry-run] Would ").unwrap_or(a);
+                    json!({
+                        "action": clean,
+                        "type": categorize_action(clean),
+                    })
+                })
+                .collect::<Vec<_>>(),
+            "errors": report.errors,
+            "root": root.as_str(),
+            "mode": mode.to_string(),
+        });
+        println!("{}", serde_json::to_string_pretty(&output)?);
     } else {
-        println!("{} Synchronization failed:", "ERROR".red().bold());
-        for error in &report.errors {
-            println!("   {} {}", "!".red(), error);
+        // Human-readable colored output
+        if dry_run {
+            println!(
+                "{} Previewing sync (dry-run)...",
+                "=>".blue().bold()
+            );
+        } else {
+            println!(
+                "{} Synchronizing tool configurations...",
+                "=>".blue().bold()
+            );
         }
-        return Err(CliError::user("Synchronization failed"));
+
+        if report.success {
+            if report.actions.is_empty() {
+                println!("{} Already synchronized. No changes needed.", "OK".green().bold());
+            } else {
+                let prefix = if dry_run { "Would take actions" } else { "Synchronization complete" };
+                println!("{} {}:", "OK".green().bold(), prefix);
+                for action in &report.actions {
+                    let clean = action.strip_prefix("[dry-run] Would ").unwrap_or(action);
+                    let (prefix_char, colored_action) = format_action(clean);
+                    println!("   {} {}", prefix_char, colored_action);
+                }
+            }
+        } else {
+            println!("{} Synchronization failed:", "ERROR".red().bold());
+            for error in &report.errors {
+                println!("   {} {}", "!".red(), error);
+            }
+            return Err(CliError::user("Synchronization failed"));
+        }
     }
 
     Ok(())
+}
+
+/// Categorize an action for JSON output
+fn categorize_action(action: &str) -> &'static str {
+    let lower = action.to_lowercase();
+    if lower.starts_with("create") || lower.contains("created") {
+        "create"
+    } else if lower.starts_with("update") || lower.contains("updated") || lower.starts_with("modify") {
+        "update"
+    } else if lower.starts_with("delete") || lower.starts_with("remove") || lower.contains("deleted") {
+        "delete"
+    } else {
+        "other"
+    }
+}
+
+/// Format an action with colored output
+fn format_action(action: &str) -> (colored::ColoredString, colored::ColoredString) {
+    let lower = action.to_lowercase();
+    if lower.starts_with("create") || lower.contains("created") {
+        ("+".green(), action.green())
+    } else if lower.starts_with("update") || lower.contains("updated") || lower.starts_with("modify") {
+        ("~".yellow(), action.yellow())
+    } else if lower.starts_with("delete") || lower.starts_with("remove") || lower.contains("deleted") {
+        ("-".red(), action.red())
+    } else {
+        (" ".normal(), action.normal())
+    }
 }
 
 /// Run the fix command
@@ -285,7 +339,7 @@ mode = "{}"
         assert!(!ledger_path.exists());
 
         // Run sync
-        let result = run_sync(path, false);
+        let result = run_sync(path, false, false);
         assert!(result.is_ok());
 
         // Ledger should now exist
@@ -351,7 +405,7 @@ mode = "{}"
         create_minimal_repo(path, "standard");
 
         // Run sync in dry-run mode
-        let result = run_sync(path, true);
+        let result = run_sync(path, true, false);
         assert!(result.is_ok());
     }
 

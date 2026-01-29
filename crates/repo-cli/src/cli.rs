@@ -1,6 +1,7 @@
 //! CLI argument parsing using clap derive
 
 use clap::{Parser, Subcommand};
+use clap_complete::Shell;
 
 /// Repository Manager - Manage tool configurations for your repository
 #[derive(Parser, Debug)]
@@ -19,6 +20,20 @@ pub struct Cli {
 /// Available commands
 #[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
 pub enum Commands {
+    /// Show repository status overview
+    Status {
+        /// Output as JSON for scripting
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Preview what sync would change
+    Diff {
+        /// Output as JSON for scripting
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Initialize a new repository configuration
     Init {
         /// Project name (creates folder if not ".")
@@ -54,6 +69,10 @@ pub enum Commands {
         /// Preview changes without applying them
         #[arg(long)]
         dry_run: bool,
+
+        /// Output as JSON for CI/CD integration
+        #[arg(long)]
+        json: bool,
     },
 
     /// Fix configuration drift automatically
@@ -142,6 +161,13 @@ pub enum Commands {
         /// Branch to merge from
         source: String,
     },
+
+    /// Generate shell completions
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: Shell,
+    },
 }
 
 /// Branch management actions
@@ -165,6 +191,12 @@ pub enum BranchAction {
 
     /// List all branch worktrees
     List,
+
+    /// Switch to a branch (or worktree in worktrees mode)
+    Checkout {
+        /// Branch name to checkout
+        name: String,
+    },
 }
 
 #[cfg(test)]
@@ -270,13 +302,19 @@ mod tests {
     #[test]
     fn parse_sync_command() {
         let cli = Cli::parse_from(["repo", "sync"]);
-        assert!(matches!(cli.command, Some(Commands::Sync { dry_run: false })));
+        assert!(matches!(cli.command, Some(Commands::Sync { dry_run: false, json: false })));
     }
 
     #[test]
     fn parse_sync_command_dry_run() {
         let cli = Cli::parse_from(["repo", "sync", "--dry-run"]);
-        assert!(matches!(cli.command, Some(Commands::Sync { dry_run: true })));
+        assert!(matches!(cli.command, Some(Commands::Sync { dry_run: true, json: false })));
+    }
+
+    #[test]
+    fn parse_sync_command_json() {
+        let cli = Cli::parse_from(["repo", "sync", "--json"]);
+        assert!(matches!(cli.command, Some(Commands::Sync { dry_run: false, json: true })));
     }
 
     #[test]

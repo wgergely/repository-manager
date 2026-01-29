@@ -27,6 +27,10 @@ pub enum CliError {
     #[error("Interactive prompt error: {0}")]
     Dialoguer(#[from] dialoguer::Error),
 
+    /// JSON serialization error
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+
     /// User-facing error with a message
     #[error("{message}")]
     User { message: String },
