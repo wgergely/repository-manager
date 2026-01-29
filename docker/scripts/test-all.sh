@@ -90,6 +90,8 @@ run_test_suite "tool-integration" "test-all-tools.sh" false || true
 run_test_suite "provider-compatibility" "test-provider-compatibility.sh" false || true
 run_test_suite "error-scenarios" "test-error-scenarios.sh" false || true
 run_test_suite "advanced-workflows" "test-advanced-workflows.sh" false || true
+run_test_suite "conflict-resolution" "test-conflict-resolution.sh" false || true
+run_test_suite "stress-scenarios" "test-stress-scenarios.sh" false || true
 
 # ============================================
 # TIER 2: Docker Build Tests
