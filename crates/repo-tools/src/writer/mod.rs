@@ -8,7 +8,9 @@
 //! - **TextWriter**: Full replacement (tool owns the file)
 
 mod json;
+mod markdown;
 mod traits;
 
 pub use json::JsonWriter;
+pub use markdown::MarkdownWriter;
 pub use traits::{ConfigWriter, SchemaKeys};
