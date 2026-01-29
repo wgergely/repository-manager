@@ -31,6 +31,7 @@ pub mod generic;
 pub mod integration;
 pub mod jetbrains;
 pub mod registry;
+pub mod translator;
 pub mod logging;
 pub mod roo;
 pub mod vscode;
@@ -57,3 +58,6 @@ pub use zed::zed_integration;
 
 // Registry types
 pub use registry::{builtin_registrations, ToolCategory, ToolRegistration, ToolRegistry, BUILTIN_COUNT};
+
+// Translator types
+pub use translator::TranslatedContent;
