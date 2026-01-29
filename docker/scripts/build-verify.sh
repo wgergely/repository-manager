@@ -22,17 +22,18 @@ GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
 # Build a single image with logging
-# Args: $1=name, $2=dockerfile, $3=tag
+# Args: $1=name, $2=dockerfile, $3=tag, $4=context (optional, defaults to DOCKER_DIR)
 build_image() {
     local name="$1"
     local dockerfile="$2"
     local tag="$3"
+    local context="${4:-$DOCKER_DIR}"
     local log_file="${RESULTS_DIR}/${name}.log"
 
     echo -n "Building ${name}... "
     ((TOTAL_BUILDS++)) || true
 
-    if docker build -f "${DOCKER_DIR}/${dockerfile}" -t "${tag}" "${DOCKER_DIR}" > "$log_file" 2>&1; then
+    if docker build -f "${DOCKER_DIR}/${dockerfile}" -t "${tag}" "${context}" > "$log_file" 2>&1; then
         echo -e "${GREEN}✓ SUCCESS${NC}"
         return 0
     else
@@ -65,6 +66,12 @@ echo ""
 echo "--- Phase 3: VS Code Extensions ---"
 build_image "cline" "vscode/cline/Dockerfile" "repo-test/cline:latest" || true
 build_image "roo" "vscode/roo/Dockerfile" "repo-test/roo:latest" || true
+echo ""
+
+# Phase 4: Repository Manager (needs project root as context for crates/)
+PROJECT_ROOT="$(dirname "$DOCKER_DIR")"
+echo "--- Phase 4: Repository Manager ---"
+build_image "repo-manager" "repo-manager/Dockerfile" "repo-test/repo-manager:latest" "$PROJECT_ROOT" || true
 echo ""
 
 # Summary

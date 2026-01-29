@@ -32,5 +32,8 @@ docker build -f vscode/cline/Dockerfile -t repo-test/cline:latest .
 echo ">>> Building Roo Code extension image..."
 docker build -f vscode/roo/Dockerfile -t repo-test/roo:latest .
 
+echo ">>> Building Repository Manager image..."
+docker build -f repo-manager/Dockerfile -t repo-test/repo-manager:latest ..
+
 echo "=== All images built successfully ==="
 docker images | grep repo-test
