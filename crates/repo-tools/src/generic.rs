@@ -11,6 +11,13 @@ use repo_fs::{NormalizedPath, io};
 use repo_meta::schema::ToolDefinition;
 use serde_json::{Value, json};
 
+/// Sanitize a string for use as a filename.
+fn sanitize_filename(s: &str) -> String {
+    s.chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+        .collect()
+}
+
 /// Generic tool integration driven by ToolDefinition schema.
 ///
 /// This implementation uses the schema to determine:
@@ -47,13 +54,24 @@ impl GenericToolIntegration {
         self
     }
 
+    /// Check if the primary config path is a directory (ends with /).
+    fn is_directory_config(&self) -> bool {
+        self.definition.integration.config_path.ends_with('/')
+    }
+
     /// Get the config file path for this tool.
+    /// For directory configs, this returns the directory path.
     fn config_path(&self, root: &NormalizedPath) -> NormalizedPath {
         root.join(&self.definition.integration.config_path)
     }
 
     /// Sync rules to a text-based config file using managed blocks.
     fn sync_text(&self, context: &SyncContext, rules: &[Rule]) -> Result<()> {
+        // If config_path is a directory, write each rule to a separate file
+        if self.is_directory_config() {
+            return self.sync_to_directory(context, rules);
+        }
+
         let path = self.config_path(&context.root);
 
         // Load existing content or start empty
@@ -71,6 +89,72 @@ impl GenericToolIntegration {
                 format!("## {}\n\n{}", rule.id, rule.content)
             };
             content = upsert_block(&content, &rule.id, &block_content)?;
+        }
+
+        io::write_text(&path, &content)?;
+
+        Ok(())
+    }
+
+    /// Sync rules to a directory, creating one file per rule.
+    fn sync_to_directory(&self, context: &SyncContext, rules: &[Rule]) -> Result<()> {
+        let dir_path = self.config_path(&context.root);
+
+        // Create directory if it doesn't exist
+        if !dir_path.exists() {
+            std::fs::create_dir_all(dir_path.as_ref())
+                .map_err(|e| crate::Error::SyncFailed {
+                    tool: self.definition.meta.slug.clone(),
+                    message: format!("Failed to create directory: {}", e),
+                })?;
+        }
+
+        // Write each rule to a separate file
+        for (i, rule) in rules.iter().enumerate() {
+            let filename = format!("{:02}-{}.md", i + 1, sanitize_filename(&rule.id));
+            let file_path = dir_path.join(&filename);
+
+            let content = if self.raw_content {
+                rule.content.clone()
+            } else {
+                format!("# {}\n\n{}", rule.id, rule.content)
+            };
+
+            io::write_text(&file_path, &content)?;
+        }
+
+        Ok(())
+    }
+
+    /// Sync rules to a YAML config file using proper YAML comments.
+    fn sync_yaml(&self, context: &SyncContext, rules: &[Rule]) -> Result<()> {
+        // If config_path is a directory, write each rule to a separate file
+        if self.is_directory_config() {
+            return self.sync_to_directory(context, rules);
+        }
+
+        let path = self.config_path(&context.root);
+
+        // For YAML, we use # comments instead of HTML-style managed blocks
+        let mut content = String::new();
+
+        // Add header comment
+        content.push_str("# Configuration managed by Repository Manager\n");
+        content.push_str("# Do not edit the sections between repo:block markers\n\n");
+
+        for rule in rules {
+            // Use YAML comment style for block markers
+            content.push_str(&format!("# repo:block:{}\n", rule.id));
+            if self.raw_content {
+                content.push_str(&rule.content);
+            } else {
+                content.push_str(&format!("# {}\n", rule.id));
+                // Indent content as YAML comment
+                for line in rule.content.lines() {
+                    content.push_str(&format!("# {}\n", line));
+                }
+            }
+            content.push_str(&format!("# /repo:block:{}\n\n", rule.id));
         }
 
         io::write_text(&path, &content)?;
@@ -176,9 +260,10 @@ impl ToolIntegration for GenericToolIntegration {
             ConfigType::Text => self.sync_text(context, rules),
             ConfigType::Json => self.sync_json(context, rules),
             ConfigType::Markdown => self.sync_markdown(context, rules),
-            ConfigType::Toml | ConfigType::Yaml => {
-                // For now, treat as text (could add structured support later)
-                self.sync_text(context, rules)
+            ConfigType::Yaml => self.sync_yaml(context, rules),
+            ConfigType::Toml => {
+                // TOML uses # comments like YAML
+                self.sync_yaml(context, rules)
             }
         }
     }
