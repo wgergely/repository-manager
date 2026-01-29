@@ -2,7 +2,7 @@
 
 > **Purpose:** Canonical reference for all tools supported by Repository Manager.
 > **Last Updated:** 2026-01-29
-> **Status:** Research Draft
+> **Status:** Research Complete (6/7 tools researched, JetBrains pending)
 
 ## Overview
 
@@ -13,14 +13,14 @@ Repository Manager supports **13 tools** across **4 categories**. This matrix do
 | Tool | Category | Headless | Docker Feasibility | API Required |
 |------|----------|----------|-------------------|--------------|
 | VS Code | IDE | Yes | Trivial | No |
-| Cursor | IDE | Research | Complex | Anthropic |
-| Zed | IDE | Research | Complex | Anthropic |
+| Cursor | IDE | **Yes (CLI)** | **Moderate** | Anthropic |
+| Zed | IDE | **No** | **Difficult** | Anthropic |
 | JetBrains | IDE | Yes | Moderate | Provider-dependent |
-| Windsurf | IDE | Research | Complex | Provider-dependent |
-| Antigravity | IDE | Research | Unknown | Unknown |
+| Windsurf | IDE | **No** | **Complex** | Codeium |
+| Antigravity | IDE | **Unknown** | **Complex** | **Gemini (Google)** |
 | Claude | CLI Agent | Yes | Trivial | Anthropic |
 | Aider | CLI Agent | Yes | Trivial | Configurable |
-| Gemini CLI | CLI Agent | Yes | Trivial | Google |
+| Gemini CLI | CLI Agent | Yes | Trivial | **Google (free tier)** |
 | Cline | Autonomous | Yes* | Moderate | Configurable |
 | Roo Code | Autonomous | Yes* | Moderate | Configurable |
 | GitHub Copilot | Copilot | Yes* | Moderate | GitHub |
@@ -79,35 +79,51 @@ code --extensionTestsPath=/path/to/tests
 | Property | Value |
 |----------|-------|
 | **Slug** | `cursor` |
-| **Description** | AI-first code editor (VS Code fork) |
+| **Description** | AI-first code editor (VS Code fork) with dedicated CLI |
 | **Config Path** | `.cursorrules` |
 | **Config Format** | Plain text |
 | **Additional Paths** | `.cursor/rules/` (directory) |
 | **Capabilities** | Custom instructions, rules directory |
-| **Installation** | AppImage, .deb, or binary download |
-| **Headless Mode** | **Research needed** - may inherit VS Code headless |
-| **Version Command** | Unknown - research needed |
-| **Versioning Model** | Auto-updating, no public version history |
+| **Installation** | `curl https://cursor.com/install -fsS \| bash` |
+| **Headless Mode** | **Yes** - CLI with print mode (`-p`) for non-interactive use |
+| **Version Command** | Unknown (CLI is separate from editor) |
+| **Versioning Model** | Auto-updating editor, CLI in beta |
 | **Pin Strategy** | Snapshot container images by date |
-| **Docker Feasibility** | **Complex** - GUI app, needs Xvfb research |
-| **API Required** | Anthropic API key (built-in) |
+| **Docker Feasibility** | **Moderate** - CLI usable, GUI needs Xvfb |
+| **API Required** | Anthropic API key (built-in or user-provided) |
 
-**Research Questions:**
-- [ ] Does Cursor expose a CLI similar to VS Code's `code` command?
-- [ ] Can `.cursorrules` loading be tested without full GUI?
-- [ ] Is there an official Docker image or headless mode?
-- [ ] What's the update mechanism - can it be disabled?
+**RESEARCH COMPLETE:**
+- [x] Does Cursor expose a CLI? **Yes - `agent` command with full CLI**
+- [x] Can `.cursorrules` loading be tested? **Yes via CLI**
+- [x] Headless mode? **Yes - print mode (`-p`) for scripts/CI**
+- [ ] Update mechanism - can it be disabled? Still unknown
 
-**Installation Commands (to verify):**
+**CLI Commands:**
 ```bash
-# Download AppImage
-wget https://download.cursor.sh/linux/appImage/x64 -O cursor.AppImage
-chmod +x cursor.AppImage
+# Installation
+curl https://cursor.com/install -fsS | bash          # Linux/macOS
+irm 'https://cursor.com/install?win32=true' | iex    # Windows
 
-# Or .deb
-wget https://download.cursor.sh/linux/deb/x64 -O cursor.deb
-dpkg -i cursor.deb
+# Core usage
+agent                        # Start interactive session
+agent "[prompt]"             # Begin with initial instruction
+agent ls                     # List previous conversations
+agent resume                 # Resume latest chat
+agent --resume="chat-id"     # Resume specific session
+
+# Modes
+agent --mode=plan            # Plan mode (design before coding)
+agent --mode=ask             # Ask mode (explore without changes)
+agent -p "[prompt]"          # Print mode (non-interactive for CI)
+agent -p --force "[prompt]"  # Print mode with auto file changes
 ```
+
+**Key Features (Jan 2026):**
+- Cloud Agents: Prepend `&` to push conversation to cloud
+- Model selection: `--model` flag
+- Non-interactive: `-p` flag for scripts/CI pipelines
+
+**Sources:** [Cursor CLI Docs](https://cursor.com/docs/cli/overview), [Cursor Changelog](https://cursor.com/changelog/cli-jan-16-2026)
 
 ---
 
@@ -116,34 +132,55 @@ dpkg -i cursor.deb
 | Property | Value |
 |----------|-------|
 | **Slug** | `zed` |
-| **Description** | High-performance GPU-accelerated editor |
+| **Description** | High-performance GPU-accelerated editor (Vulkan) |
 | **Config Path** | `.zed/settings.json`, `.rules` |
 | **Config Format** | JSON, Plain text |
 | **Additional Paths** | None documented |
 | **Capabilities** | Custom instructions, MCP servers |
-| **Installation** | Official script, binary, or Homebrew |
-| **Headless Mode** | **Research needed** - GPU requirement may block |
+| **Installation** | `curl -f https://zed.dev/install.sh \| sh` |
+| **Headless Mode** | **No** - requires Vulkan GPU, no headless mode |
 | **Version Command** | `zed --version` |
 | **Versioning Model** | Auto-updating, Preview/Stable channels |
 | **Pin Strategy** | Download specific release from GitHub |
-| **Docker Feasibility** | **Complex** - GPU-accelerated, may not run headless |
+| **Docker Feasibility** | **Difficult** - Vulkan GPU required, no software fallback |
 | **API Required** | Anthropic (for AI features) |
 
-**Research Questions:**
-- [ ] Can Zed run without GPU acceleration?
-- [ ] Is there a headless or server mode?
-- [ ] Can config loading be tested via CLI?
-- [ ] What happens when Zed launches without display?
+**RESEARCH COMPLETE:**
+- [x] Can Zed run without GPU? **No - requires Vulkan. Will fail with "NoSupportedDeviceFound"**
+- [x] Is there a headless mode? **No - not documented**
+- [x] Config loading via CLI? **No - editor must launch**
+- [x] Without display? **Will fail to open window**
+
+**GPU Requirements:**
+- Requires Vulkan-compatible GPU
+- Error without GPU: `Zed failed to open a window: NoSupportedDeviceFound`
+- Software rendering (llvmpipe) may work but has issues
+- amdvlk driver problematic - use vulkan-radeon instead
+
+**Environment Variables:**
+```bash
+ZED_CHANNEL=preview|stable     # Build channel
+ZED_DEVICE_ID=0x2484           # Force specific GPU (hex)
+ZED_PATH_SAMPLE_COUNT=0        # Fix AMD GPU crashes
+DRI_PRIME=1                    # Force discrete GPU
+MESA_VK_DEVICE_SELECT=list     # List available GPUs
+```
 
 **Installation Commands:**
 ```bash
-# Official script
+# Official script (stable)
 curl -f https://zed.dev/install.sh | sh
 
-# Or download binary
-wget https://github.com/zed-industries/zed/releases/download/v0.xxx/zed-linux-x86_64.tar.gz
-tar -xzf zed-linux-x86_64.tar.gz
+# Preview channel
+curl -f https://zed.dev/install.sh | ZED_CHANNEL=preview sh
+
+# Manual download
+wget https://github.com/zed-industries/zed/releases/download/vX.Y.Z/zed-linux-x86_64.tar.gz
 ```
+
+**Docker Strategy:** Config-file-only testing recommended. Full integration testing may require GPU passthrough or acceptance of limited coverage.
+
+**Sources:** [Zed Linux Docs](https://zed.dev/docs/linux)
 
 ---
 
@@ -188,50 +225,89 @@ tar -xzf ideaIC-2024.1.tar.gz
 | Property | Value |
 |----------|-------|
 | **Slug** | `windsurf` |
-| **Description** | AI-native code editor by Codeium |
+| **Description** | AI-native IDE by Codeium with Cascade agent |
 | **Config Path** | `.windsurfrules` |
 | **Config Format** | Plain text |
 | **Additional Paths** | None documented |
-| **Capabilities** | Custom instructions |
-| **Installation** | Binary download |
-| **Headless Mode** | **Research needed** - likely VS Code fork |
-| **Version Command** | Unknown - research needed |
-| **Versioning Model** | Auto-updating |
+| **Capabilities** | Custom instructions, Cascade AI agent |
+| **Installation** | apt repository (Debian/Ubuntu) or rpm (Fedora/CentOS) |
+| **Headless Mode** | **No** - no CLI documented |
+| **Version Command** | Unknown |
+| **Versioning Model** | Auto-updating via repository |
 | **Pin Strategy** | Snapshot container images by date |
-| **Docker Feasibility** | **Complex** - GUI app, needs Xvfb research |
-| **API Required** | Codeium account (built-in) |
+| **Docker Feasibility** | **Complex** - GUI app, needs Xvfb |
+| **API Required** | Codeium account (free tier available) |
 
-**Research Questions:**
-- [ ] Is Windsurf a VS Code fork? (affects headless strategy)
-- [ ] Official installation method for Linux?
-- [ ] Can `.windsurfrules` be tested via CLI?
-- [ ] What's the update mechanism?
+**RESEARCH COMPLETE:**
+- [x] Is Windsurf a VS Code fork? **Likely yes** (similar architecture)
+- [x] Official Linux installation? **Yes - apt/rpm repositories**
+- [x] CLI mode? **No - no CLI documented**
+- [x] Update mechanism? **Auto-updating via system package manager**
+
+**Installation Commands (Debian/Ubuntu):**
+```bash
+curl -fsSL "https://windsurf-stable.codeiumdata.com/wVxQEIWkwPUEAGf3/windsurf.gpg" | sudo gpg --dearmor -o /usr/share/keyrings/windsurf-stable-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/windsurf-stable-archive-keyring.gpg arch=amd64] https://windsurf-stable.codeiumdata.com/wVxQEIWkwPUEAGf3/apt stable main" | sudo tee /etc/apt/sources.list.d/windsurf.list > /dev/null
+sudo apt update && sudo apt install windsurf
+```
+
+**Installation Commands (Fedora/CentOS 8+):**
+```bash
+sudo rpm --import https://windsurf-stable.codeiumdata.com/wVxQEIWkwPUEAGf3/yum/RPM-GPG-KEY-windsurf
+echo -e "[windsurf]\nname=Windsurf Repository\nbaseurl=https://windsurf-stable.codeiumdata.com/wVxQEIWkwPUEAGf3/yum/repo/\nenabled=1\nautorefresh=1\ngpgcheck=1\ngpgkey=https://windsurf-stable.codeiumdata.com/wVxQEIWkwPUEAGf3/yum/RPM-GPG-KEY-windsurf" | sudo tee /etc/yum.repos.d/windsurf.repo > /dev/null
+sudo dnf install windsurf
+```
+
+**Docker Strategy:** Requires Xvfb for GUI testing. Consider config-file-only testing as fallback.
+
+**Sources:** [Windsurf Download](https://windsurf.com/editor/download-linux)
 
 ---
 
-### Antigravity
+### Antigravity (Google Antigravity)
 
 | Property | Value |
 |----------|-------|
 | **Slug** | `antigravity` |
-| **Description** | AI coding assistant (emerging tool) |
-| **Config Path** | `.agent/rules.md` |
+| **Description** | **Google's agentic IDE** - announced Nov 2025 with Gemini 3 |
+| **Config Path** | `.agent/rules.md` (workspace rules) |
 | **Config Format** | Markdown |
-| **Additional Paths** | `.agent/` directory |
-| **Capabilities** | Custom instructions, rules directory |
-| **Installation** | **Unknown - research needed** |
-| **Headless Mode** | **Unknown** |
+| **Additional Paths** | `.agent/` directory, Global rules via UI |
+| **Capabilities** | Custom instructions, rules directory, Skills system, MCP |
+| **Installation** | Download from `antigravity.google/download` |
+| **Headless Mode** | **Unknown** - likely no (agentic IDE) |
 | **Version Command** | Unknown |
-| **Versioning Model** | Unknown |
-| **Pin Strategy** | Unknown |
-| **Docker Feasibility** | **Unknown** - requires research |
-| **API Required** | Unknown |
+| **Versioning Model** | Unknown - public preview |
+| **Pin Strategy** | Snapshot container images by date |
+| **Docker Feasibility** | **Complex** - GUI app, needs Xvfb research |
+| **API Required** | **Gemini 3** (Pro, Flash, Deep Think) - free tier available |
 
-**Research Questions:**
-- [ ] What is Antigravity exactly? (company, product, open source?)
-- [ ] Where is it installed from?
-- [ ] What platforms are supported?
-- [ ] Is there any documentation?
+**RESEARCH COMPLETE - MAJOR FINDING:**
+- [x] What is Antigravity? **Google's new agentic IDE, announced November 18, 2025**
+- [x] Where to install? **antigravity.google/download**
+- [x] Platforms? **macOS, Windows, Linux**
+- [x] Documentation? **[Google Codelabs](https://codelabs.developers.google.com/getting-started-google-antigravity)**
+
+**Key Features:**
+- **Agent Manager:** Spawn, orchestrate, and observe multiple AI agents
+- **Autonomous execution:** Agents plan, execute, verify across editor/terminal/browser
+- **Artifact system:** Task lists, implementation plans, screenshots, browser recordings
+- **Knowledge base:** Save context and code snippets
+- **Skills system:** Codify best practices into executable assets
+
+**Model Support:**
+- Gemini 3 Pro (generous free rate limits)
+- Anthropic Claude Sonnet 4.5
+- OpenAI GPT-OSS
+
+**Rules Configuration:**
+- **Global rules:** Settings → Customizations → "+ Global"
+- **Workspace rules:** Settings → Customizations → "+ Workspace"
+- **Skills:** Advanced rules for specific tasks (database-migration, etc.)
+
+**Docker Strategy:** Likely requires Xvfb. Research needed on whether agents can be run via API.
+
+**Sources:** [Google Developers Blog](https://developers.googleblog.com/build-with-google-antigravity-our-new-agentic-development-platform/), [Codecademy Tutorial](https://www.codecademy.com/article/how-to-set-up-and-use-google-antigravity)
 
 ---
 
@@ -314,23 +390,56 @@ aider --show-config
 | Property | Value |
 |----------|-------|
 | **Slug** | `gemini` |
-| **Description** | Google's AI coding assistant CLI |
+| **Description** | Google's open-source AI coding assistant CLI |
 | **Config Path** | `GEMINI.md` |
 | **Config Format** | Markdown |
 | **Additional Paths** | None documented |
-| **Capabilities** | Custom instructions |
-| **Installation** | npm (package name TBD - research needed) |
+| **Capabilities** | Custom instructions, MCP support, Google Search grounding |
+| **Installation** | `npm install -g @google/gemini-cli` |
 | **Headless Mode** | Yes - CLI native |
-| **Version Command** | `gemini --version` (TBD) |
-| **Versioning Model** | npm semver (assumed) |
-| **Pin Strategy** | npm version pinning |
+| **Version Command** | `gemini --version` |
+| **Versioning Model** | npm semver, weekly releases |
+| **Pin Strategy** | `npm install -g @google/gemini-cli@x.y.z` |
 | **Docker Feasibility** | **Trivial** - pure CLI |
-| **API Required** | Google Cloud credentials |
+| **API Required** | Google Account (free tier: 60 req/min, 1000 req/day) |
 
-**Research Questions:**
-- [ ] What is the exact npm package name?
-- [ ] Is it publicly available or requires Google Cloud setup?
-- [ ] What authentication method does it use?
+**RESEARCH COMPLETE:**
+- [x] npm package name: **`@google/gemini-cli`** (current version 0.24.0)
+- [x] Publicly available? **Yes - open source Apache 2.0**
+- [x] Authentication: **Google Account (personal recommended, not Workspace)**
+
+**Installation Commands:**
+```bash
+# Global install (recommended)
+npm install -g @google/gemini-cli
+
+# Run directly with npx
+npx @google/gemini-cli
+
+# In conda environment
+conda create -y -n gemini_env -c conda-forge nodejs
+conda activate gemini_env
+npm install -g @google/gemini-cli
+
+# Verify
+gemini --version
+```
+
+**Key Features:**
+- Gemini 2.5 Pro with 1M token context window
+- Built-in tools: Google Search, file ops, shell commands, web fetch
+- MCP (Model Context Protocol) support
+- Terminal-first design
+
+**Release Schedule:**
+- **Preview:** UTC 2359 Tuesdays (may have regressions)
+- **Stable:** UTC 2000 Tuesdays (validated)
+
+**Free Tier Limits:**
+- 60 model requests per minute
+- 1,000 requests per day
+
+**Sources:** [npm package](https://www.npmjs.com/package/@google/gemini-cli), [GitHub](https://github.com/google-gemini/gemini-cli), [Gemini CLI Docs](https://geminicli.com/docs/)
 
 ---
 
@@ -368,22 +477,51 @@ code --install-extension saoudrizwan.claude-dev
 | Property | Value |
 |----------|-------|
 | **Slug** | `roo` |
-| **Description** | Fork of Cline with additional features |
+| **Description** | AI dev team in your editor (formerly Roo Cline) |
 | **Config Path** | `.roo/rules/` |
 | **Config Format** | Markdown directory |
 | **Additional Paths** | `.roomodes` (YAML/JSON) |
 | **Capabilities** | Custom instructions, MCP servers, rules directory |
-| **Installation** | VS Code extension (marketplace ID TBD) |
+| **Installation** | `code --install-extension RooVeterinaryInc.roo-cline` |
 | **Headless Mode** | Via VS Code headless |
 | **Version Command** | `code --list-extensions --show-versions` |
 | **Versioning Model** | VS Code marketplace, semver |
 | **Pin Strategy** | Install specific extension version |
 | **Docker Feasibility** | **Moderate** - requires VS Code headless |
-| **API Required** | Configurable (Anthropic, OpenAI, etc.) |
+| **API Required** | Configurable (OpenRouter, Anthropic, OpenAI, Gemini, Bedrock, local) |
 
-**Research Questions:**
-- [ ] What is the VS Code marketplace extension ID?
-- [ ] How does `.roomodes` affect behavior?
+**RESEARCH COMPLETE:**
+- [x] VS Code extension ID: **`RooVeterinaryInc.roo-cline`**
+- [ ] `.roomodes` behavior: Still needs documentation review
+
+**Installation Commands:**
+```bash
+# VS Code Marketplace (recommended)
+code --install-extension RooVeterinaryInc.roo-cline
+
+# Open VSX (for VSCodium)
+# Available at: https://open-vsx.org/extension/RooVeterinaryInc/roo-cline
+```
+
+**Supported AI Providers:**
+- OpenRouter
+- Anthropic
+- Glama
+- OpenAI
+- Google Gemini
+- AWS Bedrock
+- Azure
+- GCP Vertex
+- Local models (LM Studio, Ollama) - anything OpenAI-compatible
+
+**Approval Modes:**
+- Manual Approval: Review every step
+- Autonomous/Auto-Approve: Uninterrupted workflows
+- Hybrid: Auto-approve safe actions, confirm risky ones
+
+**History:** Renamed from "Roo Cline" to "Roo Code" after 50,000+ installations.
+
+**Sources:** [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=RooVeterinaryInc.roo-cline), [Roo Code Docs](https://docs.roocode.com/), [GitHub](https://github.com/RooCodeInc/Roo-Code)
 
 ---
 
@@ -446,9 +584,9 @@ code --install-extension AmazonWebServices.amazon-q-vscode
 | Feasibility | Tools | Notes |
 |-------------|-------|-------|
 | **Trivial** | Claude, Aider, Gemini CLI, VS Code | Pure CLI or well-documented headless |
-| **Moderate** | JetBrains, Cline, Roo, Copilot, Amazon Q | Requires headless IDE setup |
-| **Complex** | Cursor, Zed, Windsurf | GUI apps, need Xvfb/VNC research |
-| **Unknown** | Antigravity | Requires full research |
+| **Moderate** | JetBrains, Cline, Roo, Copilot, Amazon Q, **Cursor** | Requires headless IDE setup or CLI |
+| **Complex** | Windsurf, Antigravity | GUI apps, need Xvfb |
+| **Difficult** | **Zed** | Requires Vulkan GPU - no software fallback |
 
 ---
 
@@ -479,10 +617,10 @@ For certification runs, track tested versions:
 
 ## Research Tracking
 
-- [ ] Cursor: headless mode, CLI, installation verification
-- [ ] Zed: GPU requirements, headless feasibility
-- [ ] Windsurf: VS Code fork status, installation
-- [ ] Antigravity: basic product research
-- [ ] Gemini CLI: npm package name, auth method
-- [ ] Roo Code: marketplace extension ID
-- [ ] JetBrains: headless SDK documentation review
+- [x] **Cursor:** Has full CLI with headless print mode (`-p`), `agent` command
+- [x] **Zed:** Requires Vulkan GPU, NO headless mode, Docker difficult
+- [x] **Windsurf:** Has apt/rpm repos for Linux, NO CLI, needs Xvfb
+- [x] **Antigravity:** Is **Google Antigravity** - major Google IDE announced Nov 2025
+- [x] **Gemini CLI:** `@google/gemini-cli` npm package, free tier available
+- [x] **Roo Code:** Extension ID is `RooVeterinaryInc.roo-cline`
+- [ ] JetBrains: headless SDK documentation review (still pending)
