@@ -54,6 +54,11 @@ impl GenericToolIntegration {
         self
     }
 
+    /// Get the underlying tool definition.
+    pub fn definition(&self) -> &ToolDefinition {
+        &self.definition
+    }
+
     /// Check if the primary config path is a directory (ends with /).
     fn is_directory_config(&self) -> bool {
         self.definition.integration.config_path.ends_with('/')

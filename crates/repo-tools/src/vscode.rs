@@ -6,7 +6,42 @@
 use crate::error::Result;
 use crate::integration::{ConfigLocation, ConfigType, Rule, SyncContext, ToolIntegration};
 use repo_fs::{NormalizedPath, io};
+use repo_meta::schema::{
+    ConfigType as SchemaConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig,
+    ToolMeta, ToolSchemaKeys,
+};
 use serde_json::{Value, json};
+
+/// Returns the ToolDefinition for VS Code.
+///
+/// This provides the schema metadata for the registry while VSCodeIntegration
+/// handles the actual sync logic.
+pub fn vscode_definition() -> ToolDefinition {
+    ToolDefinition {
+        meta: ToolMeta {
+            name: "VS Code".into(),
+            slug: "vscode".into(),
+            description: Some("Visual Studio Code IDE".into()),
+        },
+        integration: ToolIntegrationConfig {
+            config_path: ".vscode/settings.json".into(),
+            config_type: SchemaConfigType::Json,
+            additional_paths: vec![],
+        },
+        capabilities: ToolCapabilities {
+            // VSCode itself doesn't support custom instructions
+            // but handles python path via schema_keys
+            supports_custom_instructions: false,
+            supports_mcp: false,
+            supports_rules_directory: false,
+        },
+        schema_keys: Some(ToolSchemaKeys {
+            instruction_key: None,
+            mcp_key: None,
+            python_path_key: Some("python.defaultInterpreterPath".into()),
+        }),
+    }
+}
 
 /// VSCode integration.
 ///

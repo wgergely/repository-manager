@@ -51,7 +51,7 @@ pub use generic::GenericToolIntegration;
 pub use integration::{ConfigLocation, ConfigType, Rule, SyncContext, ToolIntegration};
 pub use jetbrains::jetbrains_integration;
 pub use roo::roo_integration;
-pub use vscode::VSCodeIntegration;
+pub use vscode::{vscode_definition, VSCodeIntegration};
 pub use windsurf::{windsurf_integration, WindsurfIntegration};
 pub use zed::zed_integration;
 
