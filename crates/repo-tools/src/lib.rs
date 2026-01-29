@@ -31,6 +31,7 @@ pub mod generic;
 pub mod integration;
 pub mod jetbrains;
 pub mod registry;
+pub mod syncer;
 pub mod translator;
 pub mod writer;
 pub mod logging;
@@ -65,3 +66,6 @@ pub use translator::{CapabilityTranslator, RuleTranslator, TranslatedContent};
 
 // Writer types
 pub use writer::{ConfigWriter, JsonWriter, MarkdownWriter, SchemaKeys, TextWriter, WriterRegistry};
+
+// Syncer
+pub use syncer::ToolSyncer;
