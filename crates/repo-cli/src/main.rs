@@ -8,7 +8,8 @@ mod context;
 mod error;
 mod interactive;
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
+use clap_complete::generate;
 use colored::Colorize;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
@@ -81,6 +82,7 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::ListTools { category } => cmd_list_tools(category.as_deref()),
         Commands::ListPresets => cmd_list_presets(),
         Commands::Status => cmd_status(),
+        Commands::Completions { shell } => cmd_completions(shell),
         Commands::Branch { action } => cmd_branch(action),
         Commands::Push { remote, branch } => cmd_push(remote, branch),
         Commands::Pull { remote, branch } => cmd_pull(remote, branch),
@@ -179,6 +181,13 @@ fn cmd_list_presets() -> Result<()> {
 fn cmd_status() -> Result<()> {
     let cwd = std::env::current_dir()?;
     commands::run_status(&cwd)
+}
+
+fn cmd_completions(shell: clap_complete::Shell) -> Result<()> {
+    let mut cmd = Cli::command();
+    let name = cmd.get_name().to_string();
+    generate(shell, &mut cmd, name, &mut std::io::stdout());
+    Ok(())
 }
 
 fn cmd_branch(action: BranchAction) -> Result<()> {

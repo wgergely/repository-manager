@@ -269,10 +269,10 @@ fn remove_json_path(json: &mut serde_json::Value, path: &str) {
         }
     }
 
-    if let serde_json::Value::Object(map) = current {
-        if let Some(last_part) = parts.last() {
-            map.remove(*last_part);
-        }
+    if let serde_json::Value::Object(map) = current
+        && let Some(last_part) = parts.last()
+    {
+        map.remove(*last_part);
     }
 }
 
