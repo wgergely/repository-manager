@@ -64,4 +64,4 @@ pub use registry::{builtin_registrations, ToolCategory, ToolRegistration, ToolRe
 pub use translator::{CapabilityTranslator, RuleTranslator, TranslatedContent};
 
 // Writer types
-pub use writer::{ConfigWriter, SchemaKeys};
+pub use writer::{ConfigWriter, JsonWriter, MarkdownWriter, SchemaKeys, TextWriter, WriterRegistry};

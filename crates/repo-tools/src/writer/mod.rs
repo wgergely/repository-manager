@@ -9,8 +9,12 @@
 
 mod json;
 mod markdown;
+mod registry;
+mod text;
 mod traits;
 
 pub use json::JsonWriter;
 pub use markdown::MarkdownWriter;
+pub use registry::WriterRegistry;
+pub use text::TextWriter;
 pub use traits::{ConfigWriter, SchemaKeys};
