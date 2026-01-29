@@ -51,14 +51,24 @@ repo-test/base              Ubuntu 22.04 + Node.js + Python + Rust
 
 ## Scripts
 
+### Build Scripts
 - `build-all.sh` - Build all Docker images
 - `build-verify.sh` - Build with logging and verification
 - `verify-tools.sh` - Verify tool installations
+
+### Test Scripts (Docker Required)
 - `smoke-test.sh` - Basic tool functionality tests
 - `test-config-generation.sh` - Repository Manager config tests
 - `test-tool-reads-config.sh` - Tool config reading tests
 - `test-e2e.sh` - End-to-end tests with mock API
-- `test-all.sh` - Run all test suites
+
+### Test Scripts (No Docker Required)
+- `test-drift-detection.sh` - Configuration drift monitoring (16 tests)
+- `test-developer-workflow.sh` - Developer scenario simulation (22 tests)
+
+### Master Runners
+- `test-all.sh` - Run all test suites (tiered execution)
+- `monitor-continuous.sh` - Continuous integration monitoring
 - `run-tests.sh <mode> <profile>` - Legacy test runner
 
 ## Running Tests
@@ -97,6 +107,33 @@ Run all integration tests:
    ```bash
    ./docker/scripts/test-e2e.sh
    ```
+
+### Local Validation Tests (No Docker Required)
+
+6. **Drift Detection** - Configuration integrity monitoring:
+   ```bash
+   ./docker/scripts/test-drift-detection.sh
+   ```
+   Tests: Initial setup integrity, baseline checksums, manual edit detection,
+   tool override detection, version drift simulation, multi-tool consistency,
+   recovery testing.
+
+7. **Developer Workflow** - Real-world scenario simulation:
+   ```bash
+   ./docker/scripts/test-developer-workflow.sh
+   ```
+   Workflows: New project setup, adding tools, updating rules, handling
+   conflicts, multi-branch development, version compatibility.
+
+### Continuous Monitoring
+
+Run scheduled monitoring for drift tracking:
+```bash
+./docker/scripts/monitor-continuous.sh
+```
+
+This tracks Dockerfile changes, runs drift detection, monitors fixture
+integrity, and generates reports to `.monitoring/`.
 
 ## Test Results
 
