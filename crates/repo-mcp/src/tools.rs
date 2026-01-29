@@ -16,10 +16,10 @@
 //! - `branch_delete` - Remove a branch and its worktree
 //! - `branch_list` - List active branches
 //!
-//! ## Git Primitives
-//! - `git_push` - Push current branch
-//! - `git_pull` - Pull updates
-//! - `git_merge` - Merge target branch
+//! ## Git Primitives (Not Yet Implemented)
+//! - `git_push` - Push current branch (returns NotImplemented)
+//! - `git_pull` - Pull updates (returns NotImplemented)
+//! - `git_merge` - Merge target branch (returns NotImplemented)
 //!
 //! ## Configuration Management
 //! - `tool_add` - Enable a tool
@@ -178,10 +178,10 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                 "properties": {}
             }),
         },
-        // Git Primitives
+        // Git Primitives (not yet implemented - will return NotImplemented error)
         ToolDefinition {
             name: "git_push".to_string(),
-            description: "Push current branch to remote".to_string(),
+            description: "[Not implemented] Push current branch to remote".to_string(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -198,7 +198,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "git_pull".to_string(),
-            description: "Pull updates from remote".to_string(),
+            description: "[Not implemented] Pull updates from remote".to_string(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -215,7 +215,7 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
         },
         ToolDefinition {
             name: "git_merge".to_string(),
-            description: "Merge target branch into current branch".to_string(),
+            description: "[Not implemented] Merge target branch into current branch".to_string(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {

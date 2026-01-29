@@ -37,10 +37,15 @@
 //! - `repo://rules` - Aggregated active rules
 
 pub mod error;
+pub mod handlers;
+pub mod protocol;
+pub mod resource_handlers;
 pub mod resources;
 pub mod server;
 pub mod tools;
 
 pub use error::{Error, Result};
+pub use handlers::handle_tool_call;
+pub use resource_handlers::read_resource;
 pub use server::RepoMcpServer;
 pub use tools::{get_tool_definitions, ToolContent, ToolDefinition, ToolResult};

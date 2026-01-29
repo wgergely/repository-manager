@@ -27,4 +27,32 @@ pub enum Error {
     /// Server not initialized
     #[error("server not initialized")]
     NotInitialized,
+
+    /// Unknown tool requested
+    #[error("unknown tool: {0}")]
+    UnknownTool(String),
+
+    /// Invalid argument provided
+    #[error("invalid argument: {0}")]
+    InvalidArgument(String),
+
+    /// IO error
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    /// TOML parse error
+    #[error("TOML parse error: {0}")]
+    TomlParse(#[from] toml::de::Error),
+
+    /// TOML serialize error
+    #[error("TOML serialize error: {0}")]
+    TomlSerialize(#[from] toml::ser::Error),
+
+    /// Tool not implemented
+    #[error("tool not implemented: {0}")]
+    NotImplemented(String),
+
+    /// Unknown resource requested
+    #[error("unknown resource: {0}")]
+    UnknownResource(String),
 }

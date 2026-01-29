@@ -5,6 +5,10 @@ edition.workspace = true
 license.workspace = true
 description = "MCP server exposing Repository Manager functionality via Model Context Protocol"
 
+[[bin]]
+name = "repo-mcp"
+path = "src/main.rs"
+
 [dependencies]
 # Core repository crates
 repo-core = { path = "../repo-core" }
@@ -20,12 +24,17 @@ tokio = { workspace = true, features = ["full"] }
 # Serialization
 serde = { workspace = true }
 serde_json = { workspace = true }
+toml = { workspace = true }
 
 # Async traits
 async-trait = { workspace = true }
 
 # Logging
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
 
 # Error handling
 thiserror = { workspace = true }
