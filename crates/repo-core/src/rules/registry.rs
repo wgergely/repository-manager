@@ -85,7 +85,10 @@ impl RuleRegistry {
         let rule = Rule::new(id, content, tags);
         self.rules.push(rule);
         self.save()?;
-        Ok(self.rules.last().unwrap())
+        self.rules.last()
+            .ok_or_else(|| crate::Error::InternalError {
+                message: "rules vector unexpectedly empty after push".to_string(),
+            })
     }
 
     /// Get a rule by UUID

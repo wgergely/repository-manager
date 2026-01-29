@@ -36,6 +36,10 @@ pub enum Error {
     #[error("Not found: {0}")]
     NotFound(String),
 
+    /// Internal error (invariant violation or unexpected state)
+    #[error("Internal error: {message}")]
+    InternalError { message: String },
+
     // Transparent wrappers for underlying crate errors
     /// Filesystem error from repo-fs
     #[error(transparent)]

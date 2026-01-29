@@ -79,7 +79,10 @@ impl ProjectionWriter {
 
         let new_content = if existing.contains(&marker_start) {
             // Replace existing block
-            let start_idx = existing.find(&marker_start).unwrap();
+            let start_idx = existing.find(&marker_start)
+                .ok_or_else(|| Error::InternalError {
+                    message: format!("marker_start not found despite contains() check: {}", marker_start),
+                })?;
             let end_idx = existing
                 .find(&marker_end)
                 .map(|i| i + marker_end.len())
@@ -173,7 +176,10 @@ impl ProjectionWriter {
             return Ok(format!("Block {} not found in {}", marker, path));
         }
 
-        let start_idx = existing.find(&marker_start).unwrap();
+        let start_idx = existing.find(&marker_start)
+            .ok_or_else(|| Error::InternalError {
+                message: format!("marker_start not found despite contains() check: {}", marker_start),
+            })?;
         let end_idx = existing
             .find(&marker_end)
             .map(|i| i + marker_end.len())
@@ -264,7 +270,9 @@ fn remove_json_path(json: &mut serde_json::Value, path: &str) {
     }
 
     if let serde_json::Value::Object(map) = current {
-        map.remove(*parts.last().unwrap());
+        if let Some(last_part) = parts.last() {
+            map.remove(*last_part);
+        }
     }
 }
 
