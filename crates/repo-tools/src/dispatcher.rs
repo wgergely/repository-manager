@@ -1,9 +1,7 @@
 //! Tool dispatcher that routes to appropriate integration
 //!
-//! The dispatcher manages tool integrations and routes sync operations to the
-//! appropriate implementation. It prefers optimized built-in integrations for
-//! known tools (vscode, cursor, claude) and falls back to schema-driven generic
-//! integrations for other tools.
+//! The dispatcher uses ToolRegistry as the single source of truth for tool
+//! definitions, eliminating the previous 3-location duplication.
 
 use crate::aider::aider_integration;
 use crate::amazonq::amazonq_integration;
@@ -17,6 +15,7 @@ use crate::gemini::gemini_integration;
 use crate::generic::GenericToolIntegration;
 use crate::integration::{Rule, SyncContext, ToolIntegration};
 use crate::jetbrains::jetbrains_integration;
+use crate::registry::{ToolRegistration, ToolRegistry, BUILTIN_COUNT};
 use crate::roo::roo_integration;
 use crate::vscode::VSCodeIntegration;
 use crate::windsurf::windsurf_integration;
@@ -26,30 +25,34 @@ use std::collections::HashMap;
 
 /// Dispatches sync operations to appropriate tool integrations.
 ///
-/// The dispatcher maintains a registry of schema-defined tools and routes
-/// requests to either built-in integrations (for performance) or generic
-/// schema-driven integrations.
+/// Uses ToolRegistry as the single source of truth for tool definitions.
+/// The registry is populated with built-in tools and can have additional
+/// schema-defined tools registered at runtime.
 pub struct ToolDispatcher {
-    /// Schema-defined tools (loaded from .repository/tools/)
+    registry: ToolRegistry,
+    /// Additional schema-defined tools (loaded from .repository/tools/)
     schema_tools: HashMap<String, ToolDefinition>,
 }
 
 impl ToolDispatcher {
-    /// Create a new empty dispatcher.
+    /// Create a new dispatcher with all built-in tools.
     pub fn new() -> Self {
         Self {
+            registry: ToolRegistry::with_builtins(),
             schema_tools: HashMap::new(),
         }
     }
 
     /// Create a dispatcher with pre-loaded tool definitions.
     pub fn with_definitions(definitions: HashMap<String, ToolDefinition>) -> Self {
-        Self {
-            schema_tools: definitions,
+        let mut dispatcher = Self::new();
+        for (_, def) in definitions {
+            dispatcher.register(def);
         }
+        dispatcher
     }
 
-    /// Register a tool definition.
+    /// Register a schema-defined tool.
     pub fn register(&mut self, definition: ToolDefinition) {
         self.schema_tools
             .insert(definition.meta.slug.clone(), definition);
@@ -57,25 +60,12 @@ impl ToolDispatcher {
 
     /// Get an integration for a tool by name.
     ///
-    /// Prefers built-in integrations, falls back to generic schema-driven.
+    /// For built-in tools, returns optimized implementations.
+    /// For schema-defined tools, returns GenericToolIntegration.
     pub fn get_integration(&self, tool_name: &str) -> Option<Box<dyn ToolIntegration>> {
-        // Check for built-in integrations first
-        match tool_name {
-            "vscode" => return Some(Box::new(VSCodeIntegration::new())),
-            "cursor" => return Some(Box::new(cursor_integration())),
-            "claude" => return Some(Box::new(claude_integration())),
-            "windsurf" => return Some(Box::new(windsurf_integration())),
-            "antigravity" => return Some(Box::new(antigravity_integration())),
-            "gemini" => return Some(Box::new(gemini_integration())),
-            // New integrations
-            "copilot" => return Some(Box::new(copilot_integration())),
-            "cline" => return Some(Box::new(cline_integration())),
-            "roo" => return Some(Box::new(roo_integration())),
-            "jetbrains" => return Some(Box::new(jetbrains_integration())),
-            "zed" => return Some(Box::new(zed_integration())),
-            "aider" => return Some(Box::new(aider_integration())),
-            "amazonq" => return Some(Box::new(amazonq_integration())),
-            _ => {}
+        // Check built-in tools in registry
+        if self.registry.contains(tool_name) {
+            return Some(Self::create_builtin_integration(tool_name));
         }
 
         // Fall back to schema-defined generic integration
@@ -84,13 +74,36 @@ impl ToolDispatcher {
         })
     }
 
+    /// Create a built-in integration by name.
+    fn create_builtin_integration(name: &str) -> Box<dyn ToolIntegration> {
+        match name {
+            "vscode" => Box::new(VSCodeIntegration::new()),
+            "cursor" => Box::new(cursor_integration()),
+            "claude" => Box::new(claude_integration()),
+            "windsurf" => Box::new(windsurf_integration()),
+            "antigravity" => Box::new(antigravity_integration()),
+            "gemini" => Box::new(gemini_integration()),
+            "copilot" => Box::new(copilot_integration()),
+            "cline" => Box::new(cline_integration()),
+            "roo" => Box::new(roo_integration()),
+            "jetbrains" => Box::new(jetbrains_integration()),
+            "zed" => Box::new(zed_integration()),
+            "aider" => Box::new(aider_integration()),
+            "amazonq" => Box::new(amazonq_integration()),
+            // Fallback - shouldn't happen if registry is consistent
+            _ => Box::new(GenericToolIntegration::new(
+                crate::registry::builtin_registrations()
+                    .into_iter()
+                    .find(|r| r.slug == name)
+                    .map(|r| r.definition)
+                    .unwrap_or_else(|| panic!("Unknown built-in tool: {}", name)),
+            )),
+        }
+    }
+
     /// Check if a tool is available (built-in or schema-defined).
     pub fn has_tool(&self, tool_name: &str) -> bool {
-        matches!(
-            tool_name,
-            "vscode" | "cursor" | "claude" | "windsurf" | "antigravity" | "gemini"
-                | "copilot" | "cline" | "roo" | "jetbrains" | "zed" | "aider" | "amazonq"
-        ) || self.schema_tools.contains_key(tool_name)
+        self.registry.contains(tool_name) || self.schema_tools.contains_key(tool_name)
     }
 
     /// Sync rules to all specified tools.
@@ -116,22 +129,7 @@ impl ToolDispatcher {
 
     /// List all available tools (built-in + schema-defined).
     pub fn list_available(&self) -> Vec<String> {
-        let mut tools = vec![
-            "vscode".to_string(),
-            "cursor".to_string(),
-            "claude".to_string(),
-            "windsurf".to_string(),
-            "antigravity".to_string(),
-            "gemini".to_string(),
-            // New integrations
-            "copilot".to_string(),
-            "cline".to_string(),
-            "roo".to_string(),
-            "jetbrains".to_string(),
-            "zed".to_string(),
-            "aider".to_string(),
-            "amazonq".to_string(),
-        ];
+        let mut tools: Vec<String> = self.registry.list().iter().map(|s| s.to_string()).collect();
 
         for slug in self.schema_tools.keys() {
             if !tools.contains(slug) {
@@ -143,9 +141,24 @@ impl ToolDispatcher {
         tools
     }
 
-    /// Get the number of schema-defined tools.
+    /// Get the number of schema-defined tools (not including built-ins).
     pub fn schema_tool_count(&self) -> usize {
         self.schema_tools.len()
+    }
+
+    /// Get the total number of registered tools.
+    pub fn total_tool_count(&self) -> usize {
+        BUILTIN_COUNT + self.schema_tools.len()
+    }
+
+    /// Get a registration by slug (for capability checking).
+    pub fn get_registration(&self, slug: &str) -> Option<&ToolRegistration> {
+        self.registry.get(slug)
+    }
+
+    /// Get access to the underlying registry.
+    pub fn registry(&self) -> &ToolRegistry {
+        &self.registry
     }
 }
 
@@ -185,6 +198,7 @@ mod tests {
     fn test_new_dispatcher() {
         let dispatcher = ToolDispatcher::new();
         assert_eq!(dispatcher.schema_tool_count(), 0);
+        assert_eq!(dispatcher.total_tool_count(), BUILTIN_COUNT);
     }
 
     #[test]
@@ -197,7 +211,6 @@ mod tests {
         assert!(dispatcher.get_integration("windsurf").is_some());
         assert!(dispatcher.get_integration("antigravity").is_some());
         assert!(dispatcher.get_integration("gemini").is_some());
-        // New integrations
         assert!(dispatcher.get_integration("copilot").is_some());
         assert!(dispatcher.get_integration("cline").is_some());
         assert!(dispatcher.get_integration("roo").is_some());
@@ -218,7 +231,6 @@ mod tests {
         assert!(dispatcher.has_tool("windsurf"));
         assert!(dispatcher.has_tool("antigravity"));
         assert!(dispatcher.has_tool("gemini"));
-        // New integrations
         assert!(dispatcher.has_tool("copilot"));
         assert!(dispatcher.has_tool("cline"));
         assert!(dispatcher.has_tool("roo"));
@@ -266,10 +278,10 @@ mod tests {
         assert!(available.contains(&"windsurf".to_string()));
         assert!(available.contains(&"antigravity".to_string()));
         assert!(available.contains(&"gemini".to_string()));
-        assert!(available.contains(&"zed".to_string())); // Now a built-in
-        assert!(available.contains(&"customtool".to_string())); // Schema-defined
+        assert!(available.contains(&"zed".to_string()));
+        assert!(available.contains(&"customtool".to_string()));
 
-        // First item should be "aider" (alphabetically first now)
+        // First item should be "aider" (alphabetically first)
         assert_eq!(available[0], "aider");
     }
 
@@ -277,5 +289,23 @@ mod tests {
     fn test_unknown_tool_returns_none() {
         let dispatcher = ToolDispatcher::new();
         assert!(dispatcher.get_integration("unknown").is_none());
+    }
+
+    #[test]
+    fn test_registry_access() {
+        let dispatcher = ToolDispatcher::new();
+        let registry = dispatcher.registry();
+
+        assert_eq!(registry.len(), BUILTIN_COUNT);
+        assert!(registry.contains("cursor"));
+    }
+
+    #[test]
+    fn test_get_registration() {
+        let dispatcher = ToolDispatcher::new();
+
+        let reg = dispatcher.get_registration("cursor");
+        assert!(reg.is_some());
+        assert_eq!(reg.unwrap().name, "Cursor");
     }
 }
