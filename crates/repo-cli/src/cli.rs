@@ -108,6 +108,16 @@ pub enum Commands {
     /// List all active rules
     ListRules,
 
+    /// List available tools
+    ListTools {
+        /// Filter by category (ide, cli-agent, autonomous, copilot)
+        #[arg(short, long)]
+        category: Option<String>,
+    },
+
+    /// List available presets
+    ListPresets,
+
     /// Manage branches (worktree mode)
     Branch {
         /// Branch action to perform
@@ -494,5 +504,28 @@ mod tests {
             }
             _ => panic!("Expected Merge command"),
         }
+    }
+
+    #[test]
+    fn parse_list_tools_command() {
+        let cli = Cli::parse_from(["repo", "list-tools"]);
+        assert!(matches!(cli.command, Some(Commands::ListTools { category: None })));
+    }
+
+    #[test]
+    fn parse_list_tools_with_category() {
+        let cli = Cli::parse_from(["repo", "list-tools", "--category", "ide"]);
+        match cli.command {
+            Some(Commands::ListTools { category }) => {
+                assert_eq!(category, Some("ide".to_string()));
+            }
+            _ => panic!("Expected ListTools command"),
+        }
+    }
+
+    #[test]
+    fn parse_list_presets_command() {
+        let cli = Cli::parse_from(["repo", "list-presets"]);
+        assert!(matches!(cli.command, Some(Commands::ListPresets)));
     }
 }

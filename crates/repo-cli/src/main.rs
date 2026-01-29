@@ -78,6 +78,8 @@ fn execute_command(cmd: Commands) -> Result<()> {
         } => cmd_add_rule(&id, &instruction, tags),
         Commands::RemoveRule { id } => cmd_remove_rule(&id),
         Commands::ListRules => cmd_list_rules(),
+        Commands::ListTools { category } => cmd_list_tools(category),
+        Commands::ListPresets => cmd_list_presets(),
         Commands::Branch { action } => cmd_branch(action),
         Commands::Push { remote, branch } => cmd_push(remote, branch),
         Commands::Pull { remote, branch } => cmd_pull(remote, branch),
@@ -163,6 +165,16 @@ fn cmd_remove_rule(id: &str) -> Result<()> {
 fn cmd_list_rules() -> Result<()> {
     let cwd = std::env::current_dir()?;
     commands::run_list_rules(&cwd)
+}
+
+fn cmd_list_tools(_category: Option<String>) -> Result<()> {
+    // TODO: Implement in Task 2
+    todo!("list-tools command not yet implemented")
+}
+
+fn cmd_list_presets() -> Result<()> {
+    // TODO: Implement in Task 2
+    todo!("list-presets command not yet implemented")
 }
 
 fn cmd_branch(action: BranchAction) -> Result<()> {
