@@ -23,16 +23,22 @@ Integration testing infrastructure for Repository Manager.
 ## Image Hierarchy
 
 ```
-repo-test/base          Ubuntu 22.04 + Node.js + Python + Rust
-  └── repo-test/cli-base     Base for CLI tools
-        ├── repo-test/claude     Claude Code CLI
-        ├── repo-test/aider      Aider
-        └── repo-test/gemini     Gemini CLI
+repo-test/base              Ubuntu 22.04 + Node.js + Python + Rust
+  ├── repo-test/cli-base         Base for CLI tools
+  │     ├── repo-test/claude         Claude Code CLI
+  │     ├── repo-test/aider          Aider
+  │     ├── repo-test/gemini         Gemini CLI
+  │     └── repo-test/cursor         Cursor CLI (agent command)
+  │
+  └── repo-test/vscode-base      VS Code headless + Xvfb
+        ├── repo-test/cline          Cline extension
+        └── repo-test/roo            Roo Code extension
 ```
 
 ## Profiles
 
-- `cli` - CLI tools (Claude, Aider, Gemini)
+- `cli` - CLI tools (Claude, Aider, Gemini, Cursor)
+- `vscode` - VS Code extensions (Cline, Roo)
 - `mock` - Mock API server
 - `ci` - CI/CD configuration
 - `all` - All tools
