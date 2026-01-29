@@ -7,6 +7,8 @@
 //! - **MarkdownWriter**: Section-based merge with managed markers
 //! - **TextWriter**: Full replacement (tool owns the file)
 
+mod json;
 mod traits;
 
+pub use json::JsonWriter;
 pub use traits::{ConfigWriter, SchemaKeys};
