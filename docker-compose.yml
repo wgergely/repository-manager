@@ -75,6 +75,39 @@ services:
     tty: true
 
   # ============================================
+  # VS Code Extensions (Moderate Tier)
+  # ============================================
+  cline:
+    build:
+      context: ./docker
+      dockerfile: vscode/cline/Dockerfile
+    image: repo-test/cline:latest
+    volumes: *common-volumes
+    environment:
+      <<: *common-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    working_dir: /workspace
+    profiles: ["vscode", "all"]
+    stdin_open: true
+    tty: true
+
+  roo:
+    build:
+      context: ./docker
+      dockerfile: vscode/roo/Dockerfile
+    image: repo-test/roo:latest
+    volumes: *common-volumes
+    environment:
+      <<: *common-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    working_dir: /workspace
+    profiles: ["vscode", "all"]
+    stdin_open: true
+    tty: true
+
+  # ============================================
   # Mock API Server (for CI)
   # ============================================
   mock-api:

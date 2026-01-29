@@ -30,3 +30,17 @@ services:
       ANTHROPIC_API_KEY: "mock-key-for-ci"
     depends_on:
       - mock-api
+
+  cline:
+    environment:
+      ANTHROPIC_API_KEY: "mock-key-for-ci"
+      OPENAI_API_KEY: "mock-key-for-ci"
+    depends_on:
+      - mock-api
+
+  roo:
+    environment:
+      ANTHROPIC_API_KEY: "mock-key-for-ci"
+      OPENAI_API_KEY: "mock-key-for-ci"
+    depends_on:
+      - mock-api
