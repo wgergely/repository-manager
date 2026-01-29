@@ -65,9 +65,19 @@ repo-test/base              Ubuntu 22.04 + Node.js + Python + Rust
 ### Test Scripts (No Docker Required)
 - `test-drift-detection.sh` - Configuration drift monitoring (16 tests)
 - `test-developer-workflow.sh` - Developer scenario simulation (22 tests)
+- `test-all-tools.sh` - Per-tool integration tests (118 tests)
+
+### Per-Tool Integration Tests (No Docker Required)
+- `test-tool-claude.sh` - Claude CLI workflows (16 tests)
+- `test-tool-cursor.sh` - Cursor IDE workflows (19 tests)
+- `test-tool-aider.sh` - Aider workflows (17 tests)
+- `test-tool-gemini.sh` - Gemini CLI workflows (19 tests)
+- `test-tool-cline.sh` - Cline extension workflows (20 tests)
+- `test-tool-roo.sh` - Roo Code extension workflows (27 tests)
 
 ### Master Runners
 - `test-all.sh` - Run all test suites (tiered execution)
+- `test-all-tools.sh` - Run all per-tool tests with matrix report
 - `monitor-continuous.sh` - Continuous integration monitoring
 - `run-tests.sh <mode> <profile>` - Legacy test runner
 
@@ -125,6 +135,13 @@ Run all integration tests:
    Workflows: New project setup, adding tools, updating rules, handling
    conflicts, multi-branch development, version compatibility.
 
+8. **Per-Tool Integration** - All tool tests with matrix report:
+   ```bash
+   ./docker/scripts/test-all-tools.sh
+   ```
+   Tests all 6 supported AI tools: Claude CLI, Cursor, Aider, Gemini,
+   Cline, and Roo Code. Generates `test-results/tools/TEST-MATRIX.md`.
+
 ### Continuous Monitoring
 
 Run scheduled monitoring for drift tracking:
@@ -145,7 +162,17 @@ test-results/
 ├── smoke/           # Smoke test output
 ├── config-gen/      # Generated config files
 ├── tool-reads/      # Tool reading verification
-└── e2e/             # End-to-end test logs
+├── e2e/             # End-to-end test logs
+├── drift/           # Drift detection reports
+├── workflow/        # Developer workflow logs
+└── tools/           # Per-tool test results
+    ├── TEST-MATRIX.md    # Comprehensive test matrix
+    ├── claude/           # Claude CLI reports
+    ├── cursor/           # Cursor IDE reports
+    ├── aider/            # Aider reports
+    ├── gemini/           # Gemini CLI reports
+    ├── cline/            # Cline extension reports
+    └── roo/              # Roo Code reports
 ```
 
 ## Test Fixtures

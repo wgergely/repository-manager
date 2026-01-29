@@ -86,6 +86,7 @@ echo -e "${BLUE}═════════════════════�
 
 run_test_suite "drift-detection" "test-drift-detection.sh" false || true
 run_test_suite "developer-workflow" "test-developer-workflow.sh" false || true
+run_test_suite "tool-integration" "test-all-tools.sh" false || true
 
 # ============================================
 # TIER 2: Docker Build Tests
