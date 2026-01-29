@@ -46,3 +46,6 @@ test_results.txt
 test-results/
 docker/secrets/
 *.tar
+
+# Monitoring data
+.monitoring/
