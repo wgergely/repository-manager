@@ -61,6 +61,7 @@ This research covers:
 | [rust-config-libraries.md](rust-config-libraries.md) | figment, config-rs, serde patterns |
 | [rust-git-libraries.md](rust-git-libraries.md) | gix (gitoxide) and git2 comparison |
 | [rust-testing-2026.md](2026-01-28-rust-testing-standards.md) | Testing strategies and crates |
+| [2026-01-29-rust-registry-patterns.md](2026-01-29-rust-registry-patterns.md) | Plugin/registry patterns (inventory, linkme, enum_dispatch) |
 
 ## Key Findings (January 2026)
 
@@ -90,5 +91,5 @@ This research covers:
 
 ---
 
-*Last updated: 2026-01-28*
+*Last updated: 2026-01-29*
 *Branch: research-docs*
