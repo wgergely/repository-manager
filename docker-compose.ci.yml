@@ -1,0 +1,26 @@
+# CI overrides - routes all API calls to mock server
+# Usage: docker compose -f docker-compose.yml -f docker-compose.ci.yml up
+version: "3.9"
+
+services:
+  claude:
+    environment:
+      ANTHROPIC_API_KEY: "mock-key-for-ci"
+      ANTHROPIC_BASE_URL: "http://mock-api:8080"
+    depends_on:
+      - mock-api
+
+  aider:
+    environment:
+      OPENAI_API_KEY: "mock-key-for-ci"
+      OPENAI_API_BASE: "http://mock-api:8080/v1"
+      ANTHROPIC_API_KEY: "mock-key-for-ci"
+    depends_on:
+      - mock-api
+
+  gemini:
+    environment:
+      # Gemini CLI mock requires different setup
+      GOOGLE_API_KEY: "mock-key-for-ci"
+    depends_on:
+      - mock-api
