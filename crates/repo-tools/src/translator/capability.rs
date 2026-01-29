@@ -1,0 +1,174 @@
+//! Main capability translator orchestrator
+//!
+//! This is the entry point for capability-based translation. It coordinates
+//! all sub-translators and respects tool capabilities.
+
+use super::{RuleTranslator, TranslatedContent};
+use repo_meta::schema::{RuleDefinition, ToolDefinition};
+
+/// Main translator that orchestrates capability-based content generation.
+///
+/// This translator:
+/// 1. Checks what capabilities a tool has
+/// 2. Delegates to appropriate sub-translators
+/// 3. Combines results into a single TranslatedContent
+pub struct CapabilityTranslator;
+
+impl CapabilityTranslator {
+    /// Translate rules and other content for a specific tool.
+    ///
+    /// Respects the tool's declared capabilities, only generating
+    /// content the tool can actually use.
+    pub fn translate(tool: &ToolDefinition, rules: &[RuleDefinition]) -> TranslatedContent {
+        let mut content = TranslatedContent::empty();
+        content.format = tool.integration.config_type;
+
+        // Custom instructions (if supported)
+        if tool.capabilities.supports_custom_instructions {
+            let rule_content = RuleTranslator::translate(tool, rules);
+            content.instructions = rule_content.instructions;
+        }
+
+        // MCP servers: Future phase (Phase 5)
+        // if tool.capabilities.supports_mcp {
+        //     content.mcp_servers = ...
+        // }
+
+        // Rules directory: Future enhancement
+        // if tool.capabilities.supports_rules_directory {
+        //     // Different handling for directory-based tools
+        // }
+
+        content
+    }
+
+    /// Check if a tool has any capabilities that require syncing.
+    pub fn has_capabilities(tool: &ToolDefinition) -> bool {
+        tool.capabilities.supports_custom_instructions
+            || tool.capabilities.supports_mcp
+            || tool.capabilities.supports_rules_directory
+    }
+
+    /// Check if a tool supports custom instructions.
+    pub fn supports_instructions(tool: &ToolDefinition) -> bool {
+        tool.capabilities.supports_custom_instructions
+    }
+
+    /// Check if a tool supports MCP servers.
+    pub fn supports_mcp(tool: &ToolDefinition) -> bool {
+        tool.capabilities.supports_mcp
+    }
+
+    /// Check if a tool supports rules directory.
+    pub fn supports_rules_directory(tool: &ToolDefinition) -> bool {
+        tool.capabilities.supports_rules_directory
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use repo_meta::schema::{
+        ConfigType, RuleContent, RuleMeta, Severity, ToolCapabilities, ToolIntegrationConfig,
+        ToolMeta,
+    };
+
+    fn make_tool(instructions: bool, mcp: bool, rules_dir: bool) -> ToolDefinition {
+        ToolDefinition {
+            meta: ToolMeta {
+                name: "Test".into(),
+                slug: "test".into(),
+                description: None,
+            },
+            integration: ToolIntegrationConfig {
+                config_path: ".test".into(),
+                config_type: ConfigType::Markdown,
+                additional_paths: vec![],
+            },
+            capabilities: ToolCapabilities {
+                supports_custom_instructions: instructions,
+                supports_mcp: mcp,
+                supports_rules_directory: rules_dir,
+            },
+            schema_keys: None,
+        }
+    }
+
+    fn make_rule(id: &str) -> RuleDefinition {
+        RuleDefinition {
+            meta: RuleMeta {
+                id: id.into(),
+                severity: Severity::Mandatory,
+                tags: vec![],
+            },
+            content: RuleContent {
+                instruction: format!("Rule {} content", id),
+            },
+            examples: None,
+            targets: None,
+        }
+    }
+
+    #[test]
+    fn test_translate_with_instructions_capability() {
+        let tool = make_tool(true, false, false);
+        let rules = vec![make_rule("r1")];
+
+        let content = CapabilityTranslator::translate(&tool, &rules);
+        assert!(!content.is_empty());
+        assert!(content.instructions.is_some());
+    }
+
+    #[test]
+    fn test_translate_without_capabilities() {
+        let tool = make_tool(false, false, false);
+        let rules = vec![make_rule("r1")];
+
+        let content = CapabilityTranslator::translate(&tool, &rules);
+        assert!(content.is_empty());
+    }
+
+    #[test]
+    fn test_has_capabilities_all_false() {
+        let tool = make_tool(false, false, false);
+        assert!(!CapabilityTranslator::has_capabilities(&tool));
+    }
+
+    #[test]
+    fn test_has_capabilities_instructions() {
+        let tool = make_tool(true, false, false);
+        assert!(CapabilityTranslator::has_capabilities(&tool));
+    }
+
+    #[test]
+    fn test_has_capabilities_mcp() {
+        let tool = make_tool(false, true, false);
+        assert!(CapabilityTranslator::has_capabilities(&tool));
+    }
+
+    #[test]
+    fn test_has_capabilities_rules_dir() {
+        let tool = make_tool(false, false, true);
+        assert!(CapabilityTranslator::has_capabilities(&tool));
+    }
+
+    #[test]
+    fn test_capability_checks() {
+        let tool = make_tool(true, true, false);
+
+        assert!(CapabilityTranslator::supports_instructions(&tool));
+        assert!(CapabilityTranslator::supports_mcp(&tool));
+        assert!(!CapabilityTranslator::supports_rules_directory(&tool));
+    }
+
+    #[test]
+    fn test_format_preserved() {
+        let mut tool = make_tool(true, false, false);
+        tool.integration.config_type = ConfigType::Json;
+
+        let rules = vec![make_rule("r1")];
+        let content = CapabilityTranslator::translate(&tool, &rules);
+
+        assert_eq!(content.format, ConfigType::Json);
+    }
+}
