@@ -1,0 +1,73 @@
+# Docker Compose for Repository Manager Integration Testing
+# Based on ADR-001: Docker Compose for Container Orchestration
+version: "3.9"
+
+x-common-env: &common-env
+  TZ: UTC
+  TEST_MODE: ${TEST_MODE:-mock}
+
+x-common-volumes: &common-volumes
+  - ./test-fixtures:/fixtures:ro
+  - ./test-results:/results
+  - ./crates:/workspace/crates:ro
+
+services:
+  # ============================================
+  # CLI Agents (Trivial Tier)
+  # ============================================
+  claude:
+    build:
+      context: ./docker
+      dockerfile: cli/claude/Dockerfile
+    image: repo-test/claude:latest
+    volumes: *common-volumes
+    environment:
+      <<: *common-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+    working_dir: /workspace
+    profiles: ["cli", "all"]
+    stdin_open: true
+    tty: true
+
+  aider:
+    build:
+      context: ./docker
+      dockerfile: cli/aider/Dockerfile
+    image: repo-test/aider:latest
+    volumes: *common-volumes
+    environment:
+      <<: *common-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_BASE: ${OPENAI_API_BASE:-}
+    working_dir: /workspace
+    profiles: ["cli", "all"]
+    stdin_open: true
+    tty: true
+
+  gemini:
+    build:
+      context: ./docker
+      dockerfile: cli/gemini/Dockerfile
+    image: repo-test/gemini:latest
+    volumes: *common-volumes
+    environment:
+      <<: *common-env
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+    working_dir: /workspace
+    profiles: ["cli", "all"]
+    stdin_open: true
+    tty: true
+
+  # ============================================
+  # Mock API Server (for CI)
+  # ============================================
+  mock-api:
+    image: wiremock/wiremock:3.3.1
+    volumes:
+      - ./docker/mock-api/stubs:/home/wiremock/mappings:ro
+    ports:
+      - "8080:8080"
+    profiles: ["mock", "ci"]
+    command: ["--verbose"]
