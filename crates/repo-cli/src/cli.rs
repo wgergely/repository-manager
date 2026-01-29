@@ -20,6 +20,14 @@ pub struct Cli {
 #[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
 pub enum Commands {
     /// Initialize a new repository configuration
+    ///
+    /// Creates a .repository/ directory with config.toml.
+    ///
+    /// Examples:
+    ///   repo init                    # Initialize in current directory
+    ///   repo init my-project         # Create and initialize my-project/
+    ///   repo init --interactive      # Guided setup
+    ///   repo init -t claude -t cursor # With specific tools
     Init {
         /// Project name (creates folder if not ".")
         #[arg(default_value = ".")]
@@ -64,8 +72,15 @@ pub enum Commands {
     },
 
     /// Add a tool to the repository
+    ///
+    /// Adds the tool to config.toml and runs sync.
+    /// Use 'repo list-tools' to see available tools.
+    ///
+    /// Examples:
+    ///   repo add-tool claude    # Add Claude Code support
+    ///   repo add-tool cursor    # Add Cursor IDE support
     AddTool {
-        /// Name of the tool to add
+        /// Name of the tool (use 'repo list-tools' to see options)
         name: String,
     },
 
@@ -109,6 +124,12 @@ pub enum Commands {
     ListRules,
 
     /// List available tools
+    ///
+    /// Shows all tools that can be added to your repository.
+    ///
+    /// Examples:
+    ///   repo list-tools                # Show all tools
+    ///   repo list-tools --category ide # Show only IDE tools
     ListTools {
         /// Filter by category (ide, cli-agent, autonomous, copilot)
         #[arg(short, long)]
@@ -119,7 +140,26 @@ pub enum Commands {
     ListPresets,
 
     /// Show repository status
+    ///
+    /// Displays current configuration and tool sync status.
+    ///
+    /// Example:
+    ///   repo status
     Status,
+
+    /// Generate shell completions
+    ///
+    /// Outputs completion script for your shell.
+    ///
+    /// Examples:
+    ///   repo completions bash > ~/.local/share/bash-completion/completions/repo
+    ///   repo completions zsh > ~/.zfunc/_repo
+    ///   repo completions fish > ~/.config/fish/completions/repo.fish
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
 
     /// Manage branches (worktree mode)
     Branch {
@@ -536,5 +576,11 @@ mod tests {
     fn parse_status_command() {
         let cli = Cli::parse_from(["repo", "status"]);
         assert!(matches!(cli.command, Some(Commands::Status)));
+    }
+
+    #[test]
+    fn parse_completions_command() {
+        let cli = Cli::parse_from(["repo", "completions", "bash"]);
+        assert!(matches!(cli.command, Some(Commands::Completions { .. })));
     }
 }
