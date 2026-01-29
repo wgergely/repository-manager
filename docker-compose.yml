@@ -60,6 +60,20 @@ services:
     stdin_open: true
     tty: true
 
+  cursor:
+    build:
+      context: ./docker
+      dockerfile: cli/cursor/Dockerfile
+    image: repo-test/cursor:latest
+    volumes: *common-volumes
+    environment:
+      <<: *common-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    working_dir: /workspace
+    profiles: ["cli", "all"]
+    stdin_open: true
+    tty: true
+
   # ============================================
   # Mock API Server (for CI)
   # ============================================

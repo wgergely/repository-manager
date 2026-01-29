@@ -24,3 +24,9 @@ services:
       GOOGLE_API_KEY: "mock-key-for-ci"
     depends_on:
       - mock-api
+
+  cursor:
+    environment:
+      ANTHROPIC_API_KEY: "mock-key-for-ci"
+    depends_on:
+      - mock-api
