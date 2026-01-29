@@ -23,7 +23,29 @@
       "WebFetch(domain:zed.dev)",
       "WebFetch(domain:aider.chat)",
       "WebFetch(domain:docs.continue.dev)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(for crate in \"repo-blocks\" \"repo-cli\" \"repo-content\" \"repo-core\" \"repo-fs\" \"repo-git\" \"repo-mcp\" \"repo-meta\" \"repo-presets\" \"repo-tools\")",
+      "Bash(do echo \"=== $crate ===\" ls -la \"Y:\\\\code\\\\repository-manager-worktrees\\\\main\\\\crates$crate\\\\src\")",
+      "Bash(done)",
+      "Bash(git push)",
+      "Bash(dir:*)",
+      "Bash(do)",
+      "Bash(echo:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(xargs ls:*)",
+      "Bash(rg:*)",
+      "Bash(cat:*)",
+      "WebFetch(domain:donsz.nl)",
+      "Bash(cargo fmt:*)",
+      "Bash(rustfmt:*)",
+      "WebFetch(domain:vadosware.io)",
+      "Bash(cargo build:*)",
+      "Bash(Get-ChildItem \"Y:\\\\code\\\\repository-manager-worktrees\\\\main\\\\target\\\\debug\\\\repo-mcp.exe\")",
+      "Bash(./target/debug/repo-mcp.exe:*)",
+      "Bash(python3:*)",
+      "Bash(bc:*)",
+      "Bash(chmod:*)"
     ]
   }
 }
