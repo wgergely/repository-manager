@@ -1,12 +1,12 @@
 #!/bin/bash
-# Expert-Level Developer Workflow Tests
-# Assumes advanced usage patterns that experienced developers would expect
+# Developer Workflow Scenario Tests
+# Tests realistic developer workflow patterns
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-RESULTS_DIR="$PROJECT_ROOT/test-results/expert"
+RESULTS_DIR="$PROJECT_ROOT/test-results/workflows"
 
 # Colors
 RED='\033[0;31m'
@@ -41,13 +41,13 @@ WORK_DIR=$(mktemp -d)
 trap "rm -rf $WORK_DIR" EXIT
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${CYAN}Expert-Level Developer Workflow Tests${NC}"
+echo -e "${CYAN}Developer Workflow Scenario Tests${NC}"
 echo "Simulates advanced usage patterns from experienced developers"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 # ============================================
 # SCENARIO 1: Polyglot Monorepo Setup
-# Expert: Expects per-directory tool configs
+# Per-directory tool configs
 # ============================================
 echo ""
 echo -e "${YELLOW}Scenario 1: Polyglot Monorepo with Multiple Teams${NC}"
@@ -131,7 +131,7 @@ fi
 
 # ============================================
 # SCENARIO 2: Feature Flag Development
-# Expert: Expects conditional tool behavior
+# conditional tool behavior
 # ============================================
 echo ""
 echo -e "${YELLOW}Scenario 2: Feature Flag Development Workflow${NC}"
@@ -200,7 +200,7 @@ fi
 
 # ============================================
 # SCENARIO 3: Multi-Environment Configuration
-# Expert: Expects env-specific tool settings
+# env-specific tool settings
 # ============================================
 echo ""
 echo -e "${YELLOW}Scenario 3: Multi-Environment Config Management${NC}"
@@ -287,7 +287,7 @@ fi
 
 # ============================================
 # SCENARIO 4: AI Agent Collaboration
-# Expert: Multiple AI tools working together
+# Multiple AI tools working together
 # ============================================
 echo ""
 echo -e "${YELLOW}Scenario 4: Multi-Agent AI Collaboration${NC}"
@@ -389,7 +389,7 @@ fi
 
 # ============================================
 # SCENARIO 5: Security-Sensitive Development
-# Expert: Expects secrets management awareness
+# secrets management awareness
 # ============================================
 echo ""
 echo -e "${YELLOW}Scenario 5: Security-Sensitive Development${NC}"
@@ -474,7 +474,7 @@ fi
 
 # ============================================
 # SCENARIO 6: Performance-Critical Development
-# Expert: Expects profiling and benchmark awareness
+# profiling and benchmark awareness
 # ============================================
 echo ""
 echo -e "${YELLOW}Scenario 6: Performance-Critical Development${NC}"
@@ -572,7 +572,7 @@ fi
 
 # ============================================
 # SCENARIO 7: Open Source Project Setup
-# Expert: Community contribution workflow
+# Community contribution workflow
 # ============================================
 echo ""
 echo -e "${YELLOW}Scenario 7: Open Source Project Setup${NC}"
@@ -690,7 +690,7 @@ fi
 
 # ============================================
 # SCENARIO 8: Microservices Architecture
-# Expert: Service mesh and API contracts
+# Service mesh and API contracts
 # ============================================
 echo ""
 echo -e "${YELLOW}Scenario 8: Microservices Architecture${NC}"
@@ -785,7 +785,7 @@ fi
 
 # ============================================
 # SCENARIO 9: Database Migration Workflow
-# Expert: Schema change management
+# Schema change management
 # ============================================
 echo ""
 echo -e "${YELLOW}Scenario 9: Database Migration Workflow${NC}"
@@ -867,7 +867,7 @@ fi
 
 # ============================================
 # SCENARIO 10: CI/CD Pipeline Integration
-# Expert: Build/deploy automation awareness
+# Build/deploy automation awareness
 # ============================================
 echo ""
 echo -e "${YELLOW}Scenario 10: CI/CD Pipeline Integration${NC}"
@@ -982,7 +982,7 @@ fi
 # ============================================
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}Expert Workflow Test Summary${NC}"
+echo -e "${BOLD}Workflow Scenario Test Summary${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo "  Total Tests:  $TOTAL_TESTS"
@@ -991,7 +991,7 @@ echo -e "  Failed:       ${RED}$FAILED_TESTS${NC}"
 echo ""
 
 if [ $FAILED_TESTS -eq 0 ]; then
-    echo -e "${GREEN}${BOLD}ALL EXPERT WORKFLOW TESTS PASSED${NC}"
+    echo -e "${GREEN}${BOLD}ALL WORKFLOW SCENARIO TESTS PASSED${NC}"
     exit 0
 else
     echo -e "${RED}${BOLD}SOME TESTS FAILED${NC}"
