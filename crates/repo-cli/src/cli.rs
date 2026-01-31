@@ -158,28 +158,6 @@ pub enum Commands {
     /// List available presets
     ListPresets,
 
-    /// Show repository status
-    ///
-    /// Displays current configuration and tool sync status.
-    ///
-    /// Example:
-    ///   repo status
-    Status,
-
-    /// Generate shell completions
-    ///
-    /// Outputs completion script for your shell.
-    ///
-    /// Examples:
-    ///   repo completions bash > ~/.local/share/bash-completion/completions/repo
-    ///   repo completions zsh > ~/.zfunc/_repo
-    ///   repo completions fish > ~/.config/fish/completions/repo.fish
-    Completions {
-        /// Shell to generate completions for
-        #[arg(value_enum)]
-        shell: clap_complete::Shell,
-    },
-
     /// Manage branches (worktree mode)
     Branch {
         /// Branch action to perform
@@ -216,6 +194,13 @@ pub enum Commands {
     },
 
     /// Generate shell completions
+    ///
+    /// Outputs completion script for your shell.
+    ///
+    /// Examples:
+    ///   repo completions bash > ~/.local/share/bash-completion/completions/repo
+    ///   repo completions zsh > ~/.zfunc/_repo
+    ///   repo completions fish > ~/.config/fish/completions/repo.fish
     Completions {
         /// Shell to generate completions for
         #[arg(value_enum)]
@@ -613,7 +598,7 @@ mod tests {
     #[test]
     fn parse_status_command() {
         let cli = Cli::parse_from(["repo", "status"]);
-        assert!(matches!(cli.command, Some(Commands::Status)));
+        assert!(matches!(cli.command, Some(Commands::Status { json: false })));
     }
 
     #[test]
