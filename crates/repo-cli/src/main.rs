@@ -83,6 +83,10 @@ fn execute_command(cmd: Commands) -> Result<()> {
         } => cmd_add_rule(&id, &instruction, tags),
         Commands::RemoveRule { id } => cmd_remove_rule(&id),
         Commands::ListRules => cmd_list_rules(),
+        Commands::ListTools { category } => cmd_list_tools(category.as_deref()),
+        Commands::ListPresets => cmd_list_presets(),
+        Commands::Status => cmd_status(),
+        Commands::Completions { shell } => cmd_completions(shell),
         Commands::Branch { action } => cmd_branch(action),
         Commands::Push { remote, branch } => cmd_push(remote, branch),
         Commands::Pull { remote, branch } => cmd_pull(remote, branch),
@@ -186,6 +190,26 @@ fn cmd_remove_rule(id: &str) -> Result<()> {
 fn cmd_list_rules() -> Result<()> {
     let cwd = std::env::current_dir()?;
     commands::run_list_rules(&cwd)
+}
+
+fn cmd_list_tools(category: Option<&str>) -> Result<()> {
+    commands::run_list_tools(category)
+}
+
+fn cmd_list_presets() -> Result<()> {
+    commands::run_list_presets()
+}
+
+fn cmd_status() -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::run_status(&cwd)
+}
+
+fn cmd_completions(shell: clap_complete::Shell) -> Result<()> {
+    let mut cmd = Cli::command();
+    let name = cmd.get_name().to_string();
+    generate(shell, &mut cmd, name, &mut std::io::stdout());
+    Ok(())
 }
 
 fn cmd_branch(action: BranchAction) -> Result<()> {

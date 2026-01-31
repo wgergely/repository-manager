@@ -30,6 +30,10 @@ pub mod gemini;
 pub mod generic;
 pub mod integration;
 pub mod jetbrains;
+pub mod registry;
+pub mod syncer;
+pub mod translator;
+pub mod writer;
 pub mod logging;
 pub mod roo;
 pub mod vscode;
@@ -50,6 +54,18 @@ pub use generic::GenericToolIntegration;
 pub use integration::{ConfigLocation, ConfigType, Rule, SyncContext, ToolIntegration};
 pub use jetbrains::jetbrains_integration;
 pub use roo::roo_integration;
-pub use vscode::VSCodeIntegration;
+pub use vscode::{vscode_definition, VSCodeIntegration};
 pub use windsurf::{windsurf_integration, WindsurfIntegration};
 pub use zed::zed_integration;
+
+// Registry types
+pub use registry::{builtin_registrations, ToolCategory, ToolRegistration, ToolRegistry, BUILTIN_COUNT};
+
+// Translator types
+pub use translator::{CapabilityTranslator, RuleTranslator, TranslatedContent};
+
+// Writer types
+pub use writer::{ConfigWriter, JsonWriter, MarkdownWriter, SchemaKeys, TextWriter, WriterRegistry};
+
+// Syncer
+pub use syncer::ToolSyncer;

@@ -1,0 +1,5 @@
+# Managed by Repository Manager
+# repo:block:coding-standards
+read:
+  - .repository/rules/coding-standards.md
+# /repo:block:coding-standards
