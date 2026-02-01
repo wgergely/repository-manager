@@ -106,8 +106,40 @@ impl PresetProvider for SuperpowersProvider {
     }
 
     async fn apply(&self, _context: &Context) -> Result<ApplyReport> {
-        // TODO: Implement in Task 7
-        Ok(ApplyReport::failure(vec!["Not implemented".to_string()]))
+        let mut actions = Vec::new();
+
+        // Determine install directory
+        let install_dir = match super::paths::superpowers_install_dir(&self.version) {
+            Some(dir) => dir,
+            None => {
+                return Ok(ApplyReport::failure(vec![
+                    "Cannot determine home directory".to_string()
+                ]));
+            }
+        };
+
+        // Clone if not present
+        if !install_dir.exists() {
+            actions.push(format!("Cloning superpowers {} from {}", self.version, self.repo_url));
+
+            super::git::clone_repo(&self.repo_url, &install_dir, Some(&self.version))?;
+
+            actions.push(format!("Installed to {}", install_dir.display()));
+        } else {
+            actions.push(format!("Superpowers {} already installed", self.version));
+        }
+
+        // Enable in Claude settings
+        if let Some(settings_path) = super::paths::claude_settings_path() {
+            let plugin_key = format!("{}@{}", super::paths::PLUGIN_NAME, super::paths::MARKETPLACE_NAME);
+
+            if !super::settings::is_enabled(&settings_path, &plugin_key) {
+                super::settings::enable_superpowers(&settings_path, &plugin_key)?;
+                actions.push("Enabled superpowers in Claude settings".to_string());
+            }
+        }
+
+        Ok(ApplyReport::success(actions))
     }
 }
 
