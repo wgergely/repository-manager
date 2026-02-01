@@ -9,6 +9,7 @@ description = "Preset providers for Repository Manager"
 repo-fs = { path = "../repo-fs" }
 repo-meta = { path = "../repo-meta" }
 async-trait = { workspace = true }
+git2 = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }

@@ -1655,6 +1655,7 @@ name = "repo-presets"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "git2",
  "pretty_assertions",
  "repo-fs",
  "repo-meta",
