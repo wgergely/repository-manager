@@ -31,6 +31,10 @@ pub enum CliError {
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
+    /// Error from repo-presets
+    #[error(transparent)]
+    Presets(#[from] repo_presets::Error),
+
     /// User-facing error with a message
     #[error("{message}")]
     User { message: String },

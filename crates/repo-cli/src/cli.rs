@@ -206,6 +206,12 @@ pub enum Commands {
         #[arg(value_enum)]
         shell: Shell,
     },
+
+    /// Manage superpowers Claude Code plugin
+    Superpowers {
+        #[command(subcommand)]
+        action: SuperpowersAction,
+    },
 }
 
 /// Branch management actions
@@ -234,6 +240,25 @@ pub enum BranchAction {
     Checkout {
         /// Branch name to checkout
         name: String,
+    },
+}
+
+/// Superpowers plugin actions
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum SuperpowersAction {
+    /// Install superpowers plugin
+    Install {
+        /// Version tag to install (e.g., v4.1.1)
+        #[arg(long, default_value = "v4.1.1")]
+        version: String,
+    },
+    /// Check superpowers installation status
+    Status,
+    /// Uninstall superpowers plugin
+    Uninstall {
+        /// Version to uninstall
+        #[arg(long, default_value = "v4.1.1")]
+        version: String,
     },
 }
 

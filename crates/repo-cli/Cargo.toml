@@ -15,6 +15,7 @@ repo-fs = { path = "../repo-fs" }
 repo-git = { path = "../repo-git" }
 repo-meta = { path = "../repo-meta" }
 repo-tools = { path = "../repo-tools" }
+repo-presets = { path = "../repo-presets" }
 
 clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"
@@ -24,6 +25,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+tokio = { workspace = true, features = ["rt", "macros"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }
