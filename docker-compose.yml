@@ -20,7 +20,11 @@ services:
       context: ./docker
       dockerfile: cli/claude/Dockerfile
     image: repo-test/claude:latest
-    volumes: *common-volumes
+    volumes:
+      - ./test-fixtures:/fixtures:ro
+      - ./test-results:/results
+      - ./crates:/workspace/crates:ro
+      - claude-plugins:/root/.claude/plugins
     environment:
       <<: *common-env
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -133,3 +137,6 @@ services:
       - ./crates:/workspace/crates:ro
     working_dir: /workspace/test-project
     profiles: ["integration", "all"]
+
+volumes:
+  claude-plugins:
