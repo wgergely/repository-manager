@@ -16,7 +16,7 @@ pub fn enable_superpowers(settings_path: &Path, plugin_key: &str) -> Result<()> 
     };
 
     // Ensure enabledPlugins exists
-    if !settings.get("enabledPlugins").is_some() {
+    if settings.get("enabledPlugins").is_none() {
         settings["enabledPlugins"] = json!({});
     }
 
@@ -49,11 +49,9 @@ pub fn disable_superpowers(settings_path: &Path, plugin_key: &str) -> Result<()>
     let mut settings: Value = serde_json::from_str(&content)
         .map_err(|e| Error::ClaudeSettings(format!("Invalid JSON: {}", e)))?;
 
-    // Remove or set to false
-    if let Some(enabled_plugins) = settings.get_mut("enabledPlugins") {
-        if let Some(obj) = enabled_plugins.as_object_mut() {
-            obj.remove(plugin_key);
-        }
+    // Remove plugin key from enabledPlugins
+    if let Some(obj) = settings.get_mut("enabledPlugins").and_then(|ep| ep.as_object_mut()) {
+        obj.remove(plugin_key);
     }
 
     let content = serde_json::to_string_pretty(&settings)

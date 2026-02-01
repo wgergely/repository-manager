@@ -80,26 +80,33 @@ impl PresetProvider for SuperpowersProvider {
         }
 
         // Check if enabled in Claude settings
-        if let Some(settings_path) = super::paths::claude_settings_path() {
-            if settings_path.exists() {
-                if let Ok(content) = std::fs::read_to_string(&settings_path) {
-                    if let Ok(settings) = serde_json::from_str::<serde_json::Value>(&content) {
-                        let plugin_key = format!("{}@{}", super::paths::PLUGIN_NAME, super::paths::MARKETPLACE_NAME);
-                        if let Some(enabled) = settings.get("enabledPlugins")
-                            .and_then(|ep| ep.get(&plugin_key))
-                            .and_then(|v| v.as_bool())
-                        {
-                            if !enabled {
-                                return Ok(CheckReport {
-                                    status: PresetStatus::Drifted,
-                                    details: vec!["Superpowers is installed but disabled".to_string()],
-                                    action: ActionType::Repair,
-                                });
-                            }
-                        }
-                    }
-                }
-            }
+        let settings_path = match super::paths::claude_settings_path() {
+            Some(path) if path.exists() => path,
+            _ => return Ok(CheckReport::healthy()),
+        };
+
+        let content = match std::fs::read_to_string(&settings_path) {
+            Ok(c) => c,
+            Err(_) => return Ok(CheckReport::healthy()),
+        };
+
+        let settings: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(s) => s,
+            Err(_) => return Ok(CheckReport::healthy()),
+        };
+
+        let plugin_key = format!("{}@{}", super::paths::PLUGIN_NAME, super::paths::MARKETPLACE_NAME);
+        let is_disabled = settings.get("enabledPlugins")
+            .and_then(|ep| ep.get(&plugin_key))
+            .and_then(|v| v.as_bool())
+            .is_some_and(|enabled| !enabled);
+
+        if is_disabled {
+            return Ok(CheckReport {
+                status: PresetStatus::Drifted,
+                details: vec!["Superpowers is installed but disabled".to_string()],
+                action: ActionType::Repair,
+            });
         }
 
         Ok(CheckReport::healthy())
@@ -137,6 +144,32 @@ impl PresetProvider for SuperpowersProvider {
                 super::settings::enable_superpowers(&settings_path, &plugin_key)?;
                 actions.push("Enabled superpowers in Claude settings".to_string());
             }
+        }
+
+        Ok(ApplyReport::success(actions))
+    }
+
+    async fn uninstall(&self, _context: &Context) -> Result<ApplyReport> {
+        let mut actions = Vec::new();
+
+        // Disable in Claude settings first
+        if let Some(settings_path) = super::paths::claude_settings_path() {
+            let plugin_key = format!("{}@{}", super::paths::PLUGIN_NAME, super::paths::MARKETPLACE_NAME);
+
+            if super::settings::is_enabled(&settings_path, &plugin_key) {
+                super::settings::disable_superpowers(&settings_path, &plugin_key)?;
+                actions.push("Disabled superpowers in Claude settings".to_string());
+            }
+        }
+
+        // Remove install directory
+        if let Some(install_dir) = super::paths::superpowers_install_dir(&self.version).filter(|d| d.exists()) {
+            std::fs::remove_dir_all(&install_dir).map_err(|e| {
+                crate::error::Error::ClaudeSettings(format!(
+                    "Failed to remove {}: {}", install_dir.display(), e
+                ))
+            })?;
+            actions.push(format!("Removed {}", install_dir.display()));
         }
 
         Ok(ApplyReport::success(actions))
@@ -184,5 +217,27 @@ mod tests {
 
         assert_eq!(report.status, PresetStatus::Missing);
         assert_eq!(report.action, ActionType::Install);
+    }
+
+    #[tokio::test]
+    async fn test_uninstall() {
+        use tempfile::TempDir;
+        use repo_fs::{NormalizedPath, WorkspaceLayout, LayoutMode};
+        use std::collections::HashMap;
+
+        // This is a unit test - doesn't actually install
+        let temp = TempDir::new().unwrap();
+        let layout = WorkspaceLayout {
+            root: NormalizedPath::new(temp.path()),
+            active_context: NormalizedPath::new(temp.path()),
+            mode: LayoutMode::Classic,
+        };
+        let context = Context::new(layout, HashMap::new());
+
+        let provider = SuperpowersProvider::new();
+        let report = provider.uninstall(&context).await.unwrap();
+
+        // Should succeed even if nothing to uninstall
+        assert!(report.success);
     }
 }
