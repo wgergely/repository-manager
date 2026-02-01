@@ -45,7 +45,9 @@
       "Bash(./target/debug/repo-mcp.exe:*)",
       "Bash(python3:*)",
       "Bash(bc:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)"
     ]
   }
 }
