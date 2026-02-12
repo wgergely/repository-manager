@@ -1,6 +1,7 @@
 # ============================================================
 # WIN11 PERFORMANCE RESTORATION SCRIPT
-# Version 3.0 - Comprehensive reversal of battery optimization
+# Version 3.1 - Comprehensive reversal of battery optimization
+# Handles stuck services (StopPending/StartPending) with timeout + force-kill
 # Run as Administrator - Paste directly into elevated PowerShell
 # Restores all services, processes, power settings, and tasks
 # ============================================================
@@ -16,24 +17,96 @@ if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 }
 
 # --- CONFIGURATION ---
-$ServiceStartTimeoutSec = 10    # Max seconds to wait per service batch
+$ServiceStartTimeoutSec = 8     # Max seconds to wait per individual service start
+$StuckServiceTimeoutSec = 5     # Max seconds to wait for stuck (Pending) services
 $MaxRetries = 2                 # Retry attempts for stubborn services
 
-Write-Host "=== WIN11 PERFORMANCE RESTORATION v3.0 ===" -ForegroundColor Cyan
+Write-Host "=== WIN11 PERFORMANCE RESTORATION v3.1 ===" -ForegroundColor Cyan
 Write-Host "Reversing all battery optimization changes" -ForegroundColor Yellow
 Write-Host ""
 
 $totalTime = [System.Diagnostics.Stopwatch]::StartNew()
 
 # ============================================================
-# HELPER: START A SERVICE WITH RETRIES
+# HELPER: UNSTICK A SERVICE IN PENDING STATE
+# ============================================================
+# Services stuck in StopPending or StartPending will block
+# Start-Service indefinitely. This function detects and recovers
+# from stuck states by force-killing the underlying process.
+
+function Resolve-StuckService {
+    param(
+        [string]$ServiceName,
+        [int]$TimeoutSeconds = 5
+    )
+
+    $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if (-not $service) { return $false }
+
+    $status = $service.Status
+    $isStuck = ($status -eq 'StopPending') -or ($status -eq 'StartPending') -or ($status -eq 'ContinuePending') -or ($status -eq 'PausePending')
+
+    if (-not $isStuck) { return $true }  # Not stuck, nothing to do
+
+    Write-Host "    [$ServiceName] stuck in '$status' - recovering..." -ForegroundColor DarkYellow
+
+    # Wait briefly in case it's genuinely transitioning
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($sw.Elapsed.TotalSeconds -lt [Math]::Min($TimeoutSeconds, 3)) {
+        Start-Sleep -Milliseconds 400
+        $service.Refresh()
+        if ($service.Status -eq 'Running' -or $service.Status -eq 'Stopped') {
+            return $true
+        }
+    }
+
+    # Still stuck - get the PID and force kill it
+    try {
+        $wmi = Get-CimInstance -ClassName Win32_Service -Filter "Name='$ServiceName'" -ErrorAction SilentlyContinue
+        if ($wmi -and $wmi.ProcessId -gt 0) {
+            Write-Host "    [$ServiceName] force-killing PID $($wmi.ProcessId)..." -ForegroundColor DarkYellow
+            $null = taskkill /F /PID $wmi.ProcessId 2>$null
+            Start-Sleep -Milliseconds 500
+        }
+    } catch { }
+
+    # If still stuck, try sc.exe to reset the service state
+    $service.Refresh()
+    if ($service.Status -ne 'Running' -and $service.Status -ne 'Stopped') {
+        # sc.exe can sometimes nudge a stuck service
+        if ($status -like '*Stop*') {
+            $null = sc.exe stop $ServiceName 2>$null
+        }
+        Start-Sleep -Milliseconds 300
+
+        # Last resort: use WMI to kill by executable path pattern
+        try {
+            $wmi = Get-CimInstance -ClassName Win32_Service -Filter "Name='$ServiceName'" -ErrorAction SilentlyContinue
+            if ($wmi -and $wmi.ProcessId -gt 0) {
+                Stop-Process -Id $wmi.ProcessId -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Milliseconds 500
+            }
+        } catch { }
+    }
+
+    $service.Refresh()
+    $resolved = ($service.Status -eq 'Running' -or $service.Status -eq 'Stopped')
+    if (-not $resolved) {
+        Write-Host "    [$ServiceName] could not be unstuck (state: $($service.Status)) - will skip" -ForegroundColor Red
+    }
+    return $resolved
+}
+
+# ============================================================
+# HELPER: START A SERVICE WITH TIMEOUT + STUCK-STATE HANDLING
 # ============================================================
 
 function Start-ServiceRobust {
     param(
         [string]$ServiceName,
         [string]$StartupType = $null,
-        [int]$MaxRetries = 2
+        [int]$MaxRetries = 2,
+        [int]$TimeoutSeconds = 8
     )
 
     $result = @{
@@ -47,11 +120,32 @@ function Start-ServiceRobust {
         return $result
     }
 
-    # Restore startup type if specified
-    if ($StartupType) {
+    # Restore startup type if specified (do this even if service is running/stuck)
+    if ($StartupType -and $StartupType -ne 'Disabled') {
         try {
             Set-Service -Name $ServiceName -StartupType $StartupType -ErrorAction SilentlyContinue
         } catch { }
+    }
+
+    # For services whose default is Disabled, just restore the type and don't start
+    if ($StartupType -eq 'Disabled') {
+        try {
+            Set-Service -Name $ServiceName -StartupType Disabled -ErrorAction SilentlyContinue
+        } catch { }
+        $result.Status = "AlreadyRunning"  # count as OK - Disabled is the correct state
+        return $result
+    }
+
+    # Handle stuck Pending states BEFORE attempting start
+    $service.Refresh()
+    $pendingStates = @('StopPending', 'StartPending', 'ContinuePending', 'PausePending')
+    if ($service.Status -in $pendingStates) {
+        $unstuck = Resolve-StuckService -ServiceName $ServiceName -TimeoutSeconds $script:StuckServiceTimeoutSec
+        if (-not $unstuck) {
+            $result.Status = "Stuck"
+            return $result
+        }
+        $service.Refresh()
     }
 
     # Already running?
@@ -64,22 +158,59 @@ function Start-ServiceRobust {
     $svcWmi = Get-CimInstance -ClassName Win32_Service -Filter "Name='$ServiceName'" -ErrorAction SilentlyContinue
     if ($svcWmi -and $svcWmi.StartMode -eq 'Disabled') {
         if (-not $StartupType) {
-            # Default to Manual if no explicit type given and currently disabled
             Set-Service -Name $ServiceName -StartupType Manual -ErrorAction SilentlyContinue
         }
     }
 
+    # Attempt start with timeout protection using a background job
     for ($attempt = 0; $attempt -le $MaxRetries; $attempt++) {
         try {
-            Start-Service -Name $ServiceName -ErrorAction Stop
+            # Use a job so Start-Service can't block the script forever
+            $job = Start-Job -ScriptBlock {
+                param($svcName)
+                Start-Service -Name $svcName -ErrorAction Stop
+            } -ArgumentList $ServiceName
+
+            # Wait for the job with timeout
+            $completed = $job | Wait-Job -Timeout $TimeoutSeconds
+
+            if ($completed) {
+                # Job finished (success or error)
+                try { Receive-Job -Job $job -ErrorAction SilentlyContinue } catch { }
+                Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+            } else {
+                # Job timed out - Start-Service is hanging
+                Write-Host "    [$ServiceName] start timed out (${TimeoutSeconds}s) - force stopping job..." -ForegroundColor DarkYellow
+                Stop-Job -Job $job -ErrorAction SilentlyContinue
+                Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+
+                # The service might now be in StartPending - try to unstick
+                $service.Refresh()
+                if ($service.Status -in $pendingStates) {
+                    Resolve-StuckService -ServiceName $ServiceName -TimeoutSeconds $script:StuckServiceTimeoutSec | Out-Null
+                }
+            }
+
+            # Check result
             Start-Sleep -Milliseconds 300
             $service.Refresh()
             if ($service.Status -eq 'Running') {
                 $result.Status = "Started"
                 return $result
             }
+
+            # If stuck again after start attempt, unstick before retry
+            if ($service.Status -in $pendingStates) {
+                Resolve-StuckService -ServiceName $ServiceName -TimeoutSeconds $script:StuckServiceTimeoutSec | Out-Null
+                $service.Refresh()
+                if ($service.Status -eq 'Running') {
+                    $result.Status = "Started"
+                    return $result
+                }
+            }
+
         } catch {
-            # Some services depend on others; brief pause before retry
+            # Brief pause before retry
             Start-Sleep -Milliseconds 500
         }
     }
@@ -88,6 +219,8 @@ function Start-ServiceRobust {
     $service.Refresh()
     if ($service.Status -eq 'Running') {
         $result.Status = "Started"
+    } elseif ($service.Status -in $pendingStates) {
+        $result.Status = "Stuck"
     } else {
         $result.Status = "Failed"
     }
@@ -110,23 +243,28 @@ function Start-ServicesBatch {
     $started = 0
     $alreadyRunning = 0
     $notFound = 0
+    $stuck = @()
     $failed = @()
 
     foreach ($def in $ServiceDefs) {
         $name = $def.Name
         $startupType = $def.StartupType
 
-        $r = Start-ServiceRobust -ServiceName $name -StartupType $startupType -MaxRetries $MaxRetries
+        $r = Start-ServiceRobust -ServiceName $name -StartupType $startupType -MaxRetries $MaxRetries -TimeoutSeconds $ServiceStartTimeoutSec
         switch ($r.Status) {
             "Started"        { $started++ }
             "AlreadyRunning" { $alreadyRunning++ }
             "NotFound"       { $notFound++ }
+            "Stuck"          { $stuck += $name }
             "Failed"         { $failed += $name }
         }
     }
 
     $msg = "    Started: $started | Already running: $alreadyRunning | Not found: $notFound"
     Write-Host $msg -ForegroundColor DarkGray
+    if ($stuck.Count -gt 0) {
+        Write-Host "    Stuck ($($stuck.Count)): $($stuck -join ', ') - requires restart" -ForegroundColor Red
+    }
     if ($failed.Count -gt 0) {
         Write-Host "    Failed ($($failed.Count)): $($failed -join ', ')" -ForegroundColor DarkYellow
     }
@@ -135,6 +273,7 @@ function Start-ServicesBatch {
         Started = $started
         AlreadyRunning = $alreadyRunning
         NotFound = $notFound
+        Stuck = $stuck
         Failed = $failed
     }
 }
@@ -448,6 +587,9 @@ foreach ($svc in $verifyServices) {
             if ($wmi -and $wmi.StartMode -eq 'Manual') {
                 Write-Host "  [IDLE] $($svc.Desc) (Manual start - normal)" -ForegroundColor DarkGray
                 $okCount++
+            } elseif ($service.Status -in @('StopPending','StartPending','ContinuePending','PausePending')) {
+                Write-Host "  [STUCK] $($svc.Desc) ($($service.Status)) - RESTART REQUIRED" -ForegroundColor Red
+                $failCount++
             } else {
                 Write-Host "  [WARN] $($svc.Desc) ($($service.Status))" -ForegroundColor Yellow
                 $failCount++
