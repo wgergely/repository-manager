@@ -1,7 +1,7 @@
 # ============================================================
 # WIN11 PERFORMANCE RESTORATION SCRIPT
-# Version 3.1 - Comprehensive reversal of battery optimization
-# Handles stuck services (StopPending/StartPending) with timeout + force-kill
+# Version 3.2 - Comprehensive reversal of battery optimization
+# Handles stuck services, Start Menu restoration, cache rebuild, Widgets disable
 # Run as Administrator - Paste directly into elevated PowerShell
 # Restores all services, processes, power settings, and tasks
 # ============================================================
@@ -21,7 +21,7 @@ $ServiceStartTimeoutSec = 8     # Max seconds to wait per individual service sta
 $StuckServiceTimeoutSec = 5     # Max seconds to wait for stuck (Pending) services
 $MaxRetries = 2                 # Retry attempts for stubborn services
 
-Write-Host "=== WIN11 PERFORMANCE RESTORATION v3.1 ===" -ForegroundColor Cyan
+Write-Host "=== WIN11 PERFORMANCE RESTORATION v3.2 ===" -ForegroundColor Cyan
 Write-Host "Reversing all battery optimization changes" -ForegroundColor Yellow
 Write-Host ""
 
@@ -497,24 +497,171 @@ Write-Host "  Enabled: $tasksEnabled | Already active: $tasksAlreadyReady" -Fore
 Write-Host ""
 
 # ============================================================
-# PHASE 4: RESTART EXPLORER AND SHELL PROCESSES
+# PHASE 4: TASKBAR PREFERENCES - HIDE SEARCH, DISABLE WIDGETS
 # ============================================================
 
-Write-Host "Restarting Explorer and shell..." -ForegroundColor Green
+Write-Host "Configuring taskbar (hide search, disable Widgets)..." -ForegroundColor Green
 
-# Start Explorer if not running
-$explorerProc = Get-Process -Name "explorer" -ErrorAction SilentlyContinue
-if (-not $explorerProc) {
-    Start-Process "explorer.exe"
-    Write-Host "  Explorer started" -ForegroundColor Gray
-} else {
-    Write-Host "  Explorer already running" -ForegroundColor Gray
+$explorerRegPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search"
+$taskbarRegPath  = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
+
+# Hide Search from taskbar (0 = Hidden, 1 = Icon, 2 = Search box)
+if (-not (Test-Path $explorerRegPath)) {
+    New-Item -Path $explorerRegPath -Force | Out-Null
+}
+Set-ItemProperty -Path $explorerRegPath -Name "SearchboxTaskbarMode" -Value 0 -Type DWord -Force
+Write-Host "  Taskbar search: hidden" -ForegroundColor Gray
+
+# Disable Widgets / MSN News panel (TaskbarDa: 0 = disabled, 1 = enabled)
+if (-not (Test-Path $taskbarRegPath)) {
+    New-Item -Path $taskbarRegPath -Force | Out-Null
+}
+Set-ItemProperty -Path $taskbarRegPath -Name "TaskbarDa" -Value 0 -Type DWord -Force
+Write-Host "  Widgets panel: disabled" -ForegroundColor Gray
+
+# Also disable Widgets via Group Policy (prevents re-enabling)
+$widgetsPolicyPath = "HKLM:\SOFTWARE\Policies\Microsoft\Dsh"
+if (-not (Test-Path $widgetsPolicyPath)) {
+    New-Item -Path $widgetsPolicyPath -Force -ErrorAction SilentlyContinue | Out-Null
+}
+if (Test-Path $widgetsPolicyPath) {
+    Set-ItemProperty -Path $widgetsPolicyPath -Name "AllowNewsAndInterests" -Value 0 -Type DWord -Force -ErrorAction SilentlyContinue
+    Write-Host "  Widgets group policy: disabled" -ForegroundColor Gray
 }
 
-# Give Explorer a moment to initialize the shell
-Start-Sleep -Seconds 2
+# Kill any running Widget processes
+$widgetProcs = @("Widgets", "WidgetService")
+foreach ($wp in $widgetProcs) {
+    $proc = Get-Process -Name $wp -ErrorAction SilentlyContinue
+    if ($proc) {
+        $proc | Stop-Process -Force -ErrorAction SilentlyContinue
+        Write-Host "  Killed $wp process" -ForegroundColor Gray
+    }
+}
 
-# ctfmon (text input framework) - needed for keyboard input in some apps
+Write-Host ""
+
+# ============================================================
+# PHASE 5: START MENU RESTORATION + CACHE REBUILD
+# ============================================================
+
+Write-Host "Restoring Start Menu and rebuilding caches..." -ForegroundColor Green
+
+# 5a. Ensure Start Menu dependency services are running
+$startMenuServices = @("WpnService", "Themes", "ShellHWDetection", "WSearch", "TimeBrokerSvc")
+foreach ($svcName in $startMenuServices) {
+    $svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
+    if ($svc -and $svc.Status -ne 'Running') {
+        Start-Service -Name $svcName -ErrorAction SilentlyContinue
+    }
+}
+Write-Host "  Start Menu dependency services verified" -ForegroundColor Gray
+
+# 5b. Rebuild icon cache
+Write-Host "  Rebuilding icon cache..." -ForegroundColor Gray
+$iconCachePath = "$env:LOCALAPPDATA\IconCache.db"
+if (Test-Path $iconCachePath) {
+    Remove-Item $iconCachePath -Force -ErrorAction SilentlyContinue
+}
+# Also clear the newer icon cache files (Windows 10/11 uses iconcache_* in Explorer)
+$iconCacheDir = "$env:LOCALAPPDATA\Microsoft\Windows\Explorer"
+if (Test-Path $iconCacheDir) {
+    Get-ChildItem -Path $iconCacheDir -Filter "iconcache_*" -ErrorAction SilentlyContinue |
+        ForEach-Object { Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue }
+    Get-ChildItem -Path $iconCacheDir -Filter "thumbcache_*" -ErrorAction SilentlyContinue |
+        ForEach-Object { Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue }
+}
+Write-Host "  Icon cache cleared (will rebuild on Explorer restart)" -ForegroundColor Gray
+
+# 5c. Rebuild Start Menu tile database / layout cache
+Write-Host "  Clearing Start Menu tile cache..." -ForegroundColor Gray
+$tileDataDir = "$env:LOCALAPPDATA\Packages\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\TempState"
+if (Test-Path $tileDataDir) {
+    Get-ChildItem -Path $tileDataDir -Recurse -ErrorAction SilentlyContinue |
+        Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+    Write-Host "  Start Menu tile cache cleared" -ForegroundColor Gray
+}
+
+# Also clear the general Start Menu cache
+$startMenuCache = "$env:LOCALAPPDATA\Packages\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\LocalState"
+if (Test-Path $startMenuCache) {
+    Get-ChildItem -Path $startMenuCache -Filter "*.json" -ErrorAction SilentlyContinue |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+    Write-Host "  Start Menu layout cache cleared" -ForegroundColor Gray
+}
+
+# 5d. Re-register Start Menu and ShellExperienceHost AppX packages
+Write-Host "  Re-registering Start Menu AppX packages..." -ForegroundColor Gray
+$appxPackages = @(
+    "Microsoft.Windows.StartMenuExperienceHost",
+    "Microsoft.Windows.ShellExperienceHost"
+)
+foreach ($pkgName in $appxPackages) {
+    $pkg = Get-AppxPackage -Name $pkgName -ErrorAction SilentlyContinue
+    if ($pkg) {
+        $manifest = Join-Path $pkg.InstallLocation "AppXManifest.xml"
+        if (Test-Path $manifest) {
+            Add-AppxPackage -DisableDevelopmentMode -Register $manifest -ErrorAction SilentlyContinue
+            Write-Host "    Re-registered $pkgName" -ForegroundColor DarkGray
+        }
+    }
+}
+
+# 5e. Kill and cleanly restart Explorer to pick up registry changes + rebuilt caches
+Write-Host "  Restarting Explorer shell (clean restart)..." -ForegroundColor Gray
+$explorerProc = Get-Process -Name "explorer" -ErrorAction SilentlyContinue
+if ($explorerProc) {
+    # Graceful shutdown request first, then force after timeout
+    $explorerProc | ForEach-Object {
+        $_.CloseMainWindow() | Out-Null
+    }
+    Start-Sleep -Milliseconds 800
+    # Force kill any remaining explorer instances
+    Get-Process -Name "explorer" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 500
+}
+
+# Start fresh Explorer
+Start-Process "explorer.exe"
+Write-Host "  Explorer restarted" -ForegroundColor Gray
+
+# Wait for Explorer to initialize shell, taskbar, and Start Menu host
+Write-Host "  Waiting for shell initialization..." -ForegroundColor Gray
+$shellWait = [System.Diagnostics.Stopwatch]::StartNew()
+$shellReady = $false
+while ($shellWait.Elapsed.TotalSeconds -lt 15) {
+    Start-Sleep -Milliseconds 500
+    $startMenuHost = Get-Process -Name "StartMenuExperienceHost" -ErrorAction SilentlyContinue
+    $shellHost = Get-Process -Name "ShellExperienceHost" -ErrorAction SilentlyContinue
+    if ($startMenuHost -and $shellHost) {
+        $shellReady = $true
+        break
+    }
+}
+$shellWait.Stop()
+
+if ($shellReady) {
+    Write-Host "  Shell hosts initialized" -ForegroundColor Gray
+} else {
+    # Force-launch the shell hosts if they didn't auto-start
+    Write-Host "  Shell hosts did not auto-start, forcing launch..." -ForegroundColor Yellow
+
+    # Trigger Start Menu host by simulating a Start Menu open via COM
+    $wshell = New-Object -ComObject WScript.Shell -ErrorAction SilentlyContinue
+    if ($wshell) {
+        $wshell.SendKeys('^{ESCAPE}')  # Ctrl+Esc = open Start Menu
+        Start-Sleep -Milliseconds 1500
+        $wshell.SendKeys('{ESCAPE}')   # Close it
+        Start-Sleep -Milliseconds 500
+    }
+
+    $startMenuHost = Get-Process -Name "StartMenuExperienceHost" -ErrorAction SilentlyContinue
+    if (-not $startMenuHost) {
+        Write-Host "  StartMenuExperienceHost still not running - may need reboot" -ForegroundColor Red
+    }
+}
+
+# 5f. Start ctfmon (text input framework) - required for search/type-to-search in Start Menu
 $ctfmon = Get-Process -Name "ctfmon" -ErrorAction SilentlyContinue
 if (-not $ctfmon) {
     $ctfmonPath = "$env:SystemRoot\System32\ctfmon.exe"
@@ -524,9 +671,25 @@ if (-not $ctfmon) {
     }
 }
 
-# SecurityHealthSystray (Windows Security icon)
+# 5g. Start TextInputHost (needed for Windows 11 Start Menu search/typing)
+$textInput = Get-Process -Name "TextInputHost" -ErrorAction SilentlyContinue
+if (-not $textInput) {
+    # TextInputHost is an AppX process - trigger it by opening Start Menu briefly
+    $wshell = New-Object -ComObject WScript.Shell -ErrorAction SilentlyContinue
+    if ($wshell) {
+        $wshell.SendKeys('^{ESCAPE}')
+        Start-Sleep -Milliseconds 800
+        $wshell.SendKeys('{ESCAPE}')
+    }
+    $textInput = Get-Process -Name "TextInputHost" -ErrorAction SilentlyContinue
+    if ($textInput) {
+        Write-Host "  TextInputHost started" -ForegroundColor Gray
+    }
+}
+
+# 5h. SecurityHealthSystray (Windows Security icon)
 $secHealthPath = "$env:ProgramFiles\Windows Defender\MSASCuiL.exe"
-if (-not $secHealthPath) {
+if (-not (Test-Path $secHealthPath -ErrorAction SilentlyContinue)) {
     $secHealthPath = "${env:ProgramFiles(x86)}\Windows Defender\MSASCuiL.exe"
 }
 if (Test-Path $secHealthPath -ErrorAction SilentlyContinue) {
@@ -537,13 +700,10 @@ if (Test-Path $secHealthPath -ErrorAction SilentlyContinue) {
     }
 }
 
-# Smartscreen (background process, will be restarted by Explorer on demand)
-# No manual action needed - Explorer triggers it.
-
 Write-Host ""
 
 # ============================================================
-# PHASE 5: VERIFICATION
+# PHASE 6: VERIFICATION
 # ============================================================
 
 Write-Host "Verifying restoration..." -ForegroundColor Cyan
@@ -600,13 +760,43 @@ foreach ($svc in $verifyServices) {
     }
 }
 
-# Check Explorer
-$explorerCheck = Get-Process -Name "explorer" -ErrorAction SilentlyContinue
-if ($explorerCheck) {
-    Write-Host "  [OK]   Explorer shell" -ForegroundColor Green
+# Check Explorer and shell host processes
+$shellChecks = @(
+    @{Process="explorer";                   Desc="Explorer shell"},
+    @{Process="StartMenuExperienceHost";    Desc="Start Menu host"},
+    @{Process="ShellExperienceHost";        Desc="Shell Experience host"},
+    @{Process="TextInputHost";              Desc="Text Input host"},
+    @{Process="ctfmon";                     Desc="CTF text input"}
+)
+
+foreach ($sc in $shellChecks) {
+    $proc = Get-Process -Name $sc.Process -ErrorAction SilentlyContinue
+    if ($proc) {
+        Write-Host "  [OK]   $($sc.Desc)" -ForegroundColor Green
+        $okCount++
+    } else {
+        Write-Host "  [FAIL] $($sc.Desc)" -ForegroundColor Red
+        $failCount++
+    }
+}
+
+# Verify Widgets are disabled
+$widgetsProc = Get-Process -Name "Widgets" -ErrorAction SilentlyContinue
+if (-not $widgetsProc) {
+    Write-Host "  [OK]   Widgets disabled" -ForegroundColor Green
     $okCount++
 } else {
-    Write-Host "  [FAIL] Explorer shell" -ForegroundColor Red
+    Write-Host "  [WARN] Widgets still running" -ForegroundColor Yellow
+    $failCount++
+}
+
+# Verify search is hidden from taskbar
+$searchMode = Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -ErrorAction SilentlyContinue
+if ($searchMode -and $searchMode.SearchboxTaskbarMode -eq 0) {
+    Write-Host "  [OK]   Taskbar search hidden" -ForegroundColor Green
+    $okCount++
+} else {
+    Write-Host "  [WARN] Taskbar search may still be visible" -ForegroundColor Yellow
     $failCount++
 }
 
