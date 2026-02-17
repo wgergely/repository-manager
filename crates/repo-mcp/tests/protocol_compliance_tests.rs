@@ -370,7 +370,7 @@ async fn test_tools_list_returns_all_defined_tools() {
     let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     let tools = response["result"]["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 14, "Should list all 14 defined tools");
+    assert_eq!(tools.len(), 20, "Should list all 20 defined tools");
 
     // Verify each tool has required MCP fields
     for tool in tools {

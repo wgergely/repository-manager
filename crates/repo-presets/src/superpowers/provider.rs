@@ -188,43 +188,6 @@ impl PresetProvider for SuperpowersProvider {
     }
 }
 
-impl SuperpowersProvider {
-    /// Uninstall superpowers plugin and remove from Claude settings.
-    pub async fn uninstall(&self, _context: &Context) -> Result<ApplyReport> {
-        let mut actions = Vec::new();
-
-        // Disable in Claude settings first
-        if let Some(settings_path) = super::paths::claude_settings_path() {
-            let plugin_key = format!(
-                "{}@{}",
-                super::paths::PLUGIN_NAME,
-                super::paths::MARKETPLACE_NAME
-            );
-
-            if super::settings::is_enabled(&settings_path, &plugin_key) {
-                super::settings::disable_superpowers(&settings_path, &plugin_key)?;
-                actions.push("Disabled superpowers in Claude settings".to_string());
-            }
-        }
-
-        // Remove install directory
-        if let Some(install_dir) =
-            super::paths::superpowers_install_dir(&self.version).filter(|d| d.exists())
-        {
-            std::fs::remove_dir_all(&install_dir).map_err(|e| {
-                crate::error::Error::ClaudeSettings(format!(
-                    "Failed to remove {}: {}",
-                    install_dir.display(),
-                    e
-                ))
-            })?;
-            actions.push(format!("Removed {}", install_dir.display()));
-        }
-
-        Ok(ApplyReport::success(actions))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
