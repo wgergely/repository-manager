@@ -16,7 +16,7 @@ use colored::Colorize;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-use cli::{BranchAction, Cli, Commands, SuperpowersAction};
+use cli::{AgentAction, BranchAction, Cli, Commands, SuperpowersAction};
 use error::Result;
 
 fn main() {
@@ -88,6 +88,7 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::Pull { remote, branch } => cmd_pull(remote, branch),
         Commands::Merge { source } => cmd_merge(&source),
         Commands::Superpowers { action } => cmd_superpowers(action),
+        Commands::Agent { action } => cmd_agent(action),
     }
 }
 
@@ -218,6 +219,10 @@ fn cmd_pull(remote: Option<String>, branch: Option<String>) -> Result<()> {
 fn cmd_merge(source: &str) -> Result<()> {
     let cwd = std::env::current_dir()?;
     commands::run_merge(&cwd, source)
+}
+
+fn cmd_agent(action: AgentAction) -> Result<()> {
+    commands::agent::run_agent(action)
 }
 
 fn cmd_superpowers(action: SuperpowersAction) -> Result<()> {
