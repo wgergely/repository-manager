@@ -16,7 +16,7 @@ use colored::Colorize;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-use cli::{BranchAction, Cli, Commands, SuperpowersAction};
+use cli::{BranchAction, Cli, Commands, HooksAction, SuperpowersAction};
 use error::Result;
 
 fn main() {
@@ -88,6 +88,7 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::Pull { remote, branch } => cmd_pull(remote, branch),
         Commands::Merge { source } => cmd_merge(&source),
         Commands::Superpowers { action } => cmd_superpowers(action),
+        Commands::Hooks { action } => cmd_hooks(action),
     }
 }
 
@@ -218,6 +219,19 @@ fn cmd_pull(remote: Option<String>, branch: Option<String>) -> Result<()> {
 fn cmd_merge(source: &str) -> Result<()> {
     let cwd = std::env::current_dir()?;
     commands::run_merge(&cwd, source)
+}
+
+fn cmd_hooks(action: HooksAction) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    match action {
+        HooksAction::List => commands::run_hooks_list(&cwd),
+        HooksAction::Add {
+            event,
+            command,
+            args,
+        } => commands::run_hooks_add(&cwd, &event, &command, args),
+        HooksAction::Remove { event } => commands::run_hooks_remove(&cwd, &event),
+    }
 }
 
 fn cmd_superpowers(action: SuperpowersAction) -> Result<()> {
