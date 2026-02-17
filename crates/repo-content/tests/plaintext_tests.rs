@@ -173,3 +173,59 @@ fn test_plaintext_block_not_found_error() {
     let result = handler.remove_block(source, uuid);
     assert!(result.is_err());
 }
+
+#[test]
+fn test_plaintext_adversarial_content_with_marker_like_strings() {
+    // Content containing block marker lookalikes should be handled safely
+    let handler = PlainTextHandler::new();
+    let uuid = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+
+    let adversarial_content = "Normal text <!-- repo:block:fake-uuid --> more text <!-- /repo:block:fake-uuid --> end";
+
+    let source = "Header\n";
+    let (result, _edit) = handler
+        .insert_block(source, uuid, adversarial_content, BlockLocation::End)
+        .unwrap();
+
+    // Verify the real block exists and contains the adversarial content
+    let blocks = handler.find_blocks(&result);
+    // The real block plus any blocks the parser might find from the fake markers
+    assert!(
+        !blocks.is_empty(),
+        "Should find at least the real block"
+    );
+
+    // Find our real block
+    let real_block = blocks.iter().find(|b| b.uuid == uuid);
+    assert!(
+        real_block.is_some(),
+        "Should find the real block with the correct UUID"
+    );
+}
+
+#[test]
+fn test_plaintext_adversarial_content_with_own_closing_marker() {
+    // Block content containing its own closing marker - documents behavior
+    let handler = PlainTextHandler::new();
+    let uuid = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+
+    let source = "Before\n<!-- repo:block:550e8400-e29b-41d4-a716-446655440000 -->\n\
+         Text <!-- /repo:block:550e8400-e29b-41d4-a716-446655440000 --> injected\n\
+         <!-- /repo:block:550e8400-e29b-41d4-a716-446655440000 -->\nAfter"
+        .to_string();
+
+    let blocks = handler.find_blocks(&source);
+    assert!(
+        !blocks.is_empty(),
+        "Parser should find at least one block"
+    );
+
+    // The first block's content terminates at the first matching close marker
+    // (the one injected into content), which is a known parser limitation.
+    let first = &blocks[0];
+    assert_eq!(first.uuid, uuid);
+    assert!(
+        first.content.contains("Text"),
+        "Block should contain text before injected marker"
+    );
+}

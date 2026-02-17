@@ -43,6 +43,47 @@ fn test_registry_persists_to_toml() {
 }
 
 #[test]
+fn test_registry_persists_all_fields() {
+    let temp = TempDir::new().unwrap();
+    let registry_path = temp.path().join("registry.toml");
+
+    let original_uuid;
+    let original_hash;
+    {
+        let mut registry = RuleRegistry::new(registry_path.clone());
+        let rule = registry
+            .add_rule(
+                "full-rule",
+                "Detailed content here",
+                vec!["python".to_string(), "style".to_string()],
+            )
+            .unwrap();
+        original_uuid = rule.uuid;
+        original_hash = rule.content_hash.clone();
+    }
+
+    // Reload and verify all fields survived serialization
+    let loaded = RuleRegistry::load(registry_path).unwrap();
+    let rule = loaded.get_rule(original_uuid).unwrap();
+    assert_eq!(rule.id, "full-rule");
+    assert_eq!(rule.content, "Detailed content here");
+    assert_eq!(rule.content_hash, original_hash);
+    assert_eq!(rule.uuid, original_uuid);
+    assert!(rule.tags.contains(&"python".to_string()));
+    assert!(rule.tags.contains(&"style".to_string()));
+}
+
+#[test]
+fn test_registry_load_invalid_toml() {
+    let temp = TempDir::new().unwrap();
+    let registry_path = temp.path().join("registry.toml");
+    std::fs::write(&registry_path, "not valid toml {{{").unwrap();
+
+    let result = RuleRegistry::load(registry_path);
+    assert!(result.is_err(), "Should reject corrupted registry file");
+}
+
+#[test]
 fn test_registry_get_rule_by_uuid() {
     let temp = TempDir::new().unwrap();
     let registry_path = temp.path().join("registry.toml");

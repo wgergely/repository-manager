@@ -623,14 +623,13 @@ fn test_sync_engine_complete_check_flow() {
     let marker = Uuid::new_v4();
     let cursor_dir = temp.path().join(".cursor").join("rules");
     fs::create_dir_all(&cursor_dir).unwrap();
-    fs::write(
-        cursor_dir.join("test.mdc"),
-        format!(
-            "# Test Rule\n<!-- BEGIN {} -->\nRule content here\n<!-- END {} -->\n",
-            marker, marker
-        ),
-    )
-    .unwrap();
+    let text_block_content = format!(
+        "# Test Rule\n<!-- BEGIN {} -->\nRule content here\n<!-- END {} -->\n",
+        marker, marker
+    );
+    fs::write(cursor_dir.join("test.mdc"), &text_block_content).unwrap();
+    // Compute real checksum for the text block content
+    let text_block_checksum = repo_core::sync::compute_content_checksum(&text_block_content);
 
     // Create .repository directory and ledger
     let repo_dir = temp.path().join(".repository");
@@ -655,7 +654,7 @@ fn test_sync_engine_complete_check_flow() {
         "cursor".to_string(),
         std::path::PathBuf::from(".cursor/rules/test.mdc"),
         marker,
-        "block-checksum".to_string(),
+        text_block_checksum,
     ));
 
     ledger.add_intent(intent);

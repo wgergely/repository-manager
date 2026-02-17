@@ -77,7 +77,6 @@ pub fn interactive_init(default_name: &str) -> Result<InitConfig> {
         tools,
         presets: Vec::new(), // Could add preset selection later
         remote,
-        interactive: true,
     })
 }
 

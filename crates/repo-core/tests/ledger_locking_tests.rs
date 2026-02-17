@@ -133,9 +133,9 @@ fn sequential_ledger_saves_preserve_all_intents() {
 }
 
 #[test]
-fn ledger_save_produces_valid_content_after_atomic_rename() {
-    // Verify that save() uses write-to-temp-then-rename so the file is never
-    // in a partially-written state, and the final content is correct.
+fn ledger_save_cleans_up_temp_file_and_roundtrips() {
+    // Verify that save() cleans up the temp file and the content round-trips correctly.
+    // Note: this does not test atomicity guarantees under crash conditions.
     let dir = tempdir().unwrap();
     let path = dir.path().join("ledger.toml");
 

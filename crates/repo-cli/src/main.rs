@@ -130,7 +130,6 @@ fn cmd_init(
             tools,
             presets,
             remote,
-            interactive: false,
         }
     };
 

@@ -136,6 +136,7 @@ fn test_lock_timeout_is_respected() {
     let lock_file = std::fs::OpenOptions::new()
         .write(true)
         .create(true)
+        .truncate(false) // Lock files should not be truncated
         .open(&lock_path)
         .unwrap();
     lock_file.lock_exclusive().unwrap();

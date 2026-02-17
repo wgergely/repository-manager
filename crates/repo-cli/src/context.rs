@@ -27,31 +27,6 @@ pub enum RepoContext {
     NotARepo,
 }
 
-impl RepoContext {
-    /// Get the repository root path (container root for worktrees, repo root for standard)
-    pub fn root_path(&self) -> Option<&Path> {
-        match self {
-            RepoContext::ContainerRoot { path } => Some(path),
-            RepoContext::Worktree { container, .. } => Some(container),
-            RepoContext::StandardRepo { path } => Some(path),
-            RepoContext::NotARepo => None,
-        }
-    }
-
-    /// Check if this is a worktrees-mode repository
-    pub fn is_worktrees_mode(&self) -> bool {
-        matches!(
-            self,
-            RepoContext::ContainerRoot { .. } | RepoContext::Worktree { .. }
-        )
-    }
-
-    /// Check if this is a valid repository context
-    pub fn is_repo(&self) -> bool {
-        !matches!(self, RepoContext::NotARepo)
-    }
-}
-
 /// Detect the repository context from the given directory
 ///
 /// This walks up the directory tree looking for repository markers:
@@ -166,9 +141,12 @@ mod tests {
 
         let context = detect_context(temp.path());
 
-        assert!(matches!(context, RepoContext::StandardRepo { .. }));
-        assert_eq!(context.root_path(), Some(temp.path()));
-        assert!(!context.is_worktrees_mode());
+        match &context {
+            RepoContext::StandardRepo { path } => {
+                assert_eq!(path, temp.path());
+            }
+            _ => panic!("Expected StandardRepo, got {:?}", context),
+        }
     }
 
     #[test]
@@ -178,9 +156,12 @@ mod tests {
 
         let context = detect_context(temp.path());
 
-        assert!(matches!(context, RepoContext::ContainerRoot { .. }));
-        assert_eq!(context.root_path(), Some(temp.path()));
-        assert!(context.is_worktrees_mode());
+        match &context {
+            RepoContext::ContainerRoot { path } => {
+                assert_eq!(path, temp.path());
+            }
+            _ => panic!("Expected ContainerRoot, got {:?}", context),
+        }
     }
 
     #[test]
@@ -204,7 +185,6 @@ mod tests {
             }
             _ => panic!("Expected Worktree context, got {:?}", context),
         }
-        assert!(context.is_worktrees_mode());
     }
 
     #[test]
@@ -218,8 +198,12 @@ mod tests {
 
         let context = detect_context(&nested);
 
-        assert!(matches!(context, RepoContext::StandardRepo { .. }));
-        assert_eq!(context.root_path(), Some(temp.path()));
+        match &context {
+            RepoContext::StandardRepo { path } => {
+                assert_eq!(path, temp.path());
+            }
+            _ => panic!("Expected StandardRepo, got {:?}", context),
+        }
     }
 
     #[test]
@@ -254,8 +238,6 @@ mod tests {
         let context = detect_context(temp.path());
 
         assert!(matches!(context, RepoContext::NotARepo));
-        assert!(context.root_path().is_none());
-        assert!(!context.is_repo());
     }
 
     #[test]
@@ -267,7 +249,6 @@ mod tests {
         let context = detect_context(temp.path());
 
         assert!(matches!(context, RepoContext::ContainerRoot { .. }));
-        assert!(context.is_worktrees_mode());
     }
 
     #[test]
@@ -289,16 +270,16 @@ mod tests {
     }
 
     #[test]
-    fn test_is_repo() {
+    fn test_detect_distinguishes_repo_from_non_repo() {
         let temp = TempDir::new().unwrap();
 
         // Not a repo
         let context = detect_context(temp.path());
-        assert!(!context.is_repo());
+        assert!(matches!(context, RepoContext::NotARepo));
 
         // Standard repo
         create_repo_config(temp.path(), "standard");
         let context = detect_context(temp.path());
-        assert!(context.is_repo());
+        assert!(matches!(context, RepoContext::StandardRepo { .. }));
     }
 }

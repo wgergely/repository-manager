@@ -321,6 +321,76 @@ fn update_specific_block_among_multiple() {
 }
 
 #[test]
+fn cross_block_marker_injection_does_not_corrupt_other_blocks() {
+    // HIGH: Test that block B containing markers that look like block A's markers
+    // does not cause update/remove of A to corrupt B's content.
+    use repo_blocks::parser::parse_blocks;
+
+    // Insert block A normally
+    let mut content = insert_block("", "block-A", "content of A");
+    // Insert block B whose content contains fake markers for block A
+    let adversarial_b_content =
+        "<!-- repo:block:block-A -->\nfake A content\n<!-- /repo:block:block-A -->";
+    content = insert_block(&content, "block-B", adversarial_b_content);
+
+    // Verify both blocks are parseable before modification
+    let blocks = parse_blocks(&content);
+    assert!(
+        blocks.len() >= 2,
+        "Should find at least 2 blocks (real A + real B), found {}",
+        blocks.len()
+    );
+
+    // Now update block A - this should match the FIRST occurrence of A's markers
+    // (the real one), not the fake markers inside B
+    let updated = update_block(&content, "block-A", "updated A content").unwrap();
+
+    // Verify block A was updated
+    let blocks_after = parse_blocks(&updated);
+    let real_a = blocks_after.iter().find(|b| b.uuid == "block-A").unwrap();
+    assert_eq!(
+        real_a.content, "updated A content",
+        "Real block A should have updated content"
+    );
+
+    // Verify block B still exists and its content is intact
+    let real_b = blocks_after.iter().find(|b| b.uuid == "block-B").unwrap();
+    assert!(
+        real_b.content.contains("fake A content"),
+        "Block B content should be preserved after updating A, got: {:?}",
+        real_b.content
+    );
+}
+
+#[test]
+fn remove_block_with_cross_block_injection() {
+    // Test that removing block A when block B contains A's markers
+    // does not corrupt block B
+    use repo_blocks::parser::{has_block, parse_blocks};
+
+    let mut content = insert_block("", "target", "real target content");
+    let adversarial = "<!-- repo:block:target -->\nfake\n<!-- /repo:block:target -->";
+    content = insert_block(&content, "container", adversarial);
+
+    // Remove the real "target" block
+    let result = remove_block(&content, "target").unwrap();
+
+    // The "container" block should still exist
+    assert!(
+        has_block(&result, "container"),
+        "Container block should survive removal of target"
+    );
+
+    // The container's content should still have the fake markers as plain text
+    let blocks = parse_blocks(&result);
+    let container = blocks.iter().find(|b| b.uuid == "container").unwrap();
+    assert!(
+        container.content.contains("fake"),
+        "Container block content should be preserved"
+    );
+}
+
+#[test]
 fn insert_block_with_content_containing_newlines_at_boundaries() {
     // Content with leading/trailing newlines should be preserved exactly
     let result = insert_block("", "boundary", "\nleading\ntrailing\n");

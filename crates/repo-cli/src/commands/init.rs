@@ -16,7 +16,6 @@ pub struct InitConfig {
     pub tools: Vec<String>,
     pub presets: Vec<String>,
     pub remote: Option<String>,
-    pub interactive: bool,
 }
 
 /// Run the init command
@@ -256,7 +255,7 @@ mod tests {
             tools: vec![],
             presets: vec![],
             remote: None,
-            interactive: false,
+
         };
 
         let result = run_init(temp_dir.path(), config);
@@ -278,7 +277,7 @@ mod tests {
             tools: vec![],
             presets: vec![],
             remote: None,
-            interactive: false,
+
         };
 
         let result = run_init(temp_dir.path(), config);
@@ -300,7 +299,7 @@ mod tests {
             tools: vec![],
             presets: vec![],
             remote: None,
-            interactive: false,
+
         };
 
         let result = run_init(temp_dir.path(), config);

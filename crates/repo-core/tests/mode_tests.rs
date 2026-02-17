@@ -1,6 +1,6 @@
 //! Tests for Mode abstraction and backends
 
-use repo_core::backend::{BranchInfo, ModeBackend, StandardBackend, WorktreeBackend};
+use repo_core::backend::{ModeBackend, StandardBackend, WorktreeBackend};
 use repo_core::mode::Mode;
 use repo_fs::NormalizedPath;
 use std::fs;

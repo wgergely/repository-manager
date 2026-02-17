@@ -154,6 +154,55 @@ enabled = true
         assert!(base.presets.contains_key("tool:linter"));
         assert_eq!(base.presets["tool:linter"]["enabled"], true);
     }
+
+    #[test]
+    fn test_manifest_parse_invalid_toml() {
+        let result = Manifest::parse("not valid toml {{{");
+        assert!(result.is_err(), "Should reject malformed TOML");
+    }
+
+    #[test]
+    fn test_manifest_parse_wrong_type_for_mode() {
+        let result = Manifest::parse("[core]\nmode = 123");
+        assert!(result.is_err(), "Should reject wrong type for mode field");
+    }
+
+    #[test]
+    fn test_manifest_parse_wrong_type_for_tools() {
+        let result = Manifest::parse("tools = \"not-an-array\"");
+        assert!(result.is_err(), "Should reject wrong type for tools field");
+    }
+
+    #[test]
+    fn test_manifest_merge_deduplicates_tools() {
+        let mut base = Manifest::parse(
+            r#"
+tools = ["cargo", "rustfmt"]
+rules = ["shared-rule"]
+"#,
+        )
+        .unwrap();
+
+        let overlay = Manifest::parse(
+            r#"
+tools = ["cargo", "clippy"]
+rules = ["shared-rule", "new-rule"]
+"#,
+        )
+        .unwrap();
+
+        base.merge(&overlay);
+
+        // "cargo" appears in both - should only appear once after merge
+        let cargo_count = base.tools.iter().filter(|t| t.as_str() == "cargo").count();
+        assert_eq!(cargo_count, 1, "Duplicate tool 'cargo' should be deduplicated");
+        assert_eq!(base.tools.len(), 3, "Should have cargo, rustfmt, clippy");
+
+        // "shared-rule" appears in both - should only appear once
+        let rule_count = base.rules.iter().filter(|r| r.as_str() == "shared-rule").count();
+        assert_eq!(rule_count, 1, "Duplicate rule 'shared-rule' should be deduplicated");
+        assert_eq!(base.rules.len(), 2, "Should have shared-rule, new-rule");
+    }
 }
 
 mod resolver_tests {

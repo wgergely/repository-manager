@@ -103,3 +103,33 @@ fn test_container_slug_naming() {
     // Cleanup
     layout.remove_feature("feat/user-auth").unwrap();
 }
+
+#[test]
+fn test_container_create_duplicate_feature_returns_error() {
+    let (_temp, layout) = setup_container_repo();
+
+    // Create feature first time - should succeed
+    let path = layout.create_feature("dup-feature", None).unwrap();
+    assert!(path.exists());
+
+    // Create same feature again - should return an error
+    let result = layout.create_feature("dup-feature", None);
+    assert!(
+        result.is_err(),
+        "Creating a duplicate feature worktree should return an error"
+    );
+
+    // Cleanup
+    layout.remove_feature("dup-feature").unwrap();
+}
+
+#[test]
+fn test_container_remove_nonexistent_feature_returns_error() {
+    let (_temp, layout) = setup_container_repo();
+
+    let result = layout.remove_feature("nonexistent-feature");
+    assert!(
+        result.is_err(),
+        "Removing a non-existent feature should return an error"
+    );
+}

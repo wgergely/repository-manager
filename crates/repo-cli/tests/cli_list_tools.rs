@@ -5,7 +5,7 @@ use predicates::prelude::*;
 
 /// Get a Command for the repo binary
 fn repo_cmd() -> Command {
-    Command::cargo_bin("repo").expect("Failed to find repo binary")
+    Command::new(assert_cmd::cargo::cargo_bin!("repo"))
 }
 
 // ============================================================================

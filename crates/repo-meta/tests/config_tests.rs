@@ -143,6 +143,38 @@ fn test_load_config_with_all_defaults() {
 }
 
 #[test]
+fn test_load_malformed_toml_returns_error() {
+    let temp = TempDir::new().unwrap();
+    let config_content = "this is not valid toml {{{";
+    let root = setup_config_file(&temp, config_content);
+
+    let result = load_config(&root);
+    assert!(
+        result.is_err(),
+        "Malformed TOML should return an error, not silently succeed"
+    );
+}
+
+#[test]
+fn test_load_wrong_type_for_tools_returns_error() {
+    let temp = TempDir::new().unwrap();
+    let config_content = r#"
+[core]
+version = "1"
+
+[active]
+tools = "not-an-array"
+"#;
+    let root = setup_config_file(&temp, config_content);
+
+    let result = load_config(&root);
+    assert!(
+        result.is_err(),
+        "Wrong type for tools field should return an error"
+    );
+}
+
+#[test]
 fn test_load_empty_config_file() {
     let temp = TempDir::new().unwrap();
     // Completely empty config file - tests that struct defaults work

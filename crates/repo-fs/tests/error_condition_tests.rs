@@ -135,11 +135,11 @@ mod windows_tests {
     use std::fs;
 
     #[test]
-    fn write_atomic_readonly_file_succeeds_via_rename() {
-        // On Windows, the readonly attribute only affects direct writes to the file.
-        // write_atomic uses a temp file + rename strategy, and fs::rename on Windows
-        // CAN replace a readonly destination. This test verifies and documents that
-        // behavior: the write succeeds because rename bypasses the readonly flag.
+    fn write_atomic_readonly_file_fails_and_preserves_original() {
+        // On Windows, write_atomic with a readonly target file fails because
+        // fs::rename cannot replace a readonly destination (Access denied).
+        // The write_atomic retry loop eventually times out.
+        // This test verifies: (1) the write fails, and (2) original content is preserved.
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("readonly.txt");
         fs::write(&file_path, "original").unwrap();
@@ -149,32 +149,34 @@ mod windows_tests {
         perms.set_readonly(true);
         fs::set_permissions(&file_path, perms).unwrap();
 
+        // Use a short timeout to avoid long waits
         let path = NormalizedPath::new(&file_path);
-        let result = io::write_text(&path, "new content");
+        let config = repo_fs::RobustnessConfig {
+            lock_timeout: std::time::Duration::from_millis(500),
+            enable_fsync: false,
+        };
+        let result = io::write_atomic(&path, b"new content", config);
 
         // Restore permissions for cleanup
-        let mut perms = fs::metadata(&file_path).unwrap().permissions();
-        perms.set_readonly(false);
-        let _ = fs::set_permissions(&file_path, perms);
-
-        // On Windows, rename-based atomic write typically succeeds even for
-        // readonly targets. Assert that behavior explicitly.
-        if result.is_ok() {
-            // If the write succeeded, verify the content was actually updated
-            let content = fs::read_to_string(&file_path).unwrap();
-            assert_eq!(
-                content, "new content",
-                "Successful write must update file content"
-            );
-        } else {
-            // If the write failed (future Windows versions might change behavior),
-            // verify the original content is preserved
-            let content = fs::read_to_string(&file_path).unwrap();
-            assert_eq!(
-                content, "original",
-                "Failed write must preserve original content"
-            );
+        #[allow(clippy::permissions_set_readonly_false)]
+        {
+            let mut perms = fs::metadata(&file_path).unwrap().permissions();
+            perms.set_readonly(false);
+            let _ = fs::set_permissions(&file_path, perms);
         }
+
+        // Assert the write fails on Windows with readonly target
+        assert!(
+            result.is_err(),
+            "write_atomic should fail when target file is readonly on Windows"
+        );
+
+        // Assert original content is preserved (atomicity guarantee)
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(
+            content, "original",
+            "Original file content must be preserved when write fails"
+        );
     }
 
     #[test]

@@ -211,7 +211,7 @@ impl SyncEngine {
 
                     ProjectionKind::TextBlock {
                         marker,
-                        checksum: _,
+                        checksum,
                     } => {
                         if !file_path.exists() {
                             missing.push(DriftItem {
@@ -235,8 +235,21 @@ impl SyncEngine {
                                                 marker
                                             ),
                                         });
+                                    } else {
+                                        // Verify the block checksum matches
+                                        let actual_checksum = compute_content_checksum(&content);
+                                        if actual_checksum != *checksum {
+                                            drifted.push(DriftItem {
+                                                intent_id: intent.id.clone(),
+                                                tool: projection.tool.clone(),
+                                                file: projection.file.to_string_lossy().to_string(),
+                                                description: format!(
+                                                    "TextBlock checksum mismatch: expected {}, got {}",
+                                                    checksum, actual_checksum
+                                                ),
+                                            });
+                                        }
                                     }
-                                    // TODO: Could also check block checksum here
                                 }
                                 Err(e) => {
                                     missing.push(DriftItem {
@@ -481,6 +494,21 @@ impl SyncEngine {
     pub fn mode(&self) -> Mode {
         self.mode
     }
+}
+
+/// Compute the SHA-256 checksum of a string content
+///
+/// # Arguments
+///
+/// * `content` - The string content to hash
+///
+/// # Returns
+///
+/// The hex-encoded SHA-256 checksum of the content.
+pub fn compute_content_checksum(content: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content.as_bytes());
+    format!("{:x}", hasher.finalize())
 }
 
 /// Compute the SHA-256 checksum of a file

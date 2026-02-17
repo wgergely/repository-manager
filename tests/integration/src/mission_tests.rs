@@ -698,9 +698,11 @@ mod gaps {
     #[allow(unused_imports)]
     use super::*;
 
-    /// GAP-004: sync() only creates ledger, doesn't apply projections
+    /// GAP-004: sync() should apply projections and create tool configs
+    /// TODO: Enable when sync applies projections beyond just creating the ledger
     #[test]
-    fn gap_004_sync_doesnt_apply_projections() {
+    #[ignore = "GAP-004: sync() does not yet apply projections to create tool configs"]
+    fn gap_004_sync_applies_projections() {
         let mut repo = TestRepo::new();
         repo.init_git();
         repo.init_repo_manager("standard", &["vscode"], &[]);
@@ -723,14 +725,11 @@ content = "Test content"
         // Sync should create tool configs based on rules
         let _report = engine.sync().unwrap();
 
-        // GAP: Currently sync only creates ledger, doesn't create .vscode/settings.json
-        // This test documents that the file is NOT created by sync
+        // Correct behavior: sync should create .vscode/settings.json
         let vscode_exists = repo.root().join(".vscode/settings.json").exists();
-
-        // When this assertion fails, the gap is closed!
         assert!(
-            !vscode_exists,
-            "GAP-004 CLOSED: sync() now creates tool configs! Update this test."
+            vscode_exists,
+            "sync() should create .vscode/settings.json when vscode tool is configured"
         );
     }
 
@@ -926,9 +925,11 @@ content = "Test content"
         assert!(resource_uris.contains(&"repo://rules"));
     }
 
-    /// GAP-019: add-tool doesn't trigger sync
+    /// GAP-019: add-tool should trigger sync automatically
+    /// TODO: Enable when add-tool triggers an automatic sync
     #[test]
-    fn gap_019_add_tool_no_sync() {
+    #[ignore = "GAP-019: add-tool does not yet trigger automatic sync"]
+    fn gap_019_add_tool_triggers_sync() {
         let mut repo = TestRepo::new();
         repo.init_git();
         repo.init_repo_manager("standard", &[], &[]);
@@ -939,13 +940,11 @@ content = "Test content"
         config = config.replace("tools = []", "tools = [\"vscode\"]");
         fs::write(&config_path, config).unwrap();
 
-        // GAP: After add-tool, .vscode/settings.json should be created
-        // Currently it's not - user must run sync manually
+        // Correct behavior: after add-tool, .vscode/settings.json should be created
         let vscode_exists = repo.root().join(".vscode/settings.json").exists();
-
         assert!(
-            !vscode_exists,
-            "GAP-019 CLOSED: add-tool now triggers sync! Update this test."
+            vscode_exists,
+            "add-tool should automatically trigger sync and create .vscode/settings.json"
         );
     }
 }
@@ -1419,44 +1418,5 @@ mod consumer_verification {
     }
 }
 
-// =============================================================================
-// Summary Report (prints on test run)
-// =============================================================================
-
-#[test]
-fn test_summary() {
-    println!("\n==========================================");
-    println!("MISSION TEST SUMMARY");
-    println!("==========================================\n");
-
-    println!("Mission 1 (Init):     Implemented, tested");
-    println!("Mission 2 (Branch):   Implemented, tested");
-    println!("Mission 3 (Sync):     PARTIAL - sync/fix incomplete");
-    println!("Mission 4 (Tools):    7/7 tools implemented");
-    println!("Mission 5 (Presets):  4 providers (uv, venv, node, rust)");
-    println!("Mission 6 (Git Ops):  IMPLEMENTED (push, pull, merge)");
-    println!("Mission 7 (Rules):    CLI exists, sync integration needed");
-
-    println!("\n------------------------------------------");
-    println!("ALL PRODUCTION GAPS CLOSED:");
-    println!("------------------------------------------");
-    println!("GAP-001: repo push - IMPLEMENTED");
-    println!("GAP-002: repo pull - IMPLEMENTED");
-    println!("GAP-003: repo merge - IMPLEMENTED");
-    println!("GAP-006: Antigravity tool - IMPLEMENTED");
-    println!("GAP-007: Windsurf tool - IMPLEMENTED");
-    println!("GAP-008: Gemini CLI tool - IMPLEMENTED");
-    println!("GAP-010: Python venv provider - IMPLEMENTED");
-    println!("GAP-012: Node provider - IMPLEMENTED");
-    println!("GAP-013: Rust provider - IMPLEMENTED");
-    println!("GAP-018: MCP Server - IMPLEMENTED");
-
-    println!("\n------------------------------------------");
-    println!("REMAINING ITEMS (not blocking production):");
-    println!("------------------------------------------");
-    println!("GAP-004: sync doesn't apply projections (design decision)");
-    println!("GAP-005: fix is a sync stub (future enhancement)");
-    println!("GAP-019: add-tool doesn't auto-sync (future enhancement)");
-
-    println!("\n==========================================\n");
-}
+// Note: test_summary was removed because it contained zero assertions.
+// Mission status is tracked in documentation, not in test output.

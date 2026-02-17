@@ -6,12 +6,10 @@ use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
 use tempfile::tempdir;
-use toml;
 
 /// Get a Command for the repo binary
-#[allow(deprecated)]
 fn repo_cmd() -> Command {
-    Command::cargo_bin("repo").expect("Failed to find repo binary")
+    Command::new(assert_cmd::cargo::cargo_bin!("repo"))
 }
 
 // ============================================================================

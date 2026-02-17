@@ -215,14 +215,14 @@ fn test_check_healthy_when_text_block_marker_present() {
     // Create the config file with the marker
     let config_dir = temp.path().join(".cursor").join("rules");
     fs::create_dir_all(&config_dir).unwrap();
-    fs::write(
-        config_dir.join("test.mdc"),
-        format!(
-            "# Some content\n<!-- BEGIN {} -->\nblock content\n<!-- END {} -->\n",
-            marker, marker
-        ),
-    )
-    .unwrap();
+    let text_content = format!(
+        "# Some content\n<!-- BEGIN {} -->\nblock content\n<!-- END {} -->\n",
+        marker, marker
+    );
+    fs::write(config_dir.join("test.mdc"), &text_content).unwrap();
+
+    // Compute real checksum for the text block content
+    let text_checksum = repo_core::sync::compute_content_checksum(&text_content);
 
     // Create .repository directory and ledger
     let repo_dir = temp.path().join(".repository");
@@ -235,7 +235,7 @@ fn test_check_healthy_when_text_block_marker_present() {
         "cursor".to_string(),
         std::path::PathBuf::from(".cursor/rules/test.mdc"),
         marker,
-        "checksum".to_string(),
+        text_checksum,
     ));
     ledger.add_intent(intent);
     ledger.save(&repo_dir.join("ledger.toml")).unwrap();

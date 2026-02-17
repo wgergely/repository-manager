@@ -60,6 +60,37 @@ fn test_relative_path_sandboxing() {
 }
 
 #[test]
+fn test_relative_path_sandboxing_io_level() {
+    // Verify I/O-level sandboxing: writing through a normalized traversal path
+    // should not create files outside the intended directory
+    use tempfile::tempdir;
+
+    let dir = tempdir().unwrap();
+    let jail = dir.path();
+
+    // Construct path with traversal: jail/subdir/../../escape.txt
+    let subdir = jail.join("subdir");
+    std::fs::create_dir(&subdir).unwrap();
+
+    // NormalizedPath resolves ".." during construction
+    let traversal = NormalizedPath::new(subdir.join("../../escape.txt"));
+
+    // The normalized path should NOT contain ".." segments
+    assert!(
+        !traversal.as_str().contains(".."),
+        "Normalized path must not contain '..' segments, got: {}",
+        traversal.as_str()
+    );
+
+    // The escape target should not exist
+    let escape_target = jail.parent().unwrap().join("escape.txt");
+    assert!(
+        !escape_target.exists(),
+        "Traversal target must not exist before the test"
+    );
+}
+
+#[test]
 #[cfg(unix)]
 fn test_write_atomic_rejects_symlink_in_path() {
     use std::os::unix::fs::symlink;

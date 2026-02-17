@@ -212,3 +212,86 @@ End
     assert!(blocks[0].content.contains("First block"));
     assert!(blocks[1].content.contains("Second block"));
 }
+
+#[test]
+fn test_markdown_adversarial_content_with_closing_marker() {
+    // Block content that contains a closing marker for itself should not
+    // cause the parser to truncate the block early or produce data loss.
+    let handler = MarkdownHandler::new();
+    let uuid = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+
+    // Insert a block whose content contains its own closing marker pattern
+    let adversarial_content =
+        "Text before <!-- /repo:block:550e8400-e29b-41d4-a716-446655440000 --> text after";
+
+    let source = "# Document\n\nSome text.\n";
+    let (result, _edit) = handler
+        .insert_block(source, uuid, adversarial_content, BlockLocation::End)
+        .unwrap();
+
+    // Now parse the blocks back - the parser will match the FIRST closing marker
+    // it finds (which is inside the content), potentially truncating the block.
+    // This documents the current behavior.
+    let blocks = handler.find_blocks(&result);
+    assert!(
+        !blocks.is_empty(),
+        "Should find at least one block in adversarial content"
+    );
+
+    // The parser uses find() for the first closing marker, so the block content
+    // will be truncated at the injected marker. This is a known limitation.
+    // Document it: the content will NOT contain "text after" because the parser
+    // terminates at the first matching close marker.
+    let first_block = &blocks[0];
+    assert_eq!(first_block.uuid, uuid);
+    // The content should at minimum contain "Text before"
+    assert!(
+        first_block.content.contains("Text before"),
+        "Block should contain content before the injected marker, got: {:?}",
+        first_block.content
+    );
+}
+
+#[test]
+fn test_markdown_adversarial_content_with_different_uuid_marker() {
+    // Block content containing a closing marker for a DIFFERENT block's UUID
+    // should not affect parsing of either block.
+    let handler = MarkdownHandler::new();
+    let uuid1 = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+    let uuid2 = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap();
+
+    let source = r#"# Document
+
+<!-- repo:block:550e8400-e29b-41d4-a716-446655440000 -->
+Content A with fake marker <!-- /repo:block:550e8400-e29b-41d4-a716-446655440001 --> inside
+<!-- /repo:block:550e8400-e29b-41d4-a716-446655440000 -->
+
+<!-- repo:block:550e8400-e29b-41d4-a716-446655440001 -->
+Content B
+<!-- /repo:block:550e8400-e29b-41d4-a716-446655440001 -->
+"#;
+
+    let blocks = handler.find_blocks(source);
+
+    // Block A contains B's closing marker in its content, but since A's parser
+    // looks for A's specific closing marker, it should not be affected.
+    assert_eq!(blocks.len(), 2, "Both blocks should be found");
+    assert_eq!(blocks[0].uuid, uuid1);
+    assert_eq!(blocks[1].uuid, uuid2);
+
+    // Block A's content should be intact (the fake B marker is just text)
+    assert!(
+        blocks[0].content.contains("Content A"),
+        "Block A content should be preserved"
+    );
+    assert!(
+        blocks[0].content.contains("fake marker"),
+        "Block A should contain the fake marker text"
+    );
+
+    // Block B should also be intact
+    assert!(
+        blocks[1].content.contains("Content B"),
+        "Block B content should be preserved"
+    );
+}

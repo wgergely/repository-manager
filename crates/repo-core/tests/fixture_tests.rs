@@ -176,7 +176,7 @@ fn test_config_test_fixture_syncs_all_declared_tools() {
     for tool_name in &manifest.tools {
         if syncer.has_tool(tool_name) {
             let actions = syncer
-                .sync_tool_with_rules(tool_name, &[rule.clone()], &mut ledger)
+                .sync_tool_with_rules(tool_name, std::slice::from_ref(&rule), &mut ledger)
                 .unwrap();
             assert!(
                 !actions.is_empty(),

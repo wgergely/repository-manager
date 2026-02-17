@@ -244,20 +244,35 @@ outer end
 <!-- /repo:block:nest -->"#;
 
     let blocks = parse_blocks(content);
-    // The parser's regex finds the opening, then searches for the first close.
-    // It should find the inner close first (non-greedy behavior).
+    // The parser finds opening markers via regex iteration, then for each one
+    // searches for the first matching close marker. With nested same-UUID,
+    // the first open matches the first (inner) close.
     assert!(
         !blocks.is_empty(),
-        "Parser should extract at least one block from nested same-UUID markers"
+        "Parser should extract at least one block from nested same-UUID markers, got {}",
+        blocks.len()
     );
 
-    // The first block should end at the first closing marker
+    // The first block should end at the first closing marker (inner close)
     let first = &blocks[0];
     assert_eq!(first.uuid, "nest");
-    // Content should be everything up to the first close marker
+    // Content is from first open to first close, so includes "outer start"
+    // and the second opening marker, and "inner"
     assert!(
         first.content.contains("outer start"),
-        "First block content should contain 'outer start'"
+        "First block content should contain 'outer start', got: {:?}",
+        first.content
+    );
+    assert!(
+        first.content.contains("inner"),
+        "First block content should contain 'inner' (text before first close), got: {:?}",
+        first.content
+    );
+    // "outer end" is between the first close and second close, so it should
+    // NOT be in the first block's content
+    assert!(
+        !first.content.contains("outer end"),
+        "First block should NOT contain 'outer end' (it's after the first close marker)"
     );
 }
 
@@ -339,6 +354,38 @@ content
     assert!(
         blocks2.is_empty(),
         "UUIDs with spaces should not match the block regex"
+    );
+}
+
+#[test]
+fn content_containing_different_blocks_closing_marker() {
+    // HIGH: Block A's content contains B's closing marker.
+    // Verify that parsing B is not affected by the fake marker inside A.
+    let content = r#"<!-- repo:block:block-A -->
+Content of A <!-- /repo:block:block-B --> fake B close inside A
+<!-- /repo:block:block-A -->
+
+<!-- repo:block:block-B -->
+Real content of B
+<!-- /repo:block:block-B -->"#;
+
+    let blocks = parse_blocks(content);
+    assert_eq!(blocks.len(), 2, "Both blocks should be parsed");
+
+    assert_eq!(blocks[0].uuid, "block-A");
+    assert!(
+        blocks[0].content.contains("Content of A"),
+        "Block A should have its full content"
+    );
+    assert!(
+        blocks[0].content.contains("fake B close inside A"),
+        "Block A should contain the fake B marker as plain text"
+    );
+
+    assert_eq!(blocks[1].uuid, "block-B");
+    assert_eq!(
+        blocks[1].content, "Real content of B",
+        "Block B should have its real content, not be affected by fake marker in A"
     );
 }
 

@@ -301,6 +301,82 @@ fn test_ledger_get_intent_mut() {
 }
 
 #[test]
+fn test_ledger_load_invalid_toml() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("ledger.toml");
+    std::fs::write(&path, "not valid toml {{{").unwrap();
+
+    let result = Ledger::load(&path);
+    assert!(result.is_err(), "Should reject invalid TOML content");
+}
+
+#[test]
+fn test_ledger_load_missing_version_field() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("ledger.toml");
+    // Valid TOML but missing required version field - Ledger uses #[derive(Deserialize)]
+    // with no default on version, so this should still deserialize (version defaults via Default)
+    std::fs::write(&path, "intents = []\n").unwrap();
+
+    // This may or may not error depending on whether version has a serde default
+    let result = Ledger::load(&path);
+    // Either it errors (good - strict) or it loads with default version (acceptable)
+    if let Ok(ledger) = result {
+        // If it loads, at least ensure it's usable
+        assert!(ledger.intents().is_empty());
+    }
+}
+
+#[test]
+fn test_ledger_load_truncated_content() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("ledger.toml");
+    // Truncated TOML (incomplete table)
+    std::fs::write(&path, "version = \"1.0\"\n[[intents]]\nid = ").unwrap();
+
+    let result = Ledger::load(&path);
+    assert!(result.is_err(), "Should reject truncated TOML content");
+}
+
+#[test]
+fn test_ledger_projections_for_file_returns_correct_pairs() {
+    let mut ledger = Ledger::new();
+
+    let mut intent1 = Intent::new("rule:python/style".to_string(), json!({}));
+    let mut intent2 = Intent::new("rule:rust/naming".to_string(), json!({}));
+
+    let marker1 = Uuid::new_v4();
+    let marker2 = Uuid::new_v4();
+
+    intent1.add_projection(Projection::text_block(
+        "cursor".to_string(),
+        PathBuf::from(".cursor/rules/python.mdc"),
+        marker1,
+        "checksum1".to_string(),
+    ));
+    intent2.add_projection(Projection::text_block(
+        "cursor".to_string(),
+        PathBuf::from(".cursor/rules/python.mdc"),
+        marker2,
+        "checksum2".to_string(),
+    ));
+
+    ledger.add_intent(intent1);
+    ledger.add_intent(intent2);
+
+    let projections = ledger.projections_for_file(&PathBuf::from(".cursor/rules/python.mdc"));
+    assert_eq!(projections.len(), 2);
+
+    // Verify the actual intent-projection pairs, not just count
+    let intent_ids: Vec<&str> = projections.iter().map(|(intent, _)| intent.id.as_str()).collect();
+    assert!(intent_ids.contains(&"rule:python/style"));
+    assert!(intent_ids.contains(&"rule:rust/naming"));
+
+    let tools: Vec<&str> = projections.iter().map(|(_, proj)| proj.tool.as_str()).collect();
+    assert!(tools.iter().all(|t| *t == "cursor"));
+}
+
+#[test]
 fn test_ledger_default_version() {
     let ledger = Ledger::new();
     // Version should be accessible through serialization
