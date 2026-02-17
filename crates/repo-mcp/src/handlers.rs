@@ -53,6 +53,13 @@ pub async fn handle_tool_call(root: &Path, tool_name: &str, arguments: Value) ->
         "preset_add" => handle_preset_add(root, arguments).await,
         "preset_remove" => handle_preset_remove(root, arguments).await,
 
+        // Agent Orchestration
+        "agent_check" => handle_agent_check(root).await,
+        "agent_list" => handle_agent_list(root).await,
+        "agent_spawn" => handle_agent_spawn(root, arguments).await,
+        "agent_status" => handle_agent_status(root, arguments).await,
+        "agent_stop" => handle_agent_stop(root, arguments).await,
+
         // Plugins
         "plugins_install" => handle_plugins_install(root, arguments).await,
         "plugins_status" => handle_plugins_status(root).await,
@@ -570,6 +577,169 @@ async fn handle_preset_remove(root: &Path, arguments: Value) -> Result<Value> {
         "preset": args.name,
         "message": format!("Removed preset '{}'", args.name),
     }))
+}
+
+// ============================================================================
+// Agent Orchestration Handlers
+// ============================================================================
+
+/// Handle agent_check - Check agent subsystem prerequisites
+async fn handle_agent_check(root: &Path) -> Result<Value> {
+    let manager = repo_agent::AgentManager::discover(root)
+        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    let report = manager
+        .health_check()
+        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    Ok(json!({
+        "available": report.available,
+        "python_path": report.python_path,
+        "python_version": report.python_version,
+        "vaultspec_path": report.vaultspec_path,
+        "agent_count": report.agent_count,
+        "messages": report.messages,
+    }))
+}
+
+/// Handle agent_list - List available agent definitions
+async fn handle_agent_list(root: &Path) -> Result<Value> {
+    let manager = repo_agent::AgentManager::discover(root)
+        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    if !manager.is_available() {
+        return Ok(json!({
+            "available": false,
+            "agents": [],
+            "message": "Agent subsystem not available. Install Python 3.13+ and vaultspec.",
+        }));
+    }
+
+    let vaultspec_path = manager.vaultspec_path().ok_or_else(|| {
+        Error::InvalidArgument("Vaultspec directory not found".to_string())
+    })?;
+
+    let agents = repo_agent::subprocess::list_agents(vaultspec_path)
+        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    let agent_data: Vec<Value> = agents
+        .iter()
+        .map(|a| {
+            json!({
+                "name": a.name,
+                "tier": a.tier,
+                "provider": a.provider,
+                "available": a.available,
+            })
+        })
+        .collect();
+
+    Ok(json!({
+        "available": true,
+        "agents": agent_data,
+        "count": agents.len(),
+    }))
+}
+
+/// Handle agent_spawn - Spawn an agent to work on a task
+async fn handle_agent_spawn(root: &Path, arguments: Value) -> Result<Value> {
+    let name = arguments
+        .get("name")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| Error::InvalidArgument("'name' is required".to_string()))?;
+    let goal = arguments.get("goal").and_then(|v| v.as_str());
+    let worktree = arguments.get("worktree").and_then(|v| v.as_str());
+
+    let manager = repo_agent::AgentManager::discover(root)
+        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    if !manager.is_available() {
+        return Ok(json!({
+            "success": false,
+            "message": "Agent subsystem not available. Install Python 3.13+ and vaultspec.",
+        }));
+    }
+
+    let python = manager.python_path().ok_or_else(|| {
+        Error::InvalidArgument("Python not found".to_string())
+    })?;
+    let vaultspec = manager.vaultspec_path().ok_or_else(|| {
+        Error::InvalidArgument("Vaultspec not found".to_string())
+    })?;
+
+    let pm = repo_agent::process::ProcessManager::new(root);
+    match pm.spawn(python, vaultspec, name, worktree, goal) {
+        Ok(process) => Ok(json!({
+            "success": true,
+            "id": process.id,
+            "pid": process.pid,
+            "agent_name": process.agent_name,
+            "worktree": process.worktree,
+            "message": format!("Agent '{}' spawned (PID: {})", name, process.pid),
+        })),
+        Err(e) => Ok(json!({
+            "success": false,
+            "message": format!("Failed to spawn agent: {}", e),
+        })),
+    }
+}
+
+/// Handle agent_status - Check status of running agents
+async fn handle_agent_status(root: &Path, arguments: Value) -> Result<Value> {
+    let task_id = arguments.get("task_id").and_then(|v| v.as_str());
+
+    let pm = repo_agent::process::ProcessManager::new(root);
+    let processes = pm
+        .list()
+        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    let filtered: Vec<_> = if let Some(id) = task_id {
+        processes.into_iter().filter(|p| p.id.contains(id)).collect()
+    } else {
+        processes
+    };
+
+    let process_data: Vec<Value> = filtered
+        .iter()
+        .map(|p| {
+            json!({
+                "id": p.id,
+                "agent_name": p.agent_name,
+                "pid": p.pid,
+                "worktree": p.worktree,
+                "goal": p.goal,
+                "status": format!("{:?}", p.status),
+                "started_at": p.started_at,
+            })
+        })
+        .collect();
+
+    Ok(json!({
+        "processes": process_data,
+        "count": filtered.len(),
+    }))
+}
+
+/// Handle agent_stop - Stop a running agent
+async fn handle_agent_stop(root: &Path, arguments: Value) -> Result<Value> {
+    let task_id = arguments
+        .get("task_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| Error::InvalidArgument("'task_id' is required".to_string()))?;
+
+    let pm = repo_agent::process::ProcessManager::new(root);
+    match pm.stop(task_id) {
+        Ok(process) => Ok(json!({
+            "success": true,
+            "id": process.id,
+            "agent_name": process.agent_name,
+            "message": format!("Agent '{}' stopped", process.agent_name),
+        })),
+        Err(e) => Ok(json!({
+            "success": false,
+            "message": format!("Failed to stop agent: {}", e),
+        })),
+    }
 }
 
 // ============================================================================

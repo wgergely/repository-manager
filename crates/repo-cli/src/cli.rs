@@ -245,6 +245,13 @@ pub enum Commands {
         #[command(subcommand)]
         action: PluginsAction,
     },
+
+    /// Manage AI agents (requires vaultspec)
+    Agent {
+        /// Agent action to perform
+        #[command(subcommand)]
+        action: AgentAction,
+    },
 }
 
 /// Branch management actions
@@ -312,6 +319,83 @@ pub enum PluginsAction {
         /// Version to uninstall
         #[arg(long, default_value = "v4.1.1")]
         version: String,
+    },
+}
+
+/// Agent management actions
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum AgentAction {
+    /// Verify vaultspec installation and agent prerequisites
+    Check,
+
+    /// List available agents
+    List,
+
+    /// Spawn an agent to work on a task
+    Spawn {
+        /// Agent name or type
+        name: String,
+
+        /// Goal or task description for the agent
+        #[arg(short, long)]
+        goal: Option<String>,
+
+        /// Worktree to run the agent in
+        #[arg(short, long)]
+        worktree: Option<String>,
+    },
+
+    /// Check status of running agents
+    Status {
+        /// Specific task ID to check (shows all if omitted)
+        #[arg(short, long)]
+        task_id: Option<String>,
+    },
+
+    /// Stop a running agent
+    Stop {
+        /// Task ID of the agent to stop
+        task_id: String,
+    },
+
+    /// Sync agent configuration
+    Sync,
+
+    /// Show or set agent configuration
+    Config {
+        /// Show current configuration
+        #[arg(long)]
+        show: bool,
+    },
+
+    /// Manage agent rules
+    Rules {
+        /// Rules action to perform
+        #[command(subcommand)]
+        action: RulesSubAction,
+    },
+}
+
+/// Rules sub-actions for agent management
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum RulesSubAction {
+    /// List agent rules
+    List,
+
+    /// Add a rule for agents
+    Add {
+        /// Rule identifier
+        id: String,
+
+        /// Rule instruction text
+        #[arg(short, long)]
+        instruction: String,
+    },
+
+    /// Remove an agent rule
+    Remove {
+        /// Rule ID to remove
+        id: String,
     },
 }
 
@@ -801,5 +885,142 @@ mod tests {
     fn parse_completions_command() {
         let cli = Cli::parse_from(["repo", "completions", "bash"]);
         assert!(matches!(cli.command, Some(Commands::Completions { .. })));
+    }
+
+    #[test]
+    fn parse_agent_check_command() {
+        let cli = Cli::parse_from(["repo", "agent", "check"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Agent {
+                action: AgentAction::Check
+            })
+        ));
+    }
+
+    #[test]
+    fn parse_agent_list_command() {
+        let cli = Cli::parse_from(["repo", "agent", "list"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Agent {
+                action: AgentAction::List
+            })
+        ));
+    }
+
+    #[test]
+    fn parse_agent_spawn_command() {
+        let cli = Cli::parse_from(["repo", "agent", "spawn", "claude", "--goal", "fix bug"]);
+        match cli.command {
+            Some(Commands::Agent {
+                action: AgentAction::Spawn { name, goal, worktree },
+            }) => {
+                assert_eq!(name, "claude");
+                assert_eq!(goal, Some("fix bug".to_string()));
+                assert_eq!(worktree, None);
+            }
+            _ => panic!("Expected Agent Spawn command"),
+        }
+    }
+
+    #[test]
+    fn parse_agent_spawn_with_worktree() {
+        let cli = Cli::parse_from([
+            "repo", "agent", "spawn", "claude",
+            "--goal", "refactor", "--worktree", "feature-x",
+        ]);
+        match cli.command {
+            Some(Commands::Agent {
+                action: AgentAction::Spawn { name, goal, worktree },
+            }) => {
+                assert_eq!(name, "claude");
+                assert_eq!(goal, Some("refactor".to_string()));
+                assert_eq!(worktree, Some("feature-x".to_string()));
+            }
+            _ => panic!("Expected Agent Spawn command"),
+        }
+    }
+
+    #[test]
+    fn parse_agent_status_command() {
+        let cli = Cli::parse_from(["repo", "agent", "status"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Agent {
+                action: AgentAction::Status { task_id: None }
+            })
+        ));
+    }
+
+    #[test]
+    fn parse_agent_stop_command() {
+        let cli = Cli::parse_from(["repo", "agent", "stop", "task-123"]);
+        match cli.command {
+            Some(Commands::Agent {
+                action: AgentAction::Stop { task_id },
+            }) => {
+                assert_eq!(task_id, "task-123");
+            }
+            _ => panic!("Expected Agent Stop command"),
+        }
+    }
+
+    #[test]
+    fn parse_agent_sync_command() {
+        let cli = Cli::parse_from(["repo", "agent", "sync"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Agent {
+                action: AgentAction::Sync
+            })
+        ));
+    }
+
+    #[test]
+    fn parse_agent_rules_list_command() {
+        let cli = Cli::parse_from(["repo", "agent", "rules", "list"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Agent {
+                action: AgentAction::Rules {
+                    action: RulesSubAction::List
+                }
+            })
+        ));
+    }
+
+    #[test]
+    fn parse_agent_rules_add_command() {
+        let cli = Cli::parse_from([
+            "repo", "agent", "rules", "add", "no-secrets",
+            "--instruction", "Never expose API keys",
+        ]);
+        match cli.command {
+            Some(Commands::Agent {
+                action: AgentAction::Rules {
+                    action: RulesSubAction::Add { id, instruction },
+                },
+            }) => {
+                assert_eq!(id, "no-secrets");
+                assert_eq!(instruction, "Never expose API keys");
+            }
+            _ => panic!("Expected Agent Rules Add command"),
+        }
+    }
+
+    #[test]
+    fn parse_agent_rules_remove_command() {
+        let cli = Cli::parse_from(["repo", "agent", "rules", "remove", "no-secrets"]);
+        match cli.command {
+            Some(Commands::Agent {
+                action: AgentAction::Rules {
+                    action: RulesSubAction::Remove { id },
+                },
+            }) => {
+                assert_eq!(id, "no-secrets");
+            }
+            _ => panic!("Expected Agent Rules Remove command"),
+        }
     }
 }

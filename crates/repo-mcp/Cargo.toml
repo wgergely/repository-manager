@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Core repository crates
+repo-agent = { path = "../repo-agent" }
 repo-core = { path = "../repo-core" }
 repo-fs = { path = "../repo-fs" }
 repo-git = { path = "../repo-git" }

@@ -16,7 +16,7 @@ use colored::Colorize;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-use cli::{BranchAction, Cli, Commands, ConfigAction, PluginsAction};
+use cli::{AgentAction, BranchAction, Cli, Commands, ConfigAction, PluginsAction};
 use error::Result;
 
 fn main() {
@@ -90,6 +90,7 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::Config { action } => cmd_config(action),
         Commands::ToolInfo { name } => cmd_tool_info(&name),
         Commands::Plugins { action } => cmd_plugins(action),
+        Commands::Agent { action } => cmd_agent(action),
     }
 }
 
@@ -233,6 +234,10 @@ fn cmd_config(action: ConfigAction) -> Result<()> {
 fn cmd_tool_info(name: &str) -> Result<()> {
     let cwd = std::env::current_dir()?;
     commands::config::run_tool_info(&cwd, name)
+}
+
+fn cmd_agent(action: AgentAction) -> Result<()> {
+    commands::agent::run_agent(action)
 }
 
 fn cmd_plugins(action: PluginsAction) -> Result<()> {
