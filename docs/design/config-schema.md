@@ -28,7 +28,7 @@ We adopt a modular, file-based configuration approach using **TOML** for its str
 
 This file defines the high-level configuration of the repository. It is parsed into the `Manifest` struct in `repo-core/src/config/manifest.rs`.
 
-**Important**: `tools` and `rules` are top-level arrays that must appear before any `[section]` headers in the TOML file. There is no `[active]`, `[project]`, or `[sync]` section.
+**Important**: `tools` and `rules` are top-level arrays that must appear before any `[section]` headers in the TOML file. (In TOML, once a `[section]` header appears, subsequent keys belong to that section. Placing `tools` and `rules` first ensures they are parsed as top-level fields of the `Manifest` struct, not nested under `[core]`.) There is no `[active]`, `[project]`, or `[sync]` section.
 
 ```toml
 # Top-level arrays (must appear before [core])
