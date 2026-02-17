@@ -16,7 +16,7 @@ use colored::Colorize;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-use cli::{BranchAction, Cli, Commands, SuperpowersAction};
+use cli::{BranchAction, Cli, Commands, PluginsAction};
 use error::Result;
 
 fn main() {
@@ -87,7 +87,7 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::Push { remote, branch } => cmd_push(remote, branch),
         Commands::Pull { remote, branch } => cmd_pull(remote, branch),
         Commands::Merge { source } => cmd_merge(&source),
-        Commands::Superpowers { action } => cmd_superpowers(action),
+        Commands::Plugins { action } => cmd_plugins(action),
     }
 }
 
@@ -220,13 +220,13 @@ fn cmd_merge(source: &str) -> Result<()> {
     commands::run_merge(&cwd, source)
 }
 
-fn cmd_superpowers(action: SuperpowersAction) -> Result<()> {
+fn cmd_plugins(action: PluginsAction) -> Result<()> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| error::CliError::user(format!("Failed to create runtime: {}", e)))?;
 
-    rt.block_on(commands::superpowers::handle_superpowers(action))
+    rt.block_on(commands::plugins::handle_plugins(action))
 }
 
 #[cfg(test)]
