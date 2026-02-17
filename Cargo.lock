@@ -1538,6 +1538,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
 
 [[package]]
+name = "repo-agent"
+version = "0.1.0"
+dependencies = [
+ "repo-fs",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
 name = "repo-blocks"
 version = "0.1.0"
 dependencies = [
