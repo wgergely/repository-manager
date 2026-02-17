@@ -1,10 +1,10 @@
-//! Integration tests for SuperpowersProvider
+//! Integration tests for PluginsProvider
 //!
 //! Note: Tests that require network access are marked with #[ignore]
-//! Run with: cargo test -p repo-presets --test superpowers_tests -- --ignored
+//! Run with: cargo test -p repo-presets --test plugins_tests -- --ignored
 
 use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
-use repo_presets::{Context, PresetProvider, PresetStatus, SuperpowersProvider};
+use repo_presets::{Context, PresetProvider, PresetStatus, PluginsProvider};
 use std::collections::HashMap;
 use tempfile::TempDir;
 
@@ -19,15 +19,15 @@ fn create_test_context(temp: &TempDir) -> Context {
 
 #[tokio::test]
 async fn test_provider_id() {
-    let provider = SuperpowersProvider::new();
-    assert_eq!(provider.id(), "claude:superpowers");
+    let provider = PluginsProvider::new();
+    assert_eq!(provider.id(), "claude:plugins");
 }
 
 #[tokio::test]
 async fn test_check_when_not_installed() {
     let temp = TempDir::new().unwrap();
     let context = create_test_context(&temp);
-    let provider = SuperpowersProvider::new();
+    let provider = PluginsProvider::new();
 
     let report = provider.check(&context).await.unwrap();
 
@@ -48,7 +48,7 @@ async fn test_check_when_not_installed() {
 async fn test_check_report_includes_version_info() {
     let temp = TempDir::new().unwrap();
     let context = create_test_context(&temp);
-    let provider = SuperpowersProvider::new().with_version("v4.1.1");
+    let provider = PluginsProvider::new().with_version("v4.1.1");
 
     let report = provider.check(&context).await.unwrap();
 
@@ -64,7 +64,7 @@ async fn test_check_report_includes_version_info() {
 
 #[tokio::test]
 async fn test_with_version_changes_version() {
-    let provider = SuperpowersProvider::new().with_version("v4.0.0");
+    let provider = PluginsProvider::new().with_version("v4.0.0");
     assert_eq!(provider.version, "v4.0.0");
 
     let provider = provider.with_version("v5.0.0");
@@ -75,7 +75,7 @@ async fn test_with_version_changes_version() {
 async fn test_uninstall_when_not_installed_succeeds() {
     let temp = TempDir::new().unwrap();
     let context = create_test_context(&temp);
-    let provider = SuperpowersProvider::new();
+    let provider = PluginsProvider::new();
 
     // Uninstalling when nothing is installed should succeed gracefully
     let report = provider.uninstall(&context).await.unwrap();
@@ -92,7 +92,7 @@ async fn test_install_and_uninstall() {
     let context = create_test_context(&temp);
 
     // Use a test version
-    let provider = SuperpowersProvider::new().with_version("v4.1.1");
+    let provider = PluginsProvider::new().with_version("v4.1.1");
 
     // Install
     let report = provider.apply(&context).await.unwrap();

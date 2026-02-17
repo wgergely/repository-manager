@@ -42,8 +42,8 @@ pub enum Error {
     #[error("Failed to update Claude settings: {0}")]
     ClaudeSettings(String),
 
-    #[error("Superpowers not installed")]
-    SuperpowersNotInstalled,
+    #[error("Plugin not installed")]
+    PluginNotInstalled,
 }
 
 #[cfg(test)]
@@ -53,10 +53,10 @@ mod tests {
     #[test]
     fn test_git_clone_error_display() {
         let err = Error::GitClone {
-            url: "https://github.com/obra/superpowers".to_string(),
+            url: "https://github.com/anthropics/claude-code-plugins".to_string(),
             message: "network error".to_string(),
         };
-        assert!(err.to_string().contains("superpowers"));
+        assert!(err.to_string().contains("plugins"));
         assert!(err.to_string().contains("network error"));
     }
 

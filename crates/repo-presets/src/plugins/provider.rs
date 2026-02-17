@@ -1,25 +1,25 @@
-//! SuperpowersProvider implementation
+//! PluginsProvider implementation
 
 use crate::context::Context;
 use crate::error::Result;
 use crate::provider::{ActionType, ApplyReport, CheckReport, PresetProvider, PresetStatus};
 use async_trait::async_trait;
 
-/// Provider for the superpowers Claude Code plugin.
+/// Provider for Claude Code plugins.
 ///
 /// Handles cloning from GitHub and installing to Claude's plugin cache.
-pub struct SuperpowersProvider {
+pub struct PluginsProvider {
     /// Git repository URL
     pub repo_url: String,
     /// Version tag to install
     pub version: String,
 }
 
-impl SuperpowersProvider {
-    /// Create a new SuperpowersProvider with default settings.
+impl PluginsProvider {
+    /// Create a new PluginsProvider with default settings.
     pub fn new() -> Self {
         Self {
-            repo_url: super::paths::SUPERPOWERS_REPO.to_string(),
+            repo_url: super::paths::PLUGINS_REPO.to_string(),
             version: super::paths::DEFAULT_VERSION.to_string(),
         }
     }
@@ -30,7 +30,7 @@ impl SuperpowersProvider {
         self
     }
 
-    /// Uninstall superpowers plugin.
+    /// Uninstall the plugin.
     pub async fn uninstall(&self, _context: &Context) -> Result<ApplyReport> {
         let mut actions = Vec::new();
 
@@ -39,13 +39,13 @@ impl SuperpowersProvider {
             let plugin_key = format!("{}@{}", super::paths::PLUGIN_NAME, super::paths::MARKETPLACE_NAME);
 
             if super::settings::is_enabled(&settings_path, &plugin_key) {
-                super::settings::disable_superpowers(&settings_path, &plugin_key)?;
-                actions.push("Disabled superpowers in Claude settings".to_string());
+                super::settings::disable_plugin(&settings_path, &plugin_key)?;
+                actions.push("Disabled plugin in Claude settings".to_string());
             }
         }
 
         // Remove install directory
-        if let Some(install_dir) = super::paths::superpowers_install_dir(&self.version).filter(|d| d.exists()) {
+        if let Some(install_dir) = super::paths::plugin_install_dir(&self.version).filter(|d| d.exists()) {
             std::fs::remove_dir_all(&install_dir).map_err(|e| {
                 crate::error::Error::ClaudeSettings(format!(
                     "Failed to remove {}: {}", install_dir.display(), e
@@ -58,21 +58,21 @@ impl SuperpowersProvider {
     }
 }
 
-impl Default for SuperpowersProvider {
+impl Default for PluginsProvider {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[async_trait]
-impl PresetProvider for SuperpowersProvider {
+impl PresetProvider for PluginsProvider {
     fn id(&self) -> &str {
-        "claude:superpowers"
+        "claude:plugins"
     }
 
     async fn check(&self, _context: &Context) -> Result<CheckReport> {
-        // Check if superpowers is installed at the expected location
-        let install_dir = match super::paths::superpowers_install_dir(&self.version) {
+        // Check if plugin is installed at the expected location
+        let install_dir = match super::paths::plugin_install_dir(&self.version) {
             Some(dir) => dir,
             None => {
                 return Ok(CheckReport::broken("Cannot determine home directory"));
@@ -84,7 +84,7 @@ impl PresetProvider for SuperpowersProvider {
 
         if !plugin_json.exists() {
             return Ok(CheckReport::missing(format!(
-                "Superpowers {} not installed at {}",
+                "Plugin {} not installed at {}",
                 self.version,
                 install_dir.display()
             )));
@@ -135,7 +135,7 @@ impl PresetProvider for SuperpowersProvider {
         if is_disabled {
             return Ok(CheckReport {
                 status: PresetStatus::Drifted,
-                details: vec!["Superpowers is installed but disabled".to_string()],
+                details: vec!["Plugin is installed but disabled".to_string()],
                 action: ActionType::Repair,
             });
         }
@@ -147,7 +147,7 @@ impl PresetProvider for SuperpowersProvider {
         let mut actions = Vec::new();
 
         // Determine install directory
-        let install_dir = match super::paths::superpowers_install_dir(&self.version) {
+        let install_dir = match super::paths::plugin_install_dir(&self.version) {
             Some(dir) => dir,
             None => {
                 return Ok(ApplyReport::failure(vec![
@@ -159,7 +159,7 @@ impl PresetProvider for SuperpowersProvider {
         // Clone if not present
         if !install_dir.exists() {
             actions.push(format!(
-                "Cloning superpowers {} from {}",
+                "Cloning plugin {} from {}",
                 self.version, self.repo_url
             ));
 
@@ -167,7 +167,7 @@ impl PresetProvider for SuperpowersProvider {
 
             actions.push(format!("Installed to {}", install_dir.display()));
         } else {
-            actions.push(format!("Superpowers {} already installed", self.version));
+            actions.push(format!("Plugin {} already installed", self.version));
         }
 
         // Enable in Claude settings
@@ -179,8 +179,8 @@ impl PresetProvider for SuperpowersProvider {
             );
 
             if !super::settings::is_enabled(&settings_path, &plugin_key) {
-                super::settings::enable_superpowers(&settings_path, &plugin_key)?;
-                actions.push("Enabled superpowers in Claude settings".to_string());
+                super::settings::enable_plugin(&settings_path, &plugin_key)?;
+                actions.push("Enabled plugin in Claude settings".to_string());
             }
         }
 
@@ -194,19 +194,19 @@ mod tests {
 
     #[test]
     fn test_provider_id() {
-        let provider = SuperpowersProvider::new();
-        assert_eq!(provider.id(), "claude:superpowers");
+        let provider = PluginsProvider::new();
+        assert_eq!(provider.id(), "claude:plugins");
     }
 
     #[test]
     fn test_provider_default() {
-        let provider = SuperpowersProvider::default();
-        assert_eq!(provider.repo_url, super::super::paths::SUPERPOWERS_REPO);
+        let provider = PluginsProvider::default();
+        assert_eq!(provider.repo_url, super::super::paths::PLUGINS_REPO);
     }
 
     #[test]
     fn test_with_version() {
-        let provider = SuperpowersProvider::new().with_version("v4.0.0");
+        let provider = PluginsProvider::new().with_version("v4.0.0");
         assert_eq!(provider.version, "v4.0.0");
     }
 
@@ -224,7 +224,7 @@ mod tests {
         };
         let context = Context::new(layout, HashMap::new());
 
-        let provider = SuperpowersProvider::new();
+        let provider = PluginsProvider::new();
         let report = provider.check(&context).await.unwrap();
 
         assert_eq!(report.status, PresetStatus::Missing);
@@ -246,7 +246,7 @@ mod tests {
         };
         let context = Context::new(layout, HashMap::new());
 
-        let provider = SuperpowersProvider::new();
+        let provider = PluginsProvider::new();
         let report = provider.uninstall(&context).await.unwrap();
 
         // Should succeed even if nothing to uninstall

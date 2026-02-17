@@ -16,7 +16,7 @@ use repo_core::{
 };
 use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
 use repo_meta::Registry;
-use repo_presets::{Context, PresetProvider, SuperpowersProvider};
+use repo_presets::{Context, PresetProvider, PluginsProvider};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -53,10 +53,10 @@ pub async fn handle_tool_call(root: &Path, tool_name: &str, arguments: Value) ->
         "preset_add" => handle_preset_add(root, arguments).await,
         "preset_remove" => handle_preset_remove(root, arguments).await,
 
-        // Superpowers Plugin
-        "superpowers_install" => handle_superpowers_install(root, arguments).await,
-        "superpowers_status" => handle_superpowers_status(root).await,
-        "superpowers_uninstall" => handle_superpowers_uninstall(root, arguments).await,
+        // Plugins
+        "plugins_install" => handle_plugins_install(root, arguments).await,
+        "plugins_status" => handle_plugins_status(root).await,
+        "plugins_uninstall" => handle_plugins_uninstall(root, arguments).await,
 
         _ => Err(Error::UnknownTool(tool_name.to_string())),
     }
@@ -573,7 +573,7 @@ async fn handle_preset_remove(root: &Path, arguments: Value) -> Result<Value> {
 }
 
 // ============================================================================
-// Superpowers Plugin Handlers
+// Plugin Handlers
 // ============================================================================
 
 /// Create a preset context from the repository root
@@ -587,14 +587,14 @@ fn create_preset_context(root: &Path) -> Context {
     Context::new(layout, HashMap::new())
 }
 
-/// Handle superpowers_install - Install the superpowers Claude Code plugin
-async fn handle_superpowers_install(root: &Path, arguments: Value) -> Result<Value> {
+/// Handle plugins_install - Install a Claude Code plugin
+async fn handle_plugins_install(root: &Path, arguments: Value) -> Result<Value> {
     let version = arguments
         .get("version")
         .and_then(|v| v.as_str())
         .unwrap_or("latest");
 
-    let provider = SuperpowersProvider::new().with_version(version);
+    let provider = PluginsProvider::new().with_version(version);
     let context = create_preset_context(root);
 
     let check = provider
@@ -605,7 +605,7 @@ async fn handle_superpowers_install(root: &Path, arguments: Value) -> Result<Val
     if check.status == repo_presets::PresetStatus::Healthy {
         return Ok(json!({
             "success": true,
-            "message": format!("Superpowers {} is already installed and enabled", version),
+            "message": format!("Plugin {} is already installed and enabled", version),
             "status": "healthy",
         }));
     }
@@ -622,9 +622,9 @@ async fn handle_superpowers_install(root: &Path, arguments: Value) -> Result<Val
     }))
 }
 
-/// Handle superpowers_status - Check superpowers installation status
-async fn handle_superpowers_status(root: &Path) -> Result<Value> {
-    let provider = SuperpowersProvider::new();
+/// Handle plugins_status - Check plugin installation status
+async fn handle_plugins_status(root: &Path) -> Result<Value> {
+    let provider = PluginsProvider::new();
     let context = create_preset_context(root);
 
     let check = provider
@@ -640,14 +640,14 @@ async fn handle_superpowers_status(root: &Path) -> Result<Value> {
     }))
 }
 
-/// Handle superpowers_uninstall - Uninstall the superpowers plugin
-async fn handle_superpowers_uninstall(root: &Path, arguments: Value) -> Result<Value> {
+/// Handle plugins_uninstall - Uninstall a plugin
+async fn handle_plugins_uninstall(root: &Path, arguments: Value) -> Result<Value> {
     let version = arguments
         .get("version")
         .and_then(|v| v.as_str())
         .unwrap_or("latest");
 
-    let provider = SuperpowersProvider::new().with_version(version);
+    let provider = PluginsProvider::new().with_version(version);
     let context = create_preset_context(root);
 
     let report = provider

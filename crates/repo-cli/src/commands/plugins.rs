@@ -1,13 +1,13 @@
-//! Superpowers plugin management commands
+//! Plugin management commands
 
-use crate::cli::SuperpowersAction;
+use crate::cli::PluginsAction;
 use crate::error::{CliError, Result};
 use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
-use repo_presets::{Context, PresetProvider, PresetStatus, SuperpowersProvider};
+use repo_presets::{Context, PresetProvider, PresetStatus, PluginsProvider};
 use std::collections::HashMap;
 
-pub async fn handle_superpowers(action: SuperpowersAction) -> Result<()> {
-    // Create a minimal context (superpowers doesn't use project root)
+pub async fn handle_plugins(action: PluginsAction) -> Result<()> {
+    // Create a minimal context (plugins doesn't use project root)
     let current_dir = std::env::current_dir()?;
     let layout = WorkspaceLayout {
         root: NormalizedPath::new(&current_dir),
@@ -17,18 +17,18 @@ pub async fn handle_superpowers(action: SuperpowersAction) -> Result<()> {
     let context = Context::new(layout, HashMap::new());
 
     match action {
-        SuperpowersAction::Install { version } => {
-            let provider = SuperpowersProvider::new().with_version(&version);
+        PluginsAction::Install { version } => {
+            let provider = PluginsProvider::new().with_version(&version);
 
-            println!("Checking superpowers status...");
+            println!("Checking plugin status...");
             let check = provider.check(&context).await?;
 
             if check.status == PresetStatus::Healthy {
-                println!("Superpowers {} is already installed and enabled.", version);
+                println!("Plugin {} is already installed and enabled.", version);
                 return Ok(());
             }
 
-            println!("Installing superpowers {}...", version);
+            println!("Installing plugin {}...", version);
             let report = provider.apply(&context).await?;
 
             for action in &report.actions_taken {
@@ -36,7 +36,7 @@ pub async fn handle_superpowers(action: SuperpowersAction) -> Result<()> {
             }
 
             if report.success {
-                println!("Superpowers {} installed successfully!", version);
+                println!("Plugin {} installed successfully!", version);
             } else {
                 for err in &report.errors {
                     eprintln!("Error: {}", err);
@@ -45,20 +45,20 @@ pub async fn handle_superpowers(action: SuperpowersAction) -> Result<()> {
             }
         }
 
-        SuperpowersAction::Status => {
-            let provider = SuperpowersProvider::new();
+        PluginsAction::Status => {
+            let provider = PluginsProvider::new();
             let check = provider.check(&context).await?;
 
-            println!("Superpowers status: {:?}", check.status);
+            println!("Plugin status: {:?}", check.status);
             for detail in &check.details {
                 println!("  {}", detail);
             }
         }
 
-        SuperpowersAction::Uninstall { version } => {
-            let provider = SuperpowersProvider::new().with_version(&version);
+        PluginsAction::Uninstall { version } => {
+            let provider = PluginsProvider::new().with_version(&version);
 
-            println!("Uninstalling superpowers {}...", version);
+            println!("Uninstalling plugin {}...", version);
             let report = provider.uninstall(&context).await?;
 
             for action in &report.actions_taken {
@@ -66,7 +66,7 @@ pub async fn handle_superpowers(action: SuperpowersAction) -> Result<()> {
             }
 
             if report.success {
-                println!("Superpowers {} uninstalled.", version);
+                println!("Plugin {} uninstalled.", version);
             } else {
                 for err in &report.errors {
                     eprintln!("Error: {}", err);

@@ -1,4 +1,4 @@
-//! Git operations for superpowers installation
+//! Git operations for plugin installation
 
 use crate::error::{Error, Result};
 use std::path::Path;

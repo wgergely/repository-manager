@@ -7,7 +7,7 @@ pub mod init;
 pub mod list;
 pub mod rule;
 pub mod status;
-pub mod superpowers;
+pub mod plugins;
 pub mod sync;
 pub mod tool;
 

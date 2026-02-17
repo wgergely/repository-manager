@@ -15,7 +15,7 @@ use repo_git::{
     ClassicLayout, ContainerLayout, LayoutProvider, NamingStrategy, naming::branch_to_directory,
 };
 use repo_meta::load_config;
-use repo_presets::{Context, PresetProvider, PresetStatus, SuperpowersProvider, UvProvider};
+use repo_presets::{Context, PresetProvider, PresetStatus, PluginsProvider, UvProvider};
 use repo_tools::{
     Rule, SyncContext, ToolIntegration, VSCodeIntegration, antigravity_integration,
     claude_integration, cursor_integration, gemini_integration, windsurf_integration,
@@ -604,27 +604,27 @@ mod m5_presets {
         assert_eq!(registry.get_provider("env:nonexistent"), None);
     }
 
-    /// M5.5: Superpowers provider ID
+    /// M5.5: Plugins provider ID
     #[test]
-    fn m5_5_superpowers_provider_id() {
-        let provider = SuperpowersProvider::new();
-        assert_eq!(provider.id(), "claude:superpowers");
+    fn m5_5_plugins_provider_id() {
+        let provider = PluginsProvider::new();
+        assert_eq!(provider.id(), "claude:plugins");
     }
 
-    /// M5.6: Registry has superpowers provider
+    /// M5.6: Registry has plugins provider
     #[test]
-    fn m5_6_registry_has_superpowers_provider() {
+    fn m5_6_registry_has_plugins_provider() {
         let registry = repo_meta::Registry::with_builtins();
-        assert!(registry.has_provider("claude:superpowers"));
+        assert!(registry.has_provider("claude:plugins"));
         assert_eq!(
-            registry.get_provider("claude:superpowers"),
-            Some(&"superpowers".to_string())
+            registry.get_provider("claude:plugins"),
+            Some(&"plugins".to_string())
         );
     }
 
-    /// M5.7: Superpowers check returns non-healthy when not installed
+    /// M5.7: Plugins check returns non-healthy when not installed
     #[tokio::test]
-    async fn m5_7_superpowers_check_not_installed() {
+    async fn m5_7_plugins_check_not_installed() {
         let repo = TestRepo::new();
         let layout = WorkspaceLayout {
             root: NormalizedPath::new(repo.root()),
@@ -633,7 +633,7 @@ mod m5_presets {
         };
 
         let context = Context::new(layout, HashMap::new());
-        let provider = SuperpowersProvider::new();
+        let provider = PluginsProvider::new();
 
         let report = provider.check(&context).await.unwrap();
 
