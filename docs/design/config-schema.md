@@ -6,140 +6,140 @@ The `.repository` directory serves as the **Single Source of Truth (SSOT)** for 
 
 ## Directory Structure
 
-We adopt a modular, file-based configuration approach using **TOML** for its strong typing and readability.
+We adopt a modular, file-based configuration approach using **TOML** for the manifest and **Markdown** for rule files.
 
 ```text
 .repository/
-├── config.toml           # The primary manifest (Enabled tools, presets, mode)
-├── state.lock            # (Optional) Computed state to track sync status
-├── tools/                # Registry of available tools and their integration logic
-│   ├── claude.toml
-│   ├── rules.toml        # (Alternatively, rules logic can vary)
-│   └── vscode.toml
-├── rules/                # Definitions of prompts/behaviors to enforce
-│   ├── python-style.toml
-│   └── no-api-keys.toml
-└── presets/              # Collections of rules/tools for stacks
-    ├── python-web.toml
-    └── rust-cli.toml
+├── config.toml           # The primary manifest (enabled tools, presets, mode)
+├── tools/                # Custom tool definitions (TOML); built-in tools are compiled in
+│   └── my-custom-tool.toml
+├── rules/                # Rule files created by `repo add-rule`
+│   ├── python-style.md
+│   └── no-api-keys.md
+└── presets/              # Custom preset definitions (TOML); built-in presets are compiled in
+    └── my-custom-preset.toml
 ```
 
 ## 1. The Manifest (`config.toml`)
 
-This file defines the high-level configuration of the repository.
+This file defines the high-level configuration of the repository. Tools and rules are top-level arrays. The `[core]` section contains only the workspace mode. Presets are defined as `[presets."type:name"]` table entries.
 
 ```toml
+tools = ["claude", "cursor", "vscode"]
+rules = ["python-style", "no-api-keys"]
+
 [core]
-# Version of the repo-manager schema
-version = "1.0"
-# "standard" or "worktrees"
 mode = "worktrees"
 
-[project]
-name = "repository-manager"
-slug = "repo-man"
-
-[active]
-# Tools that are enabled for this workspace. 
-# The CLI will read schemas from .repository/tools/<name>.toml
-tools = ["claude", "cursor", "vscode", "kdb"]
-
-# Presets apply a bundle of tools and initial rules
-# Can be a simple list of names (using defaults)
-presets = ["rust", "agentic-core"]
-
-[presets.config]
-# Or detailed configuration for specific presets
-"env:python" = { provider = "uv", version = "3.12" }
-
-
-[sync]
-# Strategy for updating files: 'overwrite', 'merge', 'smart-append'
-strategy = "smart-append"
+[presets]
+"env:python" = { version = "3.12" }
+"rust" = {}
 ```
 
-## 2. Tool Registration (`tools/*.toml`)
+### Manifest Fields
 
-Each file in `tools/` defines a tool's capabilities and how the manager should interact with it.
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `tools` | `string[]` | No | `[]` | List of tool slugs to enable (e.g., `"claude"`, `"vscode"`) |
+| `rules` | `string[]` | No | `[]` | List of rule IDs to apply |
+| `core.mode` | `string` | No | `"worktrees"` | Workspace mode: `"standard"` or `"worktrees"` |
+| `presets.<key>` | `table` | No | - | Preset configurations keyed by `"type:name"` |
 
-**Example: `tools/claude.toml`**
+> **Note:** The `tools` and `rules` arrays must appear before any `[section]` headers in the TOML file, since they are top-level keys.
+
+## 2. Tool Registration
+
+The 13 built-in tools are compiled into the binary via `repo-tools::registry`. They do not require TOML files on disk. Custom tools can be placed in `.repository/tools/` as TOML files and are loaded by the `DefinitionLoader` in `repo-meta`.
+
+The `ToolDefinition` struct (in `repo-meta::schema`) defines the schema for both built-in and custom tool definitions:
+
+**Example: `tools/my-custom-tool.toml`**
 
 ```toml
 [meta]
-name = "Claude Desktop"
-slug = "claude-desktop"
-description = "Anthropic's Claude Desktop App"
+name = "My Custom Tool"
+slug = "my-custom-tool"
+description = "A custom tool integration"
 
 [integration]
-# Helper methods the CLI uses to find the config
-config_path = ".claude/config.json"
-type = "json"
-
-[capabilities]
-# Does this tool support system prompt injection?
-supports_custom_instructions = true
-# Does it support MCP servers?
-supports_mcp = true
-
-[schema.keys]
-# Mapping generic concepts to tool-specific JSON keys
-instruction_key = "global_instructions"
-mcp_key = "mcpServers"
-```
-
-**Example: `tools/cursor.toml`**
-
-```toml
-[meta]
-name = "Cursor"
-slug = "cursor"
-
-[integration]
-config_path = ".cursorrules"
-type = "text" # Plain text file
+config_path = ".my-tool-config"
+type = "text"
+additional_paths = []
 
 [capabilities]
 supports_custom_instructions = true
 supports_mcp = false
+supports_rules_directory = false
+
+[schema]
+instruction_key = "instructions"
 ```
 
-## 3. Rule Definitions (`rules/*.toml`)
+### Built-in Tool Examples
 
-Rules capture specific behaviors, constraints, or stylistic preferences. They are abstract enough to be unrolled to different tools.
+The Claude integration uses `CLAUDE.md` (markdown type) and `.claude/rules/` as its additional path. The Cursor integration uses `.cursorrules` (text type).
 
-**Example: `rules/code-style-python.toml`**
+### Supported Config Types
+
+| Type | Extension | Description |
+|------|-----------|-------------|
+| `text` | `.cursorrules`, etc. | Plain text files with managed block markers |
+| `json` | `.json` | Structured JSON merge with `__repo_managed__` key |
+| `toml` | `.toml` | TOML configuration files |
+| `yaml` | `.yaml`, `.yml` | YAML configuration files |
+| `markdown` | `.md` | Markdown files (e.g., `CLAUDE.md`) |
+
+## 3. Rule Files (`rules/*.md`)
+
+Rules capture specific behaviors, constraints, or stylistic preferences. The CLI `add-rule` command creates rules as Markdown files in `.repository/rules/`.
+
+**Example: creating a rule via CLI**
+
+```bash
+repo add-rule python-snake-case "All Python variable names must use snake_case." --tag python --tag style
+```
+
+This creates `.repository/rules/python-snake-case.md`:
+
+```markdown
+tags: python, style
+
+All Python variable names must use snake_case.
+```
+
+The `DefinitionLoader` in `repo-meta` also supports loading structured TOML rule definitions from `.repository/rules/*.toml` for advanced use cases. The TOML format matches the `RuleDefinition` struct:
+
+**Example: `rules/python-snake-case.toml`**
 
 ```toml
 [meta]
 id = "python-snake-case"
-severity = "mandatory" # mandatory, suggestion
+severity = "mandatory" # mandatory, suggestion (default: suggestion)
 tags = ["python", "style"]
 
 [content]
-# The core instruction text
 instruction = """
-All Python variable names and function names must use snake_case. 
+All Python variable names and function names must use snake_case.
 Classes should use PascalCase.
 """
 
 [examples]
-# Provide few-shot examples that tools can use
 positive = ["my_variable = 1", "def my_function():"]
 negative = ["myVariable = 1", "def myFunction():"]
 
 [targets]
-# Paths this rule applies to
 files = ["**/*.py"]
 ```
 
 ## 4. Presets (`presets/*.toml`)
 
-Presets allow bulk-enabling of rules and tools.
+Presets allow bulk-enabling of rules and tools. Built-in preset providers are compiled into the binary via `repo-presets`. Custom presets can be placed in `.repository/presets/` as TOML files.
 
 **Example: `presets/python-agentic.toml`**
 
 ```toml
 [meta]
+id = "python-agentic"
 description = "Standard setup for Python Agentic development"
 
 [requires]
@@ -155,114 +155,168 @@ include = [
 
 ## 5. The Sync Process ("Unroll")
 
-The `repo sync` command generates config files while preserving user changes through managed strategies.
+The `repo sync` command generates tool config files while preserving user content through managed blocks.
 
-**Text Files (e.g., `.cursorrules`)**:
-We use "Managed Blocks". The CLI only edits content between specific markers.
+Each rule is assigned a UUID (stored in `.repository/rules/registry.toml`). The UUID is used as the managed block marker in tool config files, allowing individual rules to be inserted, updated, or removed independently.
 
-```text
-# .cursorrules
+### Managed Block Formats
 
+**Markdown/Text Files** (e.g., `CLAUDE.md`, `.cursorrules`):
+
+Uses HTML comment markers with UUID-based block identifiers:
+
+```markdown
 # User content can go here...
 Always be concise.
 
-# --- REPO-MANAGER-START: managed-rules --
-# DO NOT EDIT THIS SECTION MANUALLY.
-# Generated from: .repository/rules/
-
-1. (python-snake-case) All Python variable names must use snake_case.
-2. (no-api-keys) Never commit API keys.
-
-# --- REPO-MANAGER-END ---
+<!-- repo:block:550e8400-e29b-41d4-a716-446655440000 -->
+All Python variable names must use snake_case.
+<!-- /repo:block:550e8400-e29b-41d4-a716-446655440000 -->
 ```
 
-**JSON Files (e.g., `.claude/config.json`)**:
-For JSON, we perform structured merges on manager-owned keys, appending or replacing labeled sections.
+**YAML/TOML Files**:
 
-### State Tracking (`state.lock`)
+Uses hash-comment markers:
 
-To robustly handle `remove-rule` operations, we must know what we previously wrote.
-`state.lock` tracks the mapping of `Rule ID` -> `Applied Checksum/Version`.
+```yaml
+# repo:block:550e8400-e29b-41d4-a716-446655440000
+some_key: managed_value
+# /repo:block:550e8400-e29b-41d4-a716-446655440000
+```
 
-```toml
-# .repository/state.lock
-[sync_status]
-last_run = "2026-01-23T12:00:00Z"
+**JSON Files** (e.g., `.vscode/settings.json`):
 
-[installed_files]
-".cursorrules" = "hash_of_managed_block"
-".claude/config.json" = "hash_of_managed_json_keys"
+Uses a reserved `__repo_managed__` key to store managed blocks:
 
-[active_rules]
-python-snake-case = "v1"
+```json
+{
+  "user_setting": true,
+  "__repo_managed__": {
+    "550e8400-e29b-41d4-a716-446655440000": {
+      "content": "managed value"
+    }
+  }
+}
 ```
 
 ## Summary of Workflow
 
-1. **User runs**: `repo add-rule "Use snake_case" --tag python`
-2. **CLI creates**: `.repository/rules/use-snake-case.toml`
+1. **User runs**: `repo add-rule python-style "Use snake_case" --tag python`
+2. **CLI creates**: `.repository/rules/python-style.md`
 3. **User runs**: `repo sync`
 4. **CLI**:
-    * Reads `config.toml` -> sees `tools=["cursor"]`.
-    * Reads `tools/cursor.toml` -> sees `config_path=".cursorrules"`, `type="text"`.
-    * Reads `rules/*.toml`.
-    * Generates a text block containing the instructions.
-    * Updates `.cursorrules` (between markers).
-    * Updates `state.lock`.
-
-This schema aligns with the Rust-based modular architecture and supports the requested modularity and unroll capabilities.
+    * Reads `config.toml` -> sees `tools = ["cursor"]`.
+    * Looks up tool integration (built-in or from `tools/*.toml`) -> gets `config_path = ".cursorrules"`, `type = "text"`.
+    * Reads rules from `.repository/rules/`.
+    * Generates managed blocks containing the rule instructions (keyed by UUID).
+    * Updates `.cursorrules` (inserting/updating managed blocks, preserving user content).
 
 ## 6. Rust Data Structures
 
-To verify feasibility, here is how the schema maps to Rust structs using `serde`.
+The following structs show how the schema maps to Rust types. These match the actual implementation.
+
+### Manifest (`repo-core::config::Manifest`)
 
 ```rust
-// config.toml
-#[derive(Debug, Deserialize, Serialize)]
-pub struct RepositoryConfig {
-    pub core: CoreConfig,
-    pub active: ActiveConfig,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct CoreConfig {
-    pub version: String,
-    pub mode: RepositoryMode, // Enum: Normal, Worktree
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ActiveConfig {
+// config.toml - from repo-core/src/config/manifest.rs
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Manifest {
+    #[serde(default)]
+    pub core: CoreSection,
+    #[serde(default)]
+    pub presets: HashMap<String, Value>,
+    #[serde(default)]
     pub tools: Vec<String>,
-    pub presets: Vec<String>,
+    #[serde(default)]
+    pub rules: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct PresetConfig {
-    #[serde(flatten)]
-    pub overrides: HashMap<String, toml::Value>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoreSection {
+    #[serde(default = "default_mode")]
+    pub mode: String,  // "standard" or "worktrees", default "worktrees"
 }
+```
 
-// tools/*.toml
-#[derive(Debug, Deserialize, Serialize)]
+### Tool Definition (`repo-meta::schema::ToolDefinition`)
+
+```rust
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ToolDefinition {
     pub meta: ToolMeta,
-    pub integration: ToolIntegration,
+    pub integration: ToolIntegrationConfig,
+    #[serde(default)]
     pub capabilities: ToolCapabilities,
+    #[serde(default, rename = "schema")]
+    pub schema_keys: Option<ToolSchemaKeys>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ToolIntegration {
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ToolMeta {
+    pub name: String,
+    pub slug: String,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ToolIntegrationConfig {
     pub config_path: String,
     #[serde(rename = "type")]
-    pub config_type: ConfigType, // Enum: Json, Text, Toml
+    pub config_type: ConfigType, // text, json, toml, yaml, markdown
+    #[serde(default)]
+    pub additional_paths: Vec<String>,
 }
 
-// rules/*.toml
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct ToolCapabilities {
+    #[serde(default)]
+    pub supports_custom_instructions: bool,
+    #[serde(default)]
+    pub supports_mcp: bool,
+    #[serde(default)]
+    pub supports_rules_directory: bool,
+}
+```
+
+### Rule Definition (`repo-meta::schema::RuleDefinition`)
+
+```rust
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RuleDefinition {
     pub meta: RuleMeta,
     pub content: RuleContent,
+    #[serde(default)]
     pub examples: Option<RuleExamples>,
+    #[serde(default)]
     pub targets: Option<RuleTargets>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RuleMeta {
+    pub id: String,
+    #[serde(default)]
+    pub severity: Severity,  // suggestion (default), mandatory
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RuleContent {
+    pub instruction: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct RuleExamples {
+    #[serde(default)]
+    pub positive: Vec<String>,
+    #[serde(default)]
+    pub negative: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct RuleTargets {
+    #[serde(default, rename = "files")]
+    pub file_patterns: Vec<String>,
 }
 ```
