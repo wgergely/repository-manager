@@ -19,9 +19,16 @@ const CONFIG_PATH: &str = ".repository/config.toml";
 
 /// Run the add-tool command
 ///
-/// Adds a tool to the repository's config.toml
-pub fn run_add_tool(path: &Path, name: &str) -> Result<()> {
-    println!("{} Adding tool: {}", "=>".blue().bold(), name.cyan());
+/// Adds a tool to the repository's config.toml.
+/// When `dry_run` is true, shows what would happen without modifying files.
+pub fn run_add_tool(path: &Path, name: &str, dry_run: bool) -> Result<()> {
+    let prefix = if dry_run { "[dry run] " } else { "" };
+    println!(
+        "{}{} Adding tool: {}",
+        prefix,
+        "=>".blue().bold(),
+        name.cyan()
+    );
 
     // Validate tool name
     let tool_registry = ToolRegistry::with_builtins();
@@ -37,19 +44,30 @@ pub fn run_add_tool(path: &Path, name: &str) -> Result<()> {
     let config_path = NormalizedPath::new(path.join(CONFIG_PATH));
 
     // Load existing manifest or create empty one
-    let mut manifest = load_manifest(&config_path)?;
+    let manifest = load_manifest(&config_path)?;
 
     // Check if tool already exists
     if manifest.tools.contains(&name.to_string()) {
         println!(
-            "{} Tool {} is already configured.",
+            "{}{} Tool {} is already configured.",
+            prefix,
             "OK".green().bold(),
             name.cyan()
         );
         return Ok(());
     }
 
+    if dry_run {
+        println!(
+            "{}Would add tool '{}' to config.toml",
+            prefix, name
+        );
+        println!("{}Would trigger sync to generate tool configurations", prefix);
+        return Ok(());
+    }
+
     // Add the tool
+    let mut manifest = manifest;
     manifest.tools.push(name.to_string());
 
     // Save the manifest
@@ -65,17 +83,34 @@ pub fn run_add_tool(path: &Path, name: &str) -> Result<()> {
 
 /// Run the remove-tool command
 ///
-/// Removes a tool from the repository's config.toml
-pub fn run_remove_tool(path: &Path, name: &str) -> Result<()> {
-    println!("{} Removing tool: {}", "=>".blue().bold(), name.cyan());
+/// Removes a tool from the repository's config.toml.
+/// When `dry_run` is true, shows what would happen without modifying files.
+pub fn run_remove_tool(path: &Path, name: &str, dry_run: bool) -> Result<()> {
+    let prefix = if dry_run { "[dry run] " } else { "" };
+    println!(
+        "{}{} Removing tool: {}",
+        prefix,
+        "=>".blue().bold(),
+        name.cyan()
+    );
 
     let config_path = NormalizedPath::new(path.join(CONFIG_PATH));
 
     // Load existing manifest
-    let mut manifest = load_manifest(&config_path)?;
+    let manifest = load_manifest(&config_path)?;
 
     // Check if tool exists
     if let Some(pos) = manifest.tools.iter().position(|t| t == name) {
+        if dry_run {
+            println!(
+                "{}Would remove tool '{}' from config.toml",
+                prefix, name
+            );
+            println!("{}Would trigger sync to update tool configurations", prefix);
+            return Ok(());
+        }
+
+        let mut manifest = manifest;
         manifest.tools.remove(pos);
         save_manifest(&config_path, &manifest)?;
         println!("{} Tool {} removed.", "OK".green().bold(), name.cyan());
@@ -84,7 +119,8 @@ pub fn run_remove_tool(path: &Path, name: &str) -> Result<()> {
         trigger_sync_and_report(path)?;
     } else {
         println!(
-            "{} Tool {} not found in configuration.",
+            "{}{} Tool {} not found in configuration.",
+            prefix,
             "WARN".yellow().bold(),
             name.cyan()
         );
@@ -95,9 +131,16 @@ pub fn run_remove_tool(path: &Path, name: &str) -> Result<()> {
 
 /// Run the add-preset command
 ///
-/// Adds a preset to the repository's config.toml
-pub fn run_add_preset(path: &Path, name: &str) -> Result<()> {
-    println!("{} Adding preset: {}", "=>".blue().bold(), name.cyan());
+/// Adds a preset to the repository's config.toml.
+/// When `dry_run` is true, shows what would happen without modifying files.
+pub fn run_add_preset(path: &Path, name: &str, dry_run: bool) -> Result<()> {
+    let prefix = if dry_run { "[dry run] " } else { "" };
+    println!(
+        "{}{} Adding preset: {}",
+        prefix,
+        "=>".blue().bold(),
+        name.cyan()
+    );
 
     // Validate preset name
     let registry = Registry::with_builtins();
@@ -113,19 +156,29 @@ pub fn run_add_preset(path: &Path, name: &str) -> Result<()> {
     let config_path = NormalizedPath::new(path.join(CONFIG_PATH));
 
     // Load existing manifest or create empty one
-    let mut manifest = load_manifest(&config_path)?;
+    let manifest = load_manifest(&config_path)?;
 
     // Check if preset already exists
     if manifest.presets.contains_key(name) {
         println!(
-            "{} Preset {} is already configured.",
+            "{}{} Preset {} is already configured.",
+            prefix,
             "OK".green().bold(),
             name.cyan()
         );
         return Ok(());
     }
 
+    if dry_run {
+        println!(
+            "{}Would add preset '{}' to config.toml",
+            prefix, name
+        );
+        return Ok(());
+    }
+
     // Add the preset with an empty object
+    let mut manifest = manifest;
     manifest
         .presets
         .insert(name.to_string(), serde_json::json!({}));
@@ -139,22 +192,40 @@ pub fn run_add_preset(path: &Path, name: &str) -> Result<()> {
 
 /// Run the remove-preset command
 ///
-/// Removes a preset from the repository's config.toml
-pub fn run_remove_preset(path: &Path, name: &str) -> Result<()> {
-    println!("{} Removing preset: {}", "=>".blue().bold(), name.cyan());
+/// Removes a preset from the repository's config.toml.
+/// When `dry_run` is true, shows what would happen without modifying files.
+pub fn run_remove_preset(path: &Path, name: &str, dry_run: bool) -> Result<()> {
+    let prefix = if dry_run { "[dry run] " } else { "" };
+    println!(
+        "{}{} Removing preset: {}",
+        prefix,
+        "=>".blue().bold(),
+        name.cyan()
+    );
 
     let config_path = NormalizedPath::new(path.join(CONFIG_PATH));
 
     // Load existing manifest
-    let mut manifest = load_manifest(&config_path)?;
+    let manifest = load_manifest(&config_path)?;
 
     // Check if preset exists
-    if manifest.presets.remove(name).is_some() {
+    if manifest.presets.contains_key(name) {
+        if dry_run {
+            println!(
+                "{}Would remove preset '{}' from config.toml",
+                prefix, name
+            );
+            return Ok(());
+        }
+
+        let mut manifest = manifest;
+        manifest.presets.remove(name);
         save_manifest(&config_path, &manifest)?;
         println!("{} Preset {} removed.", "OK".green().bold(), name.cyan());
     } else {
         println!(
-            "{} Preset {} not found in configuration.",
+            "{}{} Preset {} not found in configuration.",
+            prefix,
             "WARN".yellow().bold(),
             name.cyan()
         );
@@ -272,7 +343,7 @@ mode = "standard"
         );
 
         // Add a tool
-        let result = run_add_tool(path, "eslint");
+        let result = run_add_tool(path, "eslint", false);
         assert!(result.is_ok());
 
         // Verify tool was added
@@ -296,7 +367,7 @@ mode = "standard"
         );
 
         // Add another tool
-        let result = run_add_tool(path, "eslint");
+        let result = run_add_tool(path, "eslint", false);
         assert!(result.is_ok());
 
         // Verify both tools exist
@@ -321,7 +392,7 @@ mode = "standard"
         );
 
         // Add duplicate tool - should succeed without duplicating
-        let result = run_add_tool(path, "eslint");
+        let result = run_add_tool(path, "eslint", false);
         assert!(result.is_ok());
 
         // Parse and verify only one instance
@@ -346,7 +417,7 @@ mode = "standard"
         );
 
         // Remove a tool
-        let result = run_remove_tool(path, "eslint");
+        let result = run_remove_tool(path, "eslint", false);
         assert!(result.is_ok());
 
         // Verify tool was removed
@@ -371,7 +442,7 @@ mode = "standard"
         );
 
         // Remove non-existent tool - should succeed with warning
-        let result = run_remove_tool(path, "eslint");
+        let result = run_remove_tool(path, "eslint", false);
         assert!(result.is_ok());
 
         // Config should be unchanged
@@ -393,7 +464,7 @@ mode = "standard"
         );
 
         // Add a preset
-        let result = run_add_preset(path, "typescript");
+        let result = run_add_preset(path, "typescript", false);
         assert!(result.is_ok());
 
         // Verify preset was added with [presets] section
@@ -419,7 +490,7 @@ mode = "standard"
         );
 
         // Add another preset
-        let result = run_add_preset(path, "typescript");
+        let result = run_add_preset(path, "typescript", false);
         assert!(result.is_ok());
 
         // Verify both presets exist
@@ -447,7 +518,7 @@ mode = "standard"
         );
 
         // Remove a preset
-        let result = run_remove_preset(path, "typescript");
+        let result = run_remove_preset(path, "typescript", false);
         assert!(result.is_ok());
 
         // Verify preset was removed
@@ -473,7 +544,7 @@ mode = "standard"
         );
 
         // Remove non-existent preset - should succeed with warning
-        let result = run_remove_preset(path, "typescript");
+        let result = run_remove_preset(path, "typescript", false);
         assert!(result.is_ok());
 
         // Config should still have react
@@ -487,7 +558,7 @@ mode = "standard"
         let path = temp_dir.path();
 
         // No config.toml exists
-        let result = run_add_tool(path, "eslint");
+        let result = run_add_tool(path, "eslint", false);
         assert!(result.is_err());
 
         let err = result.unwrap_err();
@@ -526,5 +597,74 @@ mode = "standard"
         assert!(content.contains("tools = [\"eslint\", \"prettier\"]"));
         assert!(content.contains("[presets]"));
         assert!(content.contains("\"typescript\" = {}"));
+    }
+
+    #[test]
+    fn test_add_tool_dry_run_does_not_modify_config() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path();
+
+        let initial_config = "[core]\nmode = \"standard\"\n";
+        create_test_config(path, initial_config);
+
+        let result = run_add_tool(path, "eslint", true);
+        assert!(result.is_ok());
+
+        // Config should be unchanged
+        let content = read_config(path);
+        assert_eq!(content, initial_config);
+        assert!(!content.contains("eslint"));
+    }
+
+    #[test]
+    fn test_remove_tool_dry_run_does_not_modify_config() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path();
+
+        let initial_config = "tools = [\"eslint\", \"prettier\"]\n\n[core]\nmode = \"standard\"\n";
+        create_test_config(path, initial_config);
+
+        let result = run_remove_tool(path, "eslint", true);
+        assert!(result.is_ok());
+
+        // Config should still contain eslint
+        let content = read_config(path);
+        assert!(content.contains("eslint"));
+        assert!(content.contains("prettier"));
+    }
+
+    #[test]
+    fn test_add_preset_dry_run_does_not_modify_config() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path();
+
+        let initial_config = "[core]\nmode = \"standard\"\n";
+        create_test_config(path, initial_config);
+
+        let result = run_add_preset(path, "typescript", true);
+        assert!(result.is_ok());
+
+        // Config should be unchanged
+        let content = read_config(path);
+        assert_eq!(content, initial_config);
+        assert!(!content.contains("typescript"));
+    }
+
+    #[test]
+    fn test_remove_preset_dry_run_does_not_modify_config() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path();
+
+        let initial_config =
+            "[core]\nmode = \"standard\"\n\n[presets]\n\"typescript\" = {}\n\"react\" = {}\n";
+        create_test_config(path, initial_config);
+
+        let result = run_remove_preset(path, "typescript", true);
+        assert!(result.is_ok());
+
+        // Config should still contain typescript
+        let content = read_config(path);
+        assert!(content.contains("typescript"));
+        assert!(content.contains("react"));
     }
 }
