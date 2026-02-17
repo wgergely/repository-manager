@@ -25,15 +25,19 @@ We adopt a modular, file-based configuration approach using **TOML** for the man
 This file defines the high-level configuration of the repository. Tools and rules are top-level arrays. The `[core]` section contains only the workspace mode. Presets are defined as `[presets."type:name"]` table entries.
 
 ```toml
-tools = ["claude", "cursor", "vscode"]
+# Top-level arrays: tools and rules to enable
+tools = ["cursor", "claude", "vscode"]
 rules = ["python-style", "no-api-keys"]
 
 [core]
-mode = "worktrees"
+mode = "standard"  # or "worktrees" (default: "worktrees")
 
-[presets]
-"env:python" = { version = "3.12" }
-"rust" = {}
+[presets."env:python"]
+version = "3.12"
+provider = "uv"
+
+[presets."env:node"]
+version = "20"
 ```
 
 ### Manifest Fields
@@ -218,29 +222,40 @@ The following structs show how the schema maps to Rust types. These match the ac
 ### Manifest (`repo-core::config::Manifest`)
 
 ```rust
-// config.toml - from repo-core/src/config/manifest.rs
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Manifest {
-    #[serde(default)]
-    pub core: CoreSection,
-    #[serde(default)]
-    pub presets: HashMap<String, Value>,
-    #[serde(default)]
-    pub tools: Vec<String>,
-    #[serde(default)]
-    pub rules: Vec<String>,
-}
-
+/// Core configuration section
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoreSection {
-    #[serde(default = "default_mode")]
-    pub mode: String,  // "standard" or "worktrees", default "worktrees"
+    /// Repository mode: "standard" or "worktrees"
+    #[serde(default = "default_mode")]  // defaults to "worktrees"
+    pub mode: String,
+}
+
+/// Repository configuration manifest parsed from config.toml
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Manifest {
+    /// Core settings
+    #[serde(default)]
+    pub core: CoreSection,
+
+    /// Preset configurations keyed by "type:name"
+    /// e.g., "env:python", "tool:linter", "config:editor"
+    #[serde(default)]
+    pub presets: HashMap<String, serde_json::Value>,
+
+    /// List of tool slugs to configure
+    #[serde(default)]
+    pub tools: Vec<String>,
+
+    /// List of rule IDs to apply
+    #[serde(default)]
+    pub rules: Vec<String>,
 }
 ```
 
 ### Tool Definition (`repo-meta::schema::ToolDefinition`)
 
 ```rust
+/// Complete tool definition loaded from TOML
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ToolDefinition {
     pub meta: ToolMeta,
@@ -282,6 +297,7 @@ pub struct ToolCapabilities {
 ### Rule Definition (`repo-meta::schema::RuleDefinition`)
 
 ```rust
+/// Complete rule definition loaded from TOML
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RuleDefinition {
     pub meta: RuleMeta,
