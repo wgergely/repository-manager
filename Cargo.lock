@@ -1562,6 +1562,7 @@ dependencies = [
  "colored",
  "dialoguer",
  "predicates",
+ "repo-agent",
  "repo-core",
  "repo-fs",
  "repo-git",
