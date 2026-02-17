@@ -3,6 +3,7 @@
 pub mod branch;
 pub mod diff;
 pub mod git;
+pub mod governance;
 pub mod init;
 pub mod list;
 pub mod rule;
@@ -14,6 +15,7 @@ pub mod tool;
 pub use branch::{run_branch_add, run_branch_checkout, run_branch_list, run_branch_remove};
 pub use diff::run_diff;
 pub use git::{run_merge, run_pull, run_push};
+pub use governance::{run_rules_diff, run_rules_export, run_rules_import, run_rules_lint};
 pub use init::run_init;
 pub use list::{run_list_presets, run_list_tools};
 pub use rule::{run_add_rule, run_list_rules, run_remove_rule};
