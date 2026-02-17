@@ -16,7 +16,7 @@ use colored::Colorize;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-use cli::{BranchAction, Cli, Commands, SuperpowersAction};
+use cli::{BranchAction, Cli, Commands, ConfigAction, SuperpowersAction};
 use error::Result;
 
 fn main() {
@@ -87,6 +87,8 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::Push { remote, branch } => cmd_push(remote, branch),
         Commands::Pull { remote, branch } => cmd_pull(remote, branch),
         Commands::Merge { source } => cmd_merge(&source),
+        Commands::Config { action } => cmd_config(action),
+        Commands::ToolInfo { name } => cmd_tool_info(&name),
         Commands::Superpowers { action } => cmd_superpowers(action),
     }
 }
@@ -218,6 +220,18 @@ fn cmd_pull(remote: Option<String>, branch: Option<String>) -> Result<()> {
 fn cmd_merge(source: &str) -> Result<()> {
     let cwd = std::env::current_dir()?;
     commands::run_merge(&cwd, source)
+}
+
+fn cmd_config(action: ConfigAction) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    match action {
+        ConfigAction::Show { json } => commands::config::run_config_show(&cwd, json),
+    }
+}
+
+fn cmd_tool_info(name: &str) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::config::run_tool_info(&cwd, name)
 }
 
 fn cmd_superpowers(action: SuperpowersAction) -> Result<()> {

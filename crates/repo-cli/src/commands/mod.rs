@@ -1,6 +1,7 @@
 //! Command implementations for repo-cli
 
 pub mod branch;
+pub mod config;
 pub mod diff;
 pub mod git;
 pub mod init;

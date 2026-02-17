@@ -166,7 +166,7 @@ pub fn run_remove_preset(path: &Path, name: &str) -> Result<()> {
 /// Load a manifest from the config file
 ///
 /// If the file doesn't exist, returns an error.
-fn load_manifest(path: &NormalizedPath) -> Result<Manifest> {
+pub fn load_manifest(path: &NormalizedPath) -> Result<Manifest> {
     let native_path = path.to_native();
 
     if !native_path.exists() {
