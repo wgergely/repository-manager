@@ -224,6 +224,22 @@ pub enum Commands {
         shell: Shell,
     },
 
+    /// Manage repository configuration
+    Config {
+        /// Config action to perform
+        #[command(subcommand)]
+        action: ConfigAction,
+    },
+
+    /// Show detailed information about a tool
+    ///
+    /// Displays metadata, config paths, capabilities, and whether
+    /// the tool is active in the current project.
+    ToolInfo {
+        /// Tool name (e.g., "claude", "cursor", "vscode")
+        name: String,
+    },
+
     /// Manage plugins
     Plugins {
         #[command(subcommand)]
@@ -266,6 +282,17 @@ pub enum BranchAction {
 
         /// New branch name
         new: String,
+    },
+}
+
+/// Configuration management actions
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum ConfigAction {
+    /// Display the current configuration
+    Show {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
     },
 }
 

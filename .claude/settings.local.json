@@ -47,7 +47,15 @@
       "Bash(bc:*)",
       "Bash(chmod:*)",
       "Bash(ls:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "mcp__rust-quality__workspace-info",
+      "mcp__rust-quality__cargo-test",
+      "mcp__rust-quality__cargo-clippy",
+      "Bash(python:*)",
+      "mcp__rust-quality__cargo-check",
+      "Bash(git status:*)",
+      "Bash(git merge:*)",
+      "Bash(git branch:*)"
     ]
   }
 }
