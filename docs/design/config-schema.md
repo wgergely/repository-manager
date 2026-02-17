@@ -59,8 +59,8 @@ description = "Anthropic's Claude Desktop App"
 
 [integration]
 # Helper methods the CLI uses to find the config
-config_path = ".claude/config.json"
-type = "json"
+config_path = "CLAUDE.md"
+type = "markdown"
 
 [capabilities]
 # Does this tool support system prompt injection?
@@ -163,8 +163,8 @@ Always be concise.
 # --- REPO-MANAGER-END ---
 ```
 
-**JSON Files (e.g., `.claude/config.json`)**:
-For JSON, we perform structured merges on manager-owned keys, appending or replacing labeled sections.
+**Markdown Files (e.g., `CLAUDE.md`)**:
+For Markdown, we use managed blocks with `<!-- repo:block:{id} -->` markers, same as `.cursorrules`.
 
 ### State Tracking (`state.lock`)
 
@@ -178,7 +178,7 @@ last_run = "2026-01-23T12:00:00Z"
 
 [installed_files]
 ".cursorrules" = "hash_of_managed_block"
-".claude/config.json" = "hash_of_managed_json_keys"
+"CLAUDE.md" = "hash_of_managed_block"
 
 [active_rules]
 python-snake-case = "v1"
