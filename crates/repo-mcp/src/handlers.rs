@@ -16,7 +16,7 @@ use repo_core::{
 };
 use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
 use repo_meta::Registry;
-use repo_presets::{Context, PresetProvider, SuperpowersProvider};
+use repo_presets::{Context, PresetProvider, PluginsProvider};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -594,7 +594,7 @@ async fn handle_plugins_install(root: &Path, arguments: Value) -> Result<Value> 
         .and_then(|v| v.as_str())
         .unwrap_or("latest");
 
-    let provider = SuperpowersProvider::new().with_version(version);
+    let provider = PluginsProvider::new().with_version(version);
     let context = create_preset_context(root);
 
     let check = provider
@@ -624,7 +624,7 @@ async fn handle_plugins_install(root: &Path, arguments: Value) -> Result<Value> 
 
 /// Handle plugins_status - Check plugin installation status
 async fn handle_plugins_status(root: &Path) -> Result<Value> {
-    let provider = SuperpowersProvider::new();
+    let provider = PluginsProvider::new();
     let context = create_preset_context(root);
 
     let check = provider
@@ -647,7 +647,7 @@ async fn handle_plugins_uninstall(root: &Path, arguments: Value) -> Result<Value
         .and_then(|v| v.as_str())
         .unwrap_or("latest");
 
-    let provider = SuperpowersProvider::new().with_version(version);
+    let provider = PluginsProvider::new().with_version(version);
     let context = create_preset_context(root);
 
     let report = provider

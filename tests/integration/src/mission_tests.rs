@@ -15,7 +15,7 @@ use repo_git::{
     ClassicLayout, ContainerLayout, LayoutProvider, NamingStrategy, naming::branch_to_directory,
 };
 use repo_meta::load_config;
-use repo_presets::{Context, PresetProvider, PresetStatus, SuperpowersProvider, UvProvider};
+use repo_presets::{Context, PresetProvider, PresetStatus, PluginsProvider, UvProvider};
 use repo_tools::{
     Rule, SyncContext, ToolIntegration, VSCodeIntegration, antigravity_integration,
     claude_integration, cursor_integration, gemini_integration, windsurf_integration,
@@ -603,7 +603,7 @@ mod m5_presets {
     /// M5.5: Superpowers provider ID
     #[test]
     fn m5_5_superpowers_provider_id() {
-        let provider = SuperpowersProvider::new();
+        let provider = PluginsProvider::new();
         assert_eq!(provider.id(), "claude:superpowers");
     }
 
@@ -629,7 +629,7 @@ mod m5_presets {
         };
 
         let context = Context::new(layout, HashMap::new());
-        let provider = SuperpowersProvider::new();
+        let provider = PluginsProvider::new();
 
         let report = provider.check(&context).await.unwrap();
 

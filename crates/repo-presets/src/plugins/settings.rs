@@ -4,8 +4,8 @@ use crate::error::{Error, Result};
 use serde_json::{Value, json};
 use std::path::Path;
 
-/// Enable superpowers in Claude's settings.json
-pub fn enable_superpowers(settings_path: &Path, plugin_key: &str) -> Result<()> {
+/// Enable plugin in Claude's settings.json
+pub fn enable_plugin(settings_path: &Path, plugin_key: &str) -> Result<()> {
     let mut settings = if settings_path.exists() {
         let content = std::fs::read_to_string(settings_path)
             .map_err(|e| Error::ClaudeSettings(format!("Failed to read: {}", e)))?;
@@ -38,8 +38,8 @@ pub fn enable_superpowers(settings_path: &Path, plugin_key: &str) -> Result<()> 
     Ok(())
 }
 
-/// Disable superpowers in Claude's settings.json
-pub fn disable_superpowers(settings_path: &Path, plugin_key: &str) -> Result<()> {
+/// Disable plugin in Claude's settings.json
+pub fn disable_plugin(settings_path: &Path, plugin_key: &str) -> Result<()> {
     if !settings_path.exists() {
         return Ok(()); // Nothing to disable
     }
@@ -65,7 +65,7 @@ pub fn disable_superpowers(settings_path: &Path, plugin_key: &str) -> Result<()>
     Ok(())
 }
 
-/// Check if superpowers is enabled in settings
+/// Check if plugin is enabled in settings
 pub fn is_enabled(settings_path: &Path, plugin_key: &str) -> bool {
     if !settings_path.exists() {
         return false;
@@ -88,12 +88,12 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let settings_path = temp.path().join("settings.json");
 
-        enable_superpowers(&settings_path, "superpowers@git").unwrap();
+        enable_plugin(&settings_path, "plugins@git").unwrap();
 
         assert!(settings_path.exists());
         let content = std::fs::read_to_string(&settings_path).unwrap();
         let settings: Value = serde_json::from_str(&content).unwrap();
-        assert_eq!(settings["enabledPlugins"]["superpowers@git"], true);
+        assert_eq!(settings["enabledPlugins"]["plugins@git"], true);
     }
 
     #[test]
@@ -104,12 +104,12 @@ mod tests {
         // Create existing settings
         std::fs::write(&settings_path, r#"{"other": "value"}"#).unwrap();
 
-        enable_superpowers(&settings_path, "superpowers@git").unwrap();
+        enable_plugin(&settings_path, "plugins@git").unwrap();
 
         let content = std::fs::read_to_string(&settings_path).unwrap();
         let settings: Value = serde_json::from_str(&content).unwrap();
         assert_eq!(settings["other"], "value");
-        assert_eq!(settings["enabledPlugins"]["superpowers@git"], true);
+        assert_eq!(settings["enabledPlugins"]["plugins@git"], true);
     }
 
     #[test]
@@ -118,18 +118,18 @@ mod tests {
         let settings_path = temp.path().join("settings.json");
 
         // Enable first
-        enable_superpowers(&settings_path, "superpowers@git").unwrap();
-        assert!(is_enabled(&settings_path, "superpowers@git"));
+        enable_plugin(&settings_path, "plugins@git").unwrap();
+        assert!(is_enabled(&settings_path, "plugins@git"));
 
         // Then disable
-        disable_superpowers(&settings_path, "superpowers@git").unwrap();
-        assert!(!is_enabled(&settings_path, "superpowers@git"));
+        disable_plugin(&settings_path, "plugins@git").unwrap();
+        assert!(!is_enabled(&settings_path, "plugins@git"));
     }
 
     #[test]
     fn test_is_enabled_false_when_missing() {
         let temp = TempDir::new().unwrap();
         let settings_path = temp.path().join("nonexistent.json");
-        assert!(!is_enabled(&settings_path, "superpowers@git"));
+        assert!(!is_enabled(&settings_path, "plugins@git"));
     }
 }

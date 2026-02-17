@@ -3,7 +3,7 @@
 use crate::cli::PluginsAction;
 use crate::error::{CliError, Result};
 use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
-use repo_presets::{Context, PresetProvider, PresetStatus, SuperpowersProvider};
+use repo_presets::{Context, PresetProvider, PresetStatus, PluginsProvider};
 use std::collections::HashMap;
 
 pub async fn handle_plugins(action: PluginsAction) -> Result<()> {
@@ -18,7 +18,7 @@ pub async fn handle_plugins(action: PluginsAction) -> Result<()> {
 
     match action {
         PluginsAction::Install { version } => {
-            let provider = SuperpowersProvider::new().with_version(&version);
+            let provider = PluginsProvider::new().with_version(&version);
 
             println!("Checking plugin status...");
             let check = provider.check(&context).await?;
@@ -46,7 +46,7 @@ pub async fn handle_plugins(action: PluginsAction) -> Result<()> {
         }
 
         PluginsAction::Status => {
-            let provider = SuperpowersProvider::new();
+            let provider = PluginsProvider::new();
             let check = provider.check(&context).await?;
 
             println!("Plugin status: {:?}", check.status);
@@ -56,7 +56,7 @@ pub async fn handle_plugins(action: PluginsAction) -> Result<()> {
         }
 
         PluginsAction::Uninstall { version } => {
-            let provider = SuperpowersProvider::new().with_version(&version);
+            let provider = PluginsProvider::new().with_version(&version);
 
             println!("Uninstalling plugin {}...", version);
             let report = provider.uninstall(&context).await?;
