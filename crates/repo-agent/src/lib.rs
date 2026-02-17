@@ -12,6 +12,7 @@
 
 pub mod discovery;
 pub mod error;
+pub mod subprocess;
 pub mod types;
 
 pub use discovery::AgentManager;
