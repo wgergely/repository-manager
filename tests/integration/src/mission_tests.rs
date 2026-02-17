@@ -65,8 +65,9 @@ impl TestRepo {
     /// Initialize with repository manager config
     ///
     /// Writes config.toml in the correct Manifest format:
-    /// - Top-level `tools = [...]` and `presets = [...]`
+    /// - Top-level `tools = [...]`
     /// - `[core]` section with `mode`
+    /// - `[presets]` section as a table with each preset as a key
     pub fn init_repo_manager(&mut self, mode: &str, tools: &[&str], presets: &[&str]) {
         let repo_dir = self.root().join(".repository");
         fs::create_dir_all(&repo_dir).unwrap();
@@ -76,15 +77,15 @@ impl TestRepo {
             .map(|t| format!("\"{}\"", t))
             .collect::<Vec<_>>()
             .join(", ");
-        let presets_str = presets
-            .iter()
-            .map(|p| format!("\"{}\"", p))
-            .collect::<Vec<_>>()
-            .join(", ");
 
-        let config = format!(
-            "tools = [{tools_str}]\npresets = [{presets_str}]\n\n[core]\nmode = \"{mode}\"\n"
-        );
+        let mut config = format!("tools = [{tools_str}]\n\n[core]\nmode = \"{mode}\"\n");
+
+        if !presets.is_empty() {
+            config.push_str("\n[presets]\n");
+            for preset in presets {
+                config.push_str(&format!("\"{}\" = {{}}\n", preset));
+            }
+        }
 
         fs::write(repo_dir.join("config.toml"), config).unwrap();
         self.initialized = true;
@@ -161,26 +162,31 @@ mod m1_init {
     /// M1.3: Init with tools records them in config
     #[test]
     fn m1_3_init_with_tools_records_in_config() {
+        use repo_core::Manifest;
+
         let mut repo = TestRepo::new();
         repo.init_git();
         repo.init_repo_manager("standard", &["vscode", "cursor", "claude"], &[]);
 
-        let config = load_config(&NormalizedPath::new(repo.root())).unwrap();
-        assert!(config.active.tools.contains(&"vscode".to_string()));
-        assert!(config.active.tools.contains(&"cursor".to_string()));
-        assert!(config.active.tools.contains(&"claude".to_string()));
+        let content = fs::read_to_string(repo.root().join(".repository/config.toml")).unwrap();
+        let manifest = Manifest::parse(&content).unwrap();
+        assert!(manifest.tools.contains(&"vscode".to_string()));
+        assert!(manifest.tools.contains(&"cursor".to_string()));
+        assert!(manifest.tools.contains(&"claude".to_string()));
     }
 
     /// M1.4: Init with presets records them in config
     #[test]
     fn m1_4_init_with_presets_records_in_config() {
+        use repo_core::Manifest;
+
         let mut repo = TestRepo::new();
         repo.init_git();
         repo.init_repo_manager("standard", &[], &["env:python"]);
 
-        let config = load_config(&NormalizedPath::new(repo.root())).unwrap();
-        assert!(config.active.presets.contains(&"env:python".to_string()));
-    }
+        let content = fs::read_to_string(repo.root().join(".repository/config.toml")).unwrap();
+        let manifest = Manifest::parse(&content).unwrap();
+        assert!(manifest.presets.contains_key("env:python"));
 }
 
 // =============================================================================
