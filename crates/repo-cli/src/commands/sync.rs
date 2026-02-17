@@ -10,7 +10,7 @@ use serde_json::json;
 use repo_core::{CheckStatus, ConfigResolver, Mode, SyncEngine, SyncOptions};
 use repo_fs::NormalizedPath;
 
-use crate::context::{detect_context, RepoContext};
+use crate::context::{RepoContext, detect_context};
 use crate::error::{CliError, Result};
 
 /// Resolve the repository root from any path within the repo
@@ -45,9 +45,10 @@ pub fn detect_mode(root: &NormalizedPath) -> Result<Mode> {
     }
 
     let config = resolver.resolve()?;
-    let mode: Mode = config.mode.parse().map_err(|e: repo_core::Error| {
-        CliError::user(format!("Invalid mode in config: {}", e))
-    })?;
+    let mode: Mode = config
+        .mode
+        .parse()
+        .map_err(|e: repo_core::Error| CliError::user(format!("Invalid mode in config: {}", e)))?;
 
     Ok(mode)
 }
@@ -69,13 +70,13 @@ pub fn run_check(path: &Path) -> Result<()> {
 
     match report.status {
         CheckStatus::Healthy => {
-            println!("{} Repository is healthy. No drift detected.", "OK".green().bold());
+            println!(
+                "{} Repository is healthy. No drift detected.",
+                "OK".green().bold()
+            );
         }
         CheckStatus::Missing => {
-            println!(
-                "{} Some files are missing:",
-                "MISSING".yellow().bold()
-            );
+            println!("{} Some files are missing:", "MISSING".yellow().bold());
             for item in &report.missing {
                 println!(
                     "   {} {} ({}): {}",
@@ -89,10 +90,7 @@ pub fn run_check(path: &Path) -> Result<()> {
             println!("Run {} to repair.", "repo fix".cyan());
         }
         CheckStatus::Drifted => {
-            println!(
-                "{} Configuration has drifted:",
-                "DRIFTED".red().bold()
-            );
+            println!("{} Configuration has drifted:", "DRIFTED".red().bold());
             for item in &report.drifted {
                 println!(
                     "   {} {} ({}): {}",
@@ -119,10 +117,7 @@ pub fn run_check(path: &Path) -> Result<()> {
             println!("Run {} to repair.", "repo fix".cyan());
         }
         CheckStatus::Broken => {
-            println!(
-                "{} Repository is in a broken state:",
-                "BROKEN".red().bold()
-            );
+            println!("{} Repository is in a broken state:", "BROKEN".red().bold());
             for msg in &report.messages {
                 println!("   {} {}", "!".red(), msg);
             }
@@ -168,10 +163,7 @@ pub fn run_sync(path: &Path, dry_run: bool, json_output: bool) -> Result<()> {
     } else {
         // Human-readable colored output
         if dry_run {
-            println!(
-                "{} Previewing sync (dry-run)...",
-                "=>".blue().bold()
-            );
+            println!("{} Previewing sync (dry-run)...", "=>".blue().bold());
         } else {
             println!(
                 "{} Synchronizing tool configurations...",
@@ -181,9 +173,16 @@ pub fn run_sync(path: &Path, dry_run: bool, json_output: bool) -> Result<()> {
 
         if report.success {
             if report.actions.is_empty() {
-                println!("{} Already synchronized. No changes needed.", "OK".green().bold());
+                println!(
+                    "{} Already synchronized. No changes needed.",
+                    "OK".green().bold()
+                );
             } else {
-                let prefix = if dry_run { "Would take actions" } else { "Synchronization complete" };
+                let prefix = if dry_run {
+                    "Would take actions"
+                } else {
+                    "Synchronization complete"
+                };
                 println!("{} {}:", "OK".green().bold(), prefix);
                 for action in &report.actions {
                     let clean = action.strip_prefix("[dry-run] Would ").unwrap_or(action);
@@ -208,9 +207,15 @@ fn categorize_action(action: &str) -> &'static str {
     let lower = action.to_lowercase();
     if lower.starts_with("create") || lower.contains("created") {
         "create"
-    } else if lower.starts_with("update") || lower.contains("updated") || lower.starts_with("modify") {
+    } else if lower.starts_with("update")
+        || lower.contains("updated")
+        || lower.starts_with("modify")
+    {
         "update"
-    } else if lower.starts_with("delete") || lower.starts_with("remove") || lower.contains("deleted") {
+    } else if lower.starts_with("delete")
+        || lower.starts_with("remove")
+        || lower.contains("deleted")
+    {
         "delete"
     } else {
         "other"
@@ -222,9 +227,15 @@ fn format_action(action: &str) -> (colored::ColoredString, colored::ColoredStrin
     let lower = action.to_lowercase();
     if lower.starts_with("create") || lower.contains("created") {
         ("+".green(), action.green())
-    } else if lower.starts_with("update") || lower.contains("updated") || lower.starts_with("modify") {
+    } else if lower.starts_with("update")
+        || lower.contains("updated")
+        || lower.starts_with("modify")
+    {
         ("~".yellow(), action.yellow())
-    } else if lower.starts_with("delete") || lower.starts_with("remove") || lower.contains("deleted") {
+    } else if lower.starts_with("delete")
+        || lower.starts_with("remove")
+        || lower.contains("deleted")
+    {
         ("-".red(), action.red())
     } else {
         (" ".normal(), action.normal())
@@ -236,15 +247,9 @@ fn format_action(action: &str) -> (colored::ColoredString, colored::ColoredStrin
 /// Repairs configuration drift by re-synchronizing.
 pub fn run_fix(path: &Path, dry_run: bool) -> Result<()> {
     if dry_run {
-        println!(
-            "{} Previewing fix (dry-run)...",
-            "=>".blue().bold()
-        );
+        println!("{} Previewing fix (dry-run)...", "=>".blue().bold());
     } else {
-        println!(
-            "{} Fixing configuration drift...",
-            "=>".blue().bold()
-        );
+        println!("{} Fixing configuration drift...", "=>".blue().bold());
     }
 
     let root = resolve_root(path)?;
@@ -255,7 +260,10 @@ pub fn run_fix(path: &Path, dry_run: bool) -> Result<()> {
     let check_report = engine.check()?;
 
     if check_report.status == CheckStatus::Healthy {
-        println!("{} Repository is already healthy. Nothing to fix.", "OK".green().bold());
+        println!(
+            "{} Repository is already healthy. Nothing to fix.",
+            "OK".green().bold()
+        );
         return Ok(());
     }
 
@@ -265,10 +273,18 @@ pub fn run_fix(path: &Path, dry_run: bool) -> Result<()> {
 
     if report.success {
         if report.actions.is_empty() {
-            let msg = if dry_run { "No actions needed." } else { "Configuration fixed." };
+            let msg = if dry_run {
+                "No actions needed."
+            } else {
+                "Configuration fixed."
+            };
             println!("{} {}", "OK".green().bold(), msg);
         } else {
-            let prefix = if dry_run { "Would take actions" } else { "Configuration fixed" };
+            let prefix = if dry_run {
+                "Would take actions"
+            } else {
+                "Configuration fixed"
+            };
             println!("{} {}:", "OK".green().bold(), prefix);
             for action in &report.actions {
                 println!("   {} {}", "+".green(), action);

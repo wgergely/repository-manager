@@ -1,7 +1,7 @@
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use repo_fs::NormalizedPath;
 use repo_fs::io::{self, RobustnessConfig};
 use repo_fs::layout::WorkspaceLayout;
-use repo_fs::NormalizedPath;
 use std::fs;
 use tempfile::tempdir;
 

@@ -46,7 +46,9 @@ impl FromStr for Mode {
         match s.to_lowercase().as_str() {
             "standard" | "default" => Ok(Mode::Standard),
             "worktrees" | "worktree" | "container" => Ok(Mode::Worktrees),
-            _ => Err(Error::InvalidMode { mode: s.to_string() }),
+            _ => Err(Error::InvalidMode {
+                mode: s.to_string(),
+            }),
         }
     }
 }

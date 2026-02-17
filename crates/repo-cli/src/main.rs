@@ -11,7 +11,7 @@ mod interactive;
 use std::io;
 
 use clap::{CommandFactory, Parser};
-use clap_complete::{generate, Shell};
+use clap_complete::{Shell, generate};
 use colored::Colorize;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
@@ -46,10 +46,7 @@ fn run() -> Result<()> {
         Some(cmd) => execute_command(cmd),
         None => {
             // No command provided - show help hint
-            println!(
-                "{} Repository Manager CLI",
-                "repo".green().bold()
-            );
+            println!("{} Repository Manager CLI", "repo".green().bold());
             println!();
             println!("Run {} for available commands.", "repo --help".cyan());
             Ok(())
@@ -202,18 +199,10 @@ fn cmd_list_presets() -> Result<()> {
 fn cmd_branch(action: BranchAction) -> Result<()> {
     let cwd = std::env::current_dir()?;
     match action {
-        BranchAction::Add { name, base } => {
-            commands::run_branch_add(&cwd, &name, Some(&base))
-        }
-        BranchAction::Remove { name } => {
-            commands::run_branch_remove(&cwd, &name)
-        }
-        BranchAction::List => {
-            commands::run_branch_list(&cwd)
-        }
-        BranchAction::Checkout { name } => {
-            commands::run_branch_checkout(&cwd, &name)
-        }
+        BranchAction::Add { name, base } => commands::run_branch_add(&cwd, &name, Some(&base)),
+        BranchAction::Remove { name } => commands::run_branch_remove(&cwd, &name),
+        BranchAction::List => commands::run_branch_list(&cwd),
+        BranchAction::Checkout { name } => commands::run_branch_checkout(&cwd, &name),
     }
 }
 
@@ -324,13 +313,7 @@ mod tests {
         create_minimal_repo(temp_dir.path(), "standard");
 
         // First add the rule
-        commands::run_add_rule(
-            temp_dir.path(),
-            "test-rule",
-            "Test instruction.",
-            vec![],
-        )
-        .unwrap();
+        commands::run_add_rule(temp_dir.path(), "test-rule", "Test instruction.", vec![]).unwrap();
         // Then remove it
         let result = commands::run_remove_rule(temp_dir.path(), "test-rule");
         assert!(result.is_ok());

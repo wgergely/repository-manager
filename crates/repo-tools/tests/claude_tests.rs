@@ -1,7 +1,7 @@
 //! Integration tests for Claude integration.
 
 use repo_fs::NormalizedPath;
-use repo_tools::{claude_integration, ConfigType, Rule, SyncContext, ToolIntegration};
+use repo_tools::{ConfigType, Rule, SyncContext, ToolIntegration, claude_integration};
 use std::fs;
 use tempfile::TempDir;
 

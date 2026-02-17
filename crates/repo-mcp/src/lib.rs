@@ -48,4 +48,4 @@ pub use error::{Error, Result};
 pub use handlers::handle_tool_call;
 pub use resource_handlers::read_resource;
 pub use server::RepoMcpServer;
-pub use tools::{get_tool_definitions, ToolContent, ToolDefinition, ToolResult};
+pub use tools::{ToolContent, ToolDefinition, ToolResult, get_tool_definitions};

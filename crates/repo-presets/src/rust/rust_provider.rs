@@ -73,14 +73,9 @@ impl PresetProvider for RustProvider {
 
         // Check if rustc is available
         if !self.check_rustc_available().await {
-            return Ok(CheckReport {
-                status: PresetStatus::Broken,
-                details: vec![
-                    "Cargo.toml found but rustc not available on PATH.".to_string(),
-                    "Install Rust via https://rustup.rs to use this project.".to_string(),
-                ],
-                action: ActionType::Install,
-            });
+            return Ok(CheckReport::broken(
+                "Cargo.toml found but rustc not available on PATH. Install Rust via https://rustup.rs to use this project.",
+            ));
         }
 
         Ok(CheckReport::healthy())
@@ -120,7 +115,7 @@ mod tests {
 
     #[test]
     fn test_rust_provider_default() {
-        let provider = RustProvider::default();
+        let provider = RustProvider;
         assert_eq!(provider.id(), "env:rust");
     }
 

@@ -34,7 +34,11 @@ pub fn claude_settings_path() -> Option<std::path::PathBuf> {
 /// Returns: ~/.claude/plugins/installed_plugins.json
 #[allow(dead_code)] // Reserved for future use (plugin tracking)
 pub fn installed_plugins_path() -> Option<std::path::PathBuf> {
-    dirs::home_dir().map(|h| h.join(".claude").join("plugins").join("installed_plugins.json"))
+    dirs::home_dir().map(|h| {
+        h.join(".claude")
+            .join("plugins")
+            .join("installed_plugins.json")
+    })
 }
 
 #[cfg(test)]

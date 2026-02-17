@@ -66,8 +66,8 @@ impl FormatHandler for JsonFormatHandler {
         };
 
         // Parse the block content as JSON
-        let block_value: Value = serde_json::from_str(block_content)
-            .unwrap_or(Value::String(block_content.to_string()));
+        let block_value: Value =
+            serde_json::from_str(block_content).unwrap_or(Value::String(block_content.to_string()));
 
         // Get or create the managed section
         let Some(obj) = json.as_object_mut() else {
@@ -160,9 +160,11 @@ mod tests {
         let result = handler.write_block("", uuid, r#"{"setting": true}"#);
         let parsed: Value = serde_json::from_str(&result).unwrap();
 
-        assert!(parsed[MANAGED_KEY]["550e8400-e29b-41d4-a716-446655440000"]["setting"]
-            .as_bool()
-            .unwrap());
+        assert!(
+            parsed[MANAGED_KEY]["550e8400-e29b-41d4-a716-446655440000"]["setting"]
+                .as_bool()
+                .unwrap()
+        );
     }
 
     #[test]
@@ -189,8 +191,7 @@ mod tests {
         // Managed key added
         assert!(parsed[MANAGED_KEY]["550e8400-e29b-41d4-a716-446655440000"].is_object());
         assert_eq!(
-            parsed[MANAGED_KEY]["550e8400-e29b-41d4-a716-446655440000"]
-                ["python.defaultInterpreterPath"],
+            parsed[MANAGED_KEY]["550e8400-e29b-41d4-a716-446655440000"]["python.defaultInterpreterPath"],
             ".venv/bin/python"
         );
     }

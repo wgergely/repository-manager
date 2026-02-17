@@ -2,7 +2,7 @@
 //!
 //! These tests verify that repo-fs handles real error conditions gracefully.
 
-use repo_fs::{io, NormalizedPath};
+use repo_fs::{NormalizedPath, io};
 use tempfile::tempdir;
 
 #[test]
@@ -36,7 +36,10 @@ mod unix_tests {
         // Restore permissions before assertions (for cleanup)
         let _ = fs::set_permissions(&readonly_dir, Permissions::from_mode(0o755));
 
-        assert!(result.is_err(), "Writing to read-only directory should fail");
+        assert!(
+            result.is_err(),
+            "Writing to read-only directory should fail"
+        );
     }
 
     #[test]
@@ -75,7 +78,10 @@ mod unix_tests {
         // Restore permissions
         let _ = fs::set_permissions(&parent, Permissions::from_mode(0o755));
 
-        assert!(result.is_err(), "Writing when parent is read-only should fail");
+        assert!(
+            result.is_err(),
+            "Writing when parent is read-only should fail"
+        );
     }
 }
 

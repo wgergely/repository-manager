@@ -72,9 +72,7 @@ impl ToolRegistration {
 
     /// Check if the tool has any capability that requires syncing.
     pub fn has_any_capability(&self) -> bool {
-        self.supports_instructions()
-            || self.supports_mcp()
-            || self.supports_rules_directory()
+        self.supports_instructions() || self.supports_mcp() || self.supports_rules_directory()
     }
 }
 
@@ -111,8 +109,8 @@ mod tests {
 
     #[test]
     fn test_with_priority() {
-        let reg = ToolRegistration::new("test", "Test", ToolCategory::Ide, make_def())
-            .with_priority(10);
+        let reg =
+            ToolRegistration::new("test", "Test", ToolCategory::Ide, make_def()).with_priority(10);
         assert_eq!(reg.priority, 10);
     }
 

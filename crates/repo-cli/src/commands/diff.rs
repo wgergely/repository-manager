@@ -79,15 +79,22 @@ fn print_diff_output(actions: &[String], errors: &[String], root: &NormalizedPat
             let clean = action.strip_prefix("[dry-run] Would ").unwrap_or(action);
 
             // Determine the type of change and color accordingly
-            let (prefix, colored_action) = if clean.starts_with("create") || clean.starts_with("Created") {
-                ("+".green(), clean.green())
-            } else if clean.starts_with("update") || clean.starts_with("Updated") || clean.starts_with("modify") {
-                ("~".yellow(), clean.yellow())
-            } else if clean.starts_with("delete") || clean.starts_with("remove") || clean.starts_with("Deleted") {
-                ("-".red(), clean.red())
-            } else {
-                (" ".normal(), clean.normal())
-            };
+            let (prefix, colored_action) =
+                if clean.starts_with("create") || clean.starts_with("Created") {
+                    ("+".green(), clean.green())
+                } else if clean.starts_with("update")
+                    || clean.starts_with("Updated")
+                    || clean.starts_with("modify")
+                {
+                    ("~".yellow(), clean.yellow())
+                } else if clean.starts_with("delete")
+                    || clean.starts_with("remove")
+                    || clean.starts_with("Deleted")
+                {
+                    ("-".red(), clean.red())
+                } else {
+                    (" ".normal(), clean.normal())
+                };
 
             println!("  {} {}", prefix, colored_action);
         }
@@ -102,10 +109,7 @@ fn print_diff_output(actions: &[String], errors: &[String], root: &NormalizedPat
     }
 
     println!();
-    println!(
-        "Run {} to apply these changes.",
-        "repo sync".cyan()
-    );
+    println!("Run {} to apply these changes.", "repo sync".cyan());
 }
 
 #[cfg(test)]

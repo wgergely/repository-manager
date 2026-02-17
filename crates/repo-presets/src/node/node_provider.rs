@@ -103,18 +103,16 @@ impl PresetProvider for NodeProvider {
 
         if !node_available {
             // Node.js project but node not installed
-            return Ok(CheckReport {
-                status: PresetStatus::Broken,
-                details,
-                action: ActionType::Install,
-            });
+            return Ok(CheckReport::broken(details.join("; ")));
         }
 
         if !has_node_modules {
             // Node.js project with node, but dependencies not installed
             return Ok(CheckReport {
                 status: PresetStatus::Missing,
-                details: vec!["Dependencies not installed. Run npm install or yarn install.".to_string()],
+                details: vec![
+                    "Dependencies not installed. Run npm install or yarn install.".to_string(),
+                ],
                 action: ActionType::Install,
             });
         }
@@ -157,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_node_provider_default() {
-        let provider = NodeProvider::default();
+        let provider = NodeProvider;
         assert_eq!(provider.id(), "env:node");
     }
 
@@ -223,7 +221,12 @@ mod tests {
 
         let report = provider.check(&context).await.unwrap();
         assert_eq!(report.status, PresetStatus::Missing);
-        assert!(report.details.iter().any(|d| d.contains("Dependencies not installed")));
+        assert!(
+            report
+                .details
+                .iter()
+                .any(|d| d.contains("Dependencies not installed"))
+        );
     }
 
     #[tokio::test]
@@ -254,6 +257,11 @@ mod tests {
 
         let report = provider.apply(&context).await.unwrap();
         assert!(report.success);
-        assert!(report.actions_taken.iter().any(|a| a.contains("detection-only")));
+        assert!(
+            report
+                .actions_taken
+                .iter()
+                .any(|a| a.contains("detection-only"))
+        );
     }
 }

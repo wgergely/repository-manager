@@ -2,9 +2,9 @@
 //!
 //! These tests verify end-to-end behavior across multiple operations and formats.
 
+use repo_content::Document;
 use repo_content::block::BlockLocation;
 use repo_content::format::Format;
-use repo_content::Document;
 use uuid::Uuid;
 
 /// Test complete TOML document lifecycle with rollback
@@ -25,16 +25,16 @@ serde = "1.0"
     // Step 1: Insert a managed block
     let uuid = Uuid::new_v4();
     let insert_edit = doc
-        .insert_block(
-            uuid,
-            "[managed]\nkey = \"initial\"",
-            BlockLocation::End,
-        )
+        .insert_block(uuid, "[managed]\nkey = \"initial\"", BlockLocation::End)
         .unwrap();
 
     // Verify block exists
     let blocks = doc.find_blocks();
-    assert_eq!(blocks.len(), 1, "Should have one managed block after insert");
+    assert_eq!(
+        blocks.len(),
+        1,
+        "Should have one managed block after insert"
+    );
     assert_eq!(blocks[0].uuid, uuid);
     assert!(blocks[0].content.contains("key = \"initial\""));
 
@@ -44,7 +44,9 @@ serde = "1.0"
         .unwrap();
 
     // Verify update
-    let block = doc.get_block(uuid).expect("Block should exist after update");
+    let block = doc
+        .get_block(uuid)
+        .expect("Block should exist after update");
     assert!(block.content.contains("key = \"updated\""));
     assert!(!block.content.contains("key = \"initial\""));
 
@@ -52,7 +54,10 @@ serde = "1.0"
     let remove_edit = doc.remove_block(uuid).unwrap();
 
     // Verify removal
-    assert!(doc.find_blocks().is_empty(), "No blocks should remain after removal");
+    assert!(
+        doc.find_blocks().is_empty(),
+        "No blocks should remain after removal"
+    );
     assert!(doc.get_block(uuid).is_none());
 
     // Step 4: Apply inverse edits to rollback
@@ -64,23 +69,36 @@ serde = "1.0"
 
     // Re-parse to continue working with Document
     let doc = Document::parse_as(&source_after_remove_rollback, Format::Toml).unwrap();
-    let block = doc.get_block(uuid).expect("Block should be back after remove rollback");
-    assert!(block.content.contains("key = \"updated\""), "Should have updated content after remove rollback");
+    let block = doc
+        .get_block(uuid)
+        .expect("Block should be back after remove rollback");
+    assert!(
+        block.content.contains("key = \"updated\""),
+        "Should have updated content after remove rollback"
+    );
 
     // Rollback the update (restore initial content)
     let inverse_update = update_edit.inverse();
     let source_after_update_rollback = inverse_update.apply(doc.source());
 
     let doc = Document::parse_as(&source_after_update_rollback, Format::Toml).unwrap();
-    let block = doc.get_block(uuid).expect("Block should still exist after update rollback");
-    assert!(block.content.contains("key = \"initial\""), "Should have initial content after update rollback");
+    let block = doc
+        .get_block(uuid)
+        .expect("Block should still exist after update rollback");
+    assert!(
+        block.content.contains("key = \"initial\""),
+        "Should have initial content after update rollback"
+    );
 
     // Rollback the insert (remove the block entirely)
     let inverse_insert = insert_edit.inverse();
     let source_after_insert_rollback = inverse_insert.apply(doc.source());
 
     let doc = Document::parse_as(&source_after_insert_rollback, Format::Toml).unwrap();
-    assert!(doc.find_blocks().is_empty(), "No blocks should remain after full rollback");
+    assert!(
+        doc.find_blocks().is_empty(),
+        "No blocks should remain after full rollback"
+    );
 
     // Verify we're back to original content structure
     assert!(doc.source().contains("[package]"));
@@ -143,7 +161,10 @@ value = "hello"
     );
 
     // Full comparison
-    assert_eq!(toml_normalized, json_normalized, "Normalized representations should be equal");
+    assert_eq!(
+        toml_normalized, json_normalized,
+        "Normalized representations should be equal"
+    );
 }
 
 /// Test semantic comparison with key order independence
@@ -157,7 +178,10 @@ fn test_semantic_comparison_key_order() {
     let doc2 = Document::parse_as(json2, Format::Json).unwrap();
 
     // Documents should be semantically equal
-    assert!(doc1.semantic_eq(&doc2), "Documents with same data but different key order should be equal");
+    assert!(
+        doc1.semantic_eq(&doc2),
+        "Documents with same data but different key order should be equal"
+    );
 
     // Normalized forms should be identical
     let norm1 = doc1.normalize().unwrap();
@@ -184,7 +208,10 @@ fn test_block_checksum_drift() {
     assert!(!block.has_drifted(), "Fresh block should not have drifted");
 
     // Verify checksum verification works
-    assert!(block.verify_checksum(&original_checksum), "Checksum should verify correctly");
+    assert!(
+        block.verify_checksum(&original_checksum),
+        "Checksum should verify correctly"
+    );
 
     // Update the block with new content
     doc.update_block(uuid, "modified content").unwrap();
@@ -200,7 +227,10 @@ fn test_block_checksum_drift() {
     );
 
     // Updated block should not have drifted (checksum matches its content)
-    assert!(!updated_block.has_drifted(), "Updated block should not have drifted");
+    assert!(
+        !updated_block.has_drifted(),
+        "Updated block should not have drifted"
+    );
 
     // Verify that old checksum no longer matches
     assert!(
@@ -252,9 +282,12 @@ version = 1
     let uuid2 = Uuid::new_v4();
     let uuid3 = Uuid::new_v4();
 
-    doc.insert_block(uuid1, "block1 = true", BlockLocation::End).unwrap();
-    doc.insert_block(uuid2, "block2 = true", BlockLocation::End).unwrap();
-    doc.insert_block(uuid3, "block3 = true", BlockLocation::End).unwrap();
+    doc.insert_block(uuid1, "block1 = true", BlockLocation::End)
+        .unwrap();
+    doc.insert_block(uuid2, "block2 = true", BlockLocation::End)
+        .unwrap();
+    doc.insert_block(uuid3, "block3 = true", BlockLocation::End)
+        .unwrap();
 
     // Verify all blocks exist
     let blocks = doc.find_blocks();
@@ -284,7 +317,10 @@ fn test_document_diff_equivalent() {
     let doc2 = Document::parse(r#"{"y": 2, "x": 1}"#).unwrap();
 
     let diff = doc1.diff(&doc2);
-    assert!(diff.is_equivalent, "Semantically equal documents should produce equivalent diff");
+    assert!(
+        diff.is_equivalent,
+        "Semantically equal documents should produce equivalent diff"
+    );
 }
 
 /// Test document diff with differences
@@ -294,7 +330,10 @@ fn test_document_diff_not_equivalent() {
     let doc2 = Document::parse(r#"{"x": 2}"#).unwrap();
 
     let diff = doc1.diff(&doc2);
-    assert!(!diff.is_equivalent, "Different documents should not be equivalent");
+    assert!(
+        !diff.is_equivalent,
+        "Different documents should not be equivalent"
+    );
 }
 
 /// Test format auto-detection

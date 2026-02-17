@@ -69,7 +69,7 @@ async fn read_rules(root: &Path) -> Result<ResourceContent> {
     if rules_dir.exists() {
         let mut entries: Vec<_> = std::fs::read_dir(&rules_dir)?
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
             .collect();
 
         entries.sort_by_key(|e| e.file_name());

@@ -148,8 +148,10 @@ mod tests {
 
     #[test]
     fn test_response_serialize() {
-        let response =
-            JsonRpcResponse::success(Some(Value::Number(1.into())), serde_json::json!({"ok": true}));
+        let response = JsonRpcResponse::success(
+            Some(Value::Number(1.into())),
+            serde_json::json!({"ok": true}),
+        );
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("result"));
         assert!(!json.contains("error"));
@@ -342,11 +344,8 @@ mod tests {
 
     #[test]
     fn test_error_response_serializes_without_result() {
-        let response = JsonRpcResponse::error(
-            Some(Value::Number(1.into())),
-            -32600,
-            "Invalid".to_string(),
-        );
+        let response =
+            JsonRpcResponse::error(Some(Value::Number(1.into())), -32600, "Invalid".to_string());
         let json = serde_json::to_string(&response).unwrap();
 
         // Should contain error but not result

@@ -7,10 +7,10 @@
 //! The rule UUID becomes the managed block marker in tool config files,
 //! enabling bidirectional traceability between registry and projections.
 
-use crate::ledger::{Intent, Ledger, Projection, ProjectionKind};
-use crate::projection::{compute_checksum, ProjectionWriter};
-use crate::rules::RuleRegistry;
 use crate::Result;
+use crate::ledger::{Intent, Ledger, Projection, ProjectionKind};
+use crate::projection::{ProjectionWriter, compute_checksum};
+use crate::rules::RuleRegistry;
 use repo_fs::NormalizedPath;
 use std::path::PathBuf;
 
@@ -208,7 +208,10 @@ impl RuleSyncer {
             .map(|r| {
                 format!(
                     "<!-- repo:block:{} -->\n## {}\n\n{}\n<!-- /repo:block:{} -->",
-                    r.uuid, r.id, r.content.trim(), r.uuid
+                    r.uuid,
+                    r.id,
+                    r.content.trim(),
+                    r.uuid
                 )
             })
             .collect::<Vec<_>>()

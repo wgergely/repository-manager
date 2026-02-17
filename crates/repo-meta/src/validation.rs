@@ -10,9 +10,17 @@ pub struct ToolRegistry {
 impl ToolRegistry {
     pub fn with_builtins() -> Self {
         let known = [
-            "claude", "claude-desktop", "cursor", "vscode",
-            "windsurf", "gemini-cli", "antigravity", "zed",
-        ].into_iter().collect();
+            "claude",
+            "claude-desktop",
+            "cursor",
+            "vscode",
+            "windsurf",
+            "gemini-cli",
+            "antigravity",
+            "zed",
+        ]
+        .into_iter()
+        .collect();
         Self { known }
     }
 
@@ -32,10 +40,9 @@ pub struct PresetRegistry {
 
 impl PresetRegistry {
     pub fn with_builtins() -> Self {
-        let known = [
-            "python", "python-uv", "python-conda",
-            "node", "rust", "web",
-        ].into_iter().collect();
+        let known = ["python", "python-uv", "python-conda", "node", "rust", "web"]
+            .into_iter()
+            .collect();
         Self { known }
     }
 

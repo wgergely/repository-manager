@@ -26,6 +26,16 @@
 //! - `tool_remove` - Disable a tool
 //! - `rule_add` - Add a custom rule
 //! - `rule_remove` - Delete a rule
+//!
+//! ## Preset Management
+//! - `preset_list` - List configured presets
+//! - `preset_add` - Add a preset to configuration
+//! - `preset_remove` - Remove a preset from configuration
+//!
+//! ## Superpowers Plugin
+//! - `superpowers_install` - Install the superpowers Claude Code plugin
+//! - `superpowers_status` - Check superpowers installation status
+//! - `superpowers_uninstall` - Uninstall the superpowers plugin
 
 use serde::{Deserialize, Serialize};
 
@@ -288,6 +298,78 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                 "required": ["id"]
             }),
         },
+        // Preset Management
+        ToolDefinition {
+            name: "preset_list".to_string(),
+            description: "List configured presets and available preset types".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        ToolDefinition {
+            name: "preset_add".to_string(),
+            description: "Add a preset to the repository configuration".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Preset name (e.g., env:python, env:node, env:rust)"
+                    }
+                },
+                "required": ["name"]
+            }),
+        },
+        ToolDefinition {
+            name: "preset_remove".to_string(),
+            description: "Remove a preset from the repository configuration".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Preset name to remove"
+                    }
+                },
+                "required": ["name"]
+            }),
+        },
+        // Superpowers Plugin
+        ToolDefinition {
+            name: "superpowers_install".to_string(),
+            description: "Install the superpowers Claude Code plugin".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "string",
+                        "description": "Version tag to install (defaults to latest)"
+                    }
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "superpowers_status".to_string(),
+            description: "Check superpowers plugin installation status".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        ToolDefinition {
+            name: "superpowers_uninstall".to_string(),
+            description: "Uninstall the superpowers Claude Code plugin".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "string",
+                        "description": "Version tag to uninstall (defaults to latest)"
+                    }
+                }
+            }),
+        },
     ]
 }
 
@@ -316,13 +398,19 @@ mod tests {
         assert!(names.contains(&"tool_remove"));
         assert!(names.contains(&"rule_add"));
         assert!(names.contains(&"rule_remove"));
+        assert!(names.contains(&"preset_list"));
+        assert!(names.contains(&"preset_add"));
+        assert!(names.contains(&"preset_remove"));
+        assert!(names.contains(&"superpowers_install"));
+        assert!(names.contains(&"superpowers_status"));
+        assert!(names.contains(&"superpowers_uninstall"));
     }
 
     #[test]
     fn test_tool_definitions_count() {
         let tools = get_tool_definitions();
-        // 4 repo lifecycle + 3 branch + 3 git + 4 config = 14 tools
-        assert_eq!(tools.len(), 14);
+        // 4 repo lifecycle + 3 branch + 3 git + 4 config + 3 preset + 3 superpowers = 20 tools
+        assert_eq!(tools.len(), 20);
     }
 
     #[test]
@@ -401,10 +489,18 @@ mod tests {
         let tools = get_tool_definitions();
         for tool in &tools {
             // Each tool should have an object schema
-            assert!(tool.input_schema.is_object(), "Tool {} should have object schema", tool.name);
+            assert!(
+                tool.input_schema.is_object(),
+                "Tool {} should have object schema",
+                tool.name
+            );
             let schema = tool.input_schema.as_object().unwrap();
-            assert_eq!(schema.get("type").and_then(|v| v.as_str()), Some("object"),
-                "Tool {} schema type should be 'object'", tool.name);
+            assert_eq!(
+                schema.get("type").and_then(|v| v.as_str()),
+                Some("object"),
+                "Tool {} schema type should be 'object'",
+                tool.name
+            );
         }
     }
 
@@ -414,22 +510,42 @@ mod tests {
 
         // Check repo_init requires "name"
         let repo_init = tools.iter().find(|t| t.name == "repo_init").unwrap();
-        let required = repo_init.input_schema.get("required").unwrap().as_array().unwrap();
+        let required = repo_init
+            .input_schema
+            .get("required")
+            .unwrap()
+            .as_array()
+            .unwrap();
         assert!(required.iter().any(|v| v.as_str() == Some("name")));
 
         // Check branch_create requires "name"
         let branch_create = tools.iter().find(|t| t.name == "branch_create").unwrap();
-        let required = branch_create.input_schema.get("required").unwrap().as_array().unwrap();
+        let required = branch_create
+            .input_schema
+            .get("required")
+            .unwrap()
+            .as_array()
+            .unwrap();
         assert!(required.iter().any(|v| v.as_str() == Some("name")));
 
         // Check git_merge requires "source"
         let git_merge = tools.iter().find(|t| t.name == "git_merge").unwrap();
-        let required = git_merge.input_schema.get("required").unwrap().as_array().unwrap();
+        let required = git_merge
+            .input_schema
+            .get("required")
+            .unwrap()
+            .as_array()
+            .unwrap();
         assert!(required.iter().any(|v| v.as_str() == Some("source")));
 
         // Check rule_add requires "id" and "content"
         let rule_add = tools.iter().find(|t| t.name == "rule_add").unwrap();
-        let required = rule_add.input_schema.get("required").unwrap().as_array().unwrap();
+        let required = rule_add
+            .input_schema
+            .get("required")
+            .unwrap()
+            .as_array()
+            .unwrap();
         assert!(required.iter().any(|v| v.as_str() == Some("id")));
         assert!(required.iter().any(|v| v.as_str() == Some("content")));
     }

@@ -72,6 +72,9 @@ fn test_detect_accepts_git_file_as_gitdir_pointer() {
 
     let result = WorkspaceLayout::detect(root);
     // .git files ARE valid in Git (used for worktrees), so this should be detected
-    assert!(result.is_ok(), "Should detect .git file as valid repository");
+    assert!(
+        result.is_ok(),
+        "Should detect .git file as valid repository"
+    );
     assert_eq!(result.unwrap().mode, LayoutMode::Classic);
 }

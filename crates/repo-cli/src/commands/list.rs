@@ -53,12 +53,7 @@ pub fn run_list_tools(category_filter: Option<&str>) -> Result<()> {
         for slug in tools {
             if let Some(reg) = registry.get(slug) {
                 let config = &reg.definition.integration.config_path;
-                println!(
-                    "  {:<14} {} ({})",
-                    slug.green(),
-                    reg.name,
-                    config.dimmed()
-                );
+                println!("  {:<14} {} ({})", slug.green(), reg.name, config.dimmed());
             }
         }
         println!();

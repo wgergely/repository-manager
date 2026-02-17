@@ -48,11 +48,7 @@ impl PresetProvider for SuperpowersProvider {
         let install_dir = match super::paths::superpowers_install_dir(&self.version) {
             Some(dir) => dir,
             None => {
-                return Ok(CheckReport {
-                    status: PresetStatus::Broken,
-                    details: vec!["Cannot determine home directory".to_string()],
-                    action: ActionType::None,
-                });
+                return Ok(CheckReport::broken("Cannot determine home directory"));
             }
         };
 
@@ -75,7 +71,10 @@ impl PresetProvider for SuperpowersProvider {
                 }
             }
             Err(e) => {
-                return Ok(CheckReport::drifted(format!("Cannot read plugin.json: {}", e)));
+                return Ok(CheckReport::drifted(format!(
+                    "Cannot read plugin.json: {}",
+                    e
+                )));
             }
         }
 
@@ -95,8 +94,13 @@ impl PresetProvider for SuperpowersProvider {
             Err(_) => return Ok(CheckReport::healthy()),
         };
 
-        let plugin_key = format!("{}@{}", super::paths::PLUGIN_NAME, super::paths::MARKETPLACE_NAME);
-        let is_disabled = settings.get("enabledPlugins")
+        let plugin_key = format!(
+            "{}@{}",
+            super::paths::PLUGIN_NAME,
+            super::paths::MARKETPLACE_NAME
+        );
+        let is_disabled = settings
+            .get("enabledPlugins")
             .and_then(|ep| ep.get(&plugin_key))
             .and_then(|v| v.as_bool())
             .is_some_and(|enabled| !enabled);
@@ -120,14 +124,17 @@ impl PresetProvider for SuperpowersProvider {
             Some(dir) => dir,
             None => {
                 return Ok(ApplyReport::failure(vec![
-                    "Cannot determine home directory".to_string()
+                    "Cannot determine home directory".to_string(),
                 ]));
             }
         };
 
         // Clone if not present
         if !install_dir.exists() {
-            actions.push(format!("Cloning superpowers {} from {}", self.version, self.repo_url));
+            actions.push(format!(
+                "Cloning superpowers {} from {}",
+                self.version, self.repo_url
+            ));
 
             super::git::clone_repo(&self.repo_url, &install_dir, Some(&self.version))?;
 
@@ -138,7 +145,11 @@ impl PresetProvider for SuperpowersProvider {
 
         // Enable in Claude settings
         if let Some(settings_path) = super::paths::claude_settings_path() {
-            let plugin_key = format!("{}@{}", super::paths::PLUGIN_NAME, super::paths::MARKETPLACE_NAME);
+            let plugin_key = format!(
+                "{}@{}",
+                super::paths::PLUGIN_NAME,
+                super::paths::MARKETPLACE_NAME
+            );
 
             if !super::settings::is_enabled(&settings_path, &plugin_key) {
                 super::settings::enable_superpowers(&settings_path, &plugin_key)?;
@@ -148,13 +159,20 @@ impl PresetProvider for SuperpowersProvider {
 
         Ok(ApplyReport::success(actions))
     }
+}
 
-    async fn uninstall(&self, _context: &Context) -> Result<ApplyReport> {
+impl SuperpowersProvider {
+    /// Uninstall superpowers plugin and remove from Claude settings.
+    pub async fn uninstall(&self, _context: &Context) -> Result<ApplyReport> {
         let mut actions = Vec::new();
 
         // Disable in Claude settings first
         if let Some(settings_path) = super::paths::claude_settings_path() {
-            let plugin_key = format!("{}@{}", super::paths::PLUGIN_NAME, super::paths::MARKETPLACE_NAME);
+            let plugin_key = format!(
+                "{}@{}",
+                super::paths::PLUGIN_NAME,
+                super::paths::MARKETPLACE_NAME
+            );
 
             if super::settings::is_enabled(&settings_path, &plugin_key) {
                 super::settings::disable_superpowers(&settings_path, &plugin_key)?;
@@ -163,10 +181,14 @@ impl PresetProvider for SuperpowersProvider {
         }
 
         // Remove install directory
-        if let Some(install_dir) = super::paths::superpowers_install_dir(&self.version).filter(|d| d.exists()) {
+        if let Some(install_dir) =
+            super::paths::superpowers_install_dir(&self.version).filter(|d| d.exists())
+        {
             std::fs::remove_dir_all(&install_dir).map_err(|e| {
                 crate::error::Error::ClaudeSettings(format!(
-                    "Failed to remove {}: {}", install_dir.display(), e
+                    "Failed to remove {}: {}",
+                    install_dir.display(),
+                    e
                 ))
             })?;
             actions.push(format!("Removed {}", install_dir.display()));
@@ -200,9 +222,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_check_not_installed() {
-        use tempfile::TempDir;
-        use repo_fs::{NormalizedPath, WorkspaceLayout, LayoutMode};
+        use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
         use std::collections::HashMap;
+        use tempfile::TempDir;
 
         let temp = TempDir::new().unwrap();
         let layout = WorkspaceLayout {
@@ -221,9 +243,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_uninstall() {
-        use tempfile::TempDir;
-        use repo_fs::{NormalizedPath, WorkspaceLayout, LayoutMode};
+        use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
         use std::collections::HashMap;
+        use tempfile::TempDir;
 
         // This is a unit test - doesn't actually install
         let temp = TempDir::new().unwrap();

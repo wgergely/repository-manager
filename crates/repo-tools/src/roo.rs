@@ -5,7 +5,9 @@
 //! Reference: https://docs.roocode.com/features/custom-instructions
 
 use crate::generic::GenericToolIntegration;
-use repo_meta::schema::{ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta};
+use repo_meta::schema::{
+    ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta,
+};
 
 /// Creates a Roo Code integration.
 ///
@@ -27,9 +29,7 @@ pub fn roo_integration() -> GenericToolIntegration {
             // Primary path is the rules directory
             config_path: ".roo/rules/".into(),
             config_type: ConfigType::Markdown,
-            additional_paths: vec![
-                ".roomodes".into(),
-            ],
+            additional_paths: vec![".roomodes".into()],
         },
         capabilities: ToolCapabilities {
             supports_custom_instructions: true,

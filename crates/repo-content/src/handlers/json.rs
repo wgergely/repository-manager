@@ -77,8 +77,8 @@ impl FormatHandler for JsonHandler {
     ) -> Result<(String, Edit)> {
         let mut value: Value = serde_json::from_str(source)?;
 
-        let content_value: Value = serde_json::from_str(content)
-            .unwrap_or_else(|_| Value::String(content.to_string()));
+        let content_value: Value =
+            serde_json::from_str(content).unwrap_or_else(|_| Value::String(content.to_string()));
 
         let managed = value
             .as_object_mut()
@@ -105,8 +105,8 @@ impl FormatHandler for JsonHandler {
     fn update_block(&self, source: &str, uuid: Uuid, content: &str) -> Result<(String, Edit)> {
         let mut value: Value = serde_json::from_str(source)?;
 
-        let content_value: Value = serde_json::from_str(content)
-            .unwrap_or_else(|_| Value::String(content.to_string()));
+        let content_value: Value =
+            serde_json::from_str(content).unwrap_or_else(|_| Value::String(content.to_string()));
 
         let managed = value
             .get_mut(MANAGED_KEY)

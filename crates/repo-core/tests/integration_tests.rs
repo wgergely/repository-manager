@@ -4,11 +4,11 @@
 //! ensuring all components work together correctly.
 
 use pretty_assertions::assert_eq;
+use repo_core::Mode;
 use repo_core::backend::{ModeBackend, StandardBackend, WorktreeBackend};
 use repo_core::config::{ConfigResolver, RuntimeContext};
 use repo_core::ledger::{Intent, Ledger, Projection, ProjectionKind};
 use repo_core::sync::{CheckStatus, SyncEngine};
-use repo_core::Mode;
 use repo_fs::NormalizedPath;
 use serde_json::json;
 use std::fs;
@@ -35,7 +35,8 @@ fn test_complete_workflow() {
     // Step 1: Create temp directory with .git structure
     let temp = TempDir::new().expect("Failed to create temp dir");
     fs::create_dir(temp.path().join(".git")).expect("Failed to create .git");
-    fs::write(temp.path().join(".git/HEAD"), "ref: refs/heads/main\n").expect("Failed to write HEAD");
+    fs::write(temp.path().join(".git/HEAD"), "ref: refs/heads/main\n")
+        .expect("Failed to write HEAD");
     fs::create_dir_all(temp.path().join(".git/refs/heads")).expect("Failed to create refs/heads");
 
     // Step 2: Create .repository/config.toml with presets and tools
@@ -115,7 +116,8 @@ font_size = 14
     assert_eq!(json_output["runtime"]["rust"]["edition"], "2021");
 
     // Step 6: Create SyncEngine and run sync()
-    let engine = SyncEngine::new(root.clone(), Mode::Standard).expect("Failed to create SyncEngine");
+    let engine =
+        SyncEngine::new(root.clone(), Mode::Standard).expect("Failed to create SyncEngine");
 
     // Step 7: Verify sync succeeds
     let sync_report = engine.sync().expect("Sync failed");
@@ -123,7 +125,10 @@ font_size = 14
 
     // Verify ledger was created
     let ledger_path = engine.ledger_path();
-    assert!(ledger_path.exists(), "Ledger file should be created by sync");
+    assert!(
+        ledger_path.exists(),
+        "Ledger file should be created by sync"
+    );
 
     // Step 8: Run check() and verify healthy status
     let check_report = engine.check().expect("Check failed");
@@ -156,11 +161,16 @@ fn test_mode_backends() {
     // Create temp dir with .git
     let standard_temp = TempDir::new().expect("Failed to create temp dir");
     fs::create_dir(standard_temp.path().join(".git")).expect("Failed to create .git");
-    fs::write(standard_temp.path().join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
+    fs::write(
+        standard_temp.path().join(".git/HEAD"),
+        "ref: refs/heads/main\n",
+    )
+    .unwrap();
     fs::create_dir_all(standard_temp.path().join(".git/refs/heads")).unwrap();
 
     let standard_root = NormalizedPath::new(standard_temp.path());
-    let standard_backend = StandardBackend::new(standard_root.clone()).expect("Failed to create StandardBackend");
+    let standard_backend =
+        StandardBackend::new(standard_root.clone()).expect("Failed to create StandardBackend");
 
     // Verify config_root() returns root.join(".repository")
     let expected_config_root = standard_root.join(".repository");
@@ -185,7 +195,11 @@ fn test_mode_backends() {
     let worktree_temp = TempDir::new().expect("Failed to create temp dir");
     fs::create_dir(worktree_temp.path().join(".gt")).expect("Failed to create .gt");
     fs::create_dir(worktree_temp.path().join("main")).expect("Failed to create main/");
-    fs::write(worktree_temp.path().join(".gt/HEAD"), "ref: refs/heads/main\n").unwrap();
+    fs::write(
+        worktree_temp.path().join(".gt/HEAD"),
+        "ref: refs/heads/main\n",
+    )
+    .unwrap();
     fs::create_dir_all(worktree_temp.path().join(".gt/refs/heads")).unwrap();
 
     // Create .git file in main that points to .gt
@@ -197,7 +211,8 @@ fn test_mode_backends() {
 
     let container = NormalizedPath::new(worktree_temp.path());
     let main_worktree = NormalizedPath::new(worktree_temp.path().join("main"));
-    let worktree_backend = WorktreeBackend::new(container.clone()).expect("Failed to create WorktreeBackend");
+    let worktree_backend =
+        WorktreeBackend::new(container.clone()).expect("Failed to create WorktreeBackend");
 
     // Verify config_root() returns container.join(".repository") (shared)
     let expected_container_config = container.join(".repository");
@@ -219,7 +234,10 @@ fn test_mode_backends() {
     fs::create_dir(&feature_worktree_path).expect("Failed to create feature-x/");
     fs::write(
         feature_worktree_path.join(".git"),
-        format!("gitdir: {}/.gt/worktrees/feature-x", worktree_temp.path().display()),
+        format!(
+            "gitdir: {}/.gt/worktrees/feature-x",
+            worktree_temp.path().display()
+        ),
     )
     .expect("Failed to write feature-x/.git");
 
@@ -301,7 +319,10 @@ fn test_ledger_persistence() {
     ledger.add_intent(intent);
 
     // Add a second intent
-    let mut intent2 = Intent::new("rule:rust/style/naming".to_string(), json!({"strict": true}));
+    let mut intent2 = Intent::new(
+        "rule:rust/style/naming".to_string(),
+        json!({"strict": true}),
+    );
     intent2.add_projection(Projection::file_managed(
         "rustfmt".to_string(),
         std::path::PathBuf::from("rustfmt.toml"),
@@ -330,7 +351,11 @@ fn test_ledger_persistence() {
     assert_eq!(loaded_intent.args["exclude"][0], "test_*.py");
 
     // Verify projections
-    assert_eq!(loaded_intent.projections().len(), 3, "Should have 3 projections");
+    assert_eq!(
+        loaded_intent.projections().len(),
+        3,
+        "Should have 3 projections"
+    );
 
     // Verify TextBlock projection
     let text_block_proj = loaded_intent
@@ -378,7 +403,9 @@ fn test_ledger_persistence() {
     }
 
     // Verify second intent
-    let loaded_intent2 = loaded.get_intent(intent2_uuid).expect("Second intent should exist");
+    let loaded_intent2 = loaded
+        .get_intent(intent2_uuid)
+        .expect("Second intent should exist");
     assert_eq!(loaded_intent2.id, "rule:rust/style/naming");
     assert_eq!(loaded_intent2.args["strict"], true);
     assert_eq!(loaded_intent2.projections().len(), 1);

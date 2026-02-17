@@ -145,7 +145,8 @@ impl BackupManager {
     /// # Returns
     /// List of restored file paths
     pub fn restore_backup(&self, tool: &str) -> Result<Vec<PathBuf>> {
-        let backup = self.get_backup(tool)?
+        let backup = self
+            .get_backup(tool)?
             .ok_or_else(|| crate::Error::SyncError {
                 message: format!("No backup found for tool: {}", tool),
             })?;
@@ -257,7 +258,9 @@ mod tests {
         let file_path = PathBuf::from(".cursorrules");
         fs::write(temp.path().join(&file_path), "# Test content").unwrap();
 
-        let backup = manager.create_backup("cursor", &[file_path.clone()]).unwrap();
+        let backup = manager
+            .create_backup("cursor", std::slice::from_ref(&file_path))
+            .unwrap();
 
         assert_eq!(backup.tool, "cursor");
         assert_eq!(backup.metadata.files.len(), 1);
@@ -290,7 +293,9 @@ mod tests {
         let file_path = PathBuf::from(".cursorrules");
         let original_content = "# Test content";
         fs::write(temp.path().join(&file_path), original_content).unwrap();
-        manager.create_backup("cursor", &[file_path.clone()]).unwrap();
+        manager
+            .create_backup("cursor", std::slice::from_ref(&file_path))
+            .unwrap();
 
         // Delete the original file
         fs::remove_file(temp.path().join(&file_path)).unwrap();
@@ -335,8 +340,12 @@ mod tests {
         fs::create_dir_all(temp.path().join(".vscode")).unwrap();
         fs::write(temp.path().join(".vscode/settings.json"), "{}").unwrap();
 
-        manager.create_backup("cursor", &[PathBuf::from(".cursorrules")]).unwrap();
-        manager.create_backup("vscode", &[PathBuf::from(".vscode/settings.json")]).unwrap();
+        manager
+            .create_backup("cursor", &[PathBuf::from(".cursorrules")])
+            .unwrap();
+        manager
+            .create_backup("vscode", &[PathBuf::from(".vscode/settings.json")])
+            .unwrap();
 
         // List backups
         let backups = manager.list_backups().unwrap();
@@ -355,7 +364,9 @@ mod tests {
         fs::write(temp.path().join(&file_path), original_content).unwrap();
 
         // Create backup
-        manager.create_backup("vscode", &[file_path.clone()]).unwrap();
+        manager
+            .create_backup("vscode", std::slice::from_ref(&file_path))
+            .unwrap();
 
         // Delete original
         fs::remove_dir_all(&nested_dir).unwrap();

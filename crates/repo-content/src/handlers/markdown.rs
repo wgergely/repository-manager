@@ -15,8 +15,7 @@ use crate::error::{Error, Result};
 use crate::format::{Format, FormatHandler};
 
 /// Pattern to match multiple consecutive blank lines (markdown-specific normalization)
-static MULTIPLE_BLANK_LINES: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\n{3,}").unwrap());
+static MULTIPLE_BLANK_LINES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\n{3,}").unwrap());
 
 /// Handler for Markdown files with HTML comment markers
 #[derive(Debug, Default)]
@@ -71,7 +70,9 @@ impl FormatHandler for MarkdownHandler {
             .join("\n");
 
         // Collapse multiple consecutive blank lines (\n\n\n+) to single blank line (\n\n)
-        normalized = MULTIPLE_BLANK_LINES.replace_all(&normalized, "\n\n").to_string();
+        normalized = MULTIPLE_BLANK_LINES
+            .replace_all(&normalized, "\n\n")
+            .to_string();
 
         // Trim overall content
         normalized = normalized.trim().to_string();

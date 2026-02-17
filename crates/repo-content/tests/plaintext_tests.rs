@@ -64,7 +64,9 @@ fn test_plaintext_update_block() {
 Original content
 <!-- /repo:block:550e8400-e29b-41d4-a716-446655440000 -->"#;
 
-    let (result, _edit) = handler.update_block(source, uuid, "Updated content").unwrap();
+    let (result, _edit) = handler
+        .update_block(source, uuid, "Updated content")
+        .unwrap();
 
     assert!(result.contains("Updated content"));
     assert!(!result.contains("Original content"));
@@ -93,7 +95,8 @@ fn test_plaintext_normalize() {
     let source = "  Line with trailing spaces   \n  Another line  \n";
 
     let normalized = handler.normalize(source).unwrap();
-    let expected = serde_json::Value::String("Line with trailing spaces\n  Another line".to_string());
+    let expected =
+        serde_json::Value::String("Line with trailing spaces\n  Another line".to_string());
 
     assert_eq!(normalized, expected);
 }
@@ -127,7 +130,12 @@ fn test_plaintext_insert_block_after_marker() {
 
     let source = "Header\n---\nContent below";
     let (result, _edit) = handler
-        .insert_block(source, uuid, "Inserted", BlockLocation::After("---".to_string()))
+        .insert_block(
+            source,
+            uuid,
+            "Inserted",
+            BlockLocation::After("---".to_string()),
+        )
         .unwrap();
 
     assert!(result.contains("Header\n---"));

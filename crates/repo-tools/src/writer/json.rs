@@ -5,8 +5,8 @@
 use super::{ConfigWriter, SchemaKeys};
 use crate::error::Result;
 use crate::translator::TranslatedContent;
-use repo_fs::{io, NormalizedPath};
-use serde_json::{json, Value};
+use repo_fs::{NormalizedPath, io};
+use serde_json::{Value, json};
 
 /// JSON config writer that semantically merges content.
 ///

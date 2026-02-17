@@ -10,7 +10,11 @@ fn test_registry_add_rule_generates_uuid() {
 
     let mut registry = RuleRegistry::new(registry_path);
     let rule = registry
-        .add_rule("python-style", "Use snake_case for variables", vec!["python".to_string()])
+        .add_rule(
+            "python-style",
+            "Use snake_case for variables",
+            vec!["python".to_string()],
+        )
         .unwrap();
 
     assert!(!rule.uuid.is_nil());
@@ -44,9 +48,7 @@ fn test_registry_get_rule_by_uuid() {
     let registry_path = temp.path().join("registry.toml");
 
     let mut registry = RuleRegistry::new(registry_path);
-    let rule = registry
-        .add_rule("my-rule", "Content", vec![])
-        .unwrap();
+    let rule = registry.add_rule("my-rule", "Content", vec![]).unwrap();
     let uuid = rule.uuid;
 
     let found = registry.get_rule(uuid);
@@ -60,9 +62,7 @@ fn test_registry_get_rule_by_id() {
     let registry_path = temp.path().join("registry.toml");
 
     let mut registry = RuleRegistry::new(registry_path);
-    registry
-        .add_rule("unique-id", "Content", vec![])
-        .unwrap();
+    registry.add_rule("unique-id", "Content", vec![]).unwrap();
 
     let found = registry.get_rule_by_id("unique-id");
     assert!(found.is_some());
@@ -78,9 +78,7 @@ fn test_registry_remove_rule() {
     let registry_path = temp.path().join("registry.toml");
 
     let mut registry = RuleRegistry::new(registry_path);
-    let rule = registry
-        .add_rule("to-remove", "Content", vec![])
-        .unwrap();
+    let rule = registry.add_rule("to-remove", "Content", vec![]).unwrap();
     let uuid = rule.uuid;
 
     assert_eq!(registry.all_rules().len(), 1);
@@ -140,7 +138,11 @@ fn test_registry_rules_by_tag() {
         .add_rule("py1", "Python rule 1", vec!["python".to_string()])
         .unwrap();
     registry
-        .add_rule("py2", "Python rule 2", vec!["python".to_string(), "style".to_string()])
+        .add_rule(
+            "py2",
+            "Python rule 2",
+            vec!["python".to_string(), "style".to_string()],
+        )
         .unwrap();
     registry
         .add_rule("js1", "JS rule", vec!["javascript".to_string()])
@@ -163,8 +165,14 @@ fn test_registry_duplicate_id_allowed() {
     let registry_path = temp.path().join("registry.toml");
 
     let mut registry = RuleRegistry::new(registry_path);
-    let uuid1 = registry.add_rule("same-id", "Content 1", vec![]).unwrap().uuid;
-    let uuid2 = registry.add_rule("same-id", "Content 2", vec![]).unwrap().uuid;
+    let uuid1 = registry
+        .add_rule("same-id", "Content 1", vec![])
+        .unwrap()
+        .uuid;
+    let uuid2 = registry
+        .add_rule("same-id", "Content 2", vec![])
+        .unwrap()
+        .uuid;
 
     // Both should exist with different UUIDs
     assert_ne!(uuid1, uuid2);

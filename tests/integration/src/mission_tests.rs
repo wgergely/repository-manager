@@ -8,16 +8,17 @@
 //! - Expected behavior
 //! - Current implementation status
 
-use repo_core::sync::{CheckStatus, SyncEngine};
 use repo_core::Mode;
+use repo_core::sync::{CheckStatus, SyncEngine};
 use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
-use repo_git::{ClassicLayout, ContainerLayout, LayoutProvider, NamingStrategy, naming::branch_to_directory};
+use repo_git::{
+    ClassicLayout, ContainerLayout, LayoutProvider, NamingStrategy, naming::branch_to_directory,
+};
 use repo_meta::load_config;
-use repo_presets::{Context, PresetProvider, PresetStatus, UvProvider};
+use repo_presets::{Context, PresetProvider, PresetStatus, SuperpowersProvider, UvProvider};
 use repo_tools::{
-    antigravity_integration, claude_integration, cursor_integration,
-    gemini_integration, windsurf_integration, VSCodeIntegration,
-    Rule, SyncContext, ToolIntegration,
+    Rule, SyncContext, ToolIntegration, VSCodeIntegration, antigravity_integration,
+    claude_integration, cursor_integration, gemini_integration, windsurf_integration,
 };
 use std::collections::HashMap;
 use std::fs;
@@ -32,6 +33,12 @@ use tempfile::TempDir;
 pub struct TestRepo {
     temp_dir: TempDir,
     initialized: bool,
+}
+
+impl Default for TestRepo {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TestRepo {
@@ -260,14 +267,18 @@ mod m2_branch {
     #[test]
     fn m2_4_container_git_database_path() {
         let repo = TestRepo::new();
-        fs::create_dir(repo.root().join(".gt")).unwrap();  // ContainerLayout uses .gt
+        fs::create_dir(repo.root().join(".gt")).unwrap(); // ContainerLayout uses .gt
         fs::create_dir(repo.root().join("main")).unwrap();
 
         match ContainerLayout::new(NormalizedPath::new(repo.root()), NamingStrategy::Slug) {
             Ok(layout) => {
                 let git_db = layout.git_database();
                 // ContainerLayout uses .gt for the git database
-                assert!(git_db.as_str().ends_with(".gt"), "Expected .gt, got: {}", git_db.as_str());
+                assert!(
+                    git_db.as_str().ends_with(".gt"),
+                    "Expected .gt, got: {}",
+                    git_db.as_str()
+                );
             }
             Err(e) => {
                 println!("ContainerLayout::new() error: {:?}", e);
@@ -470,7 +481,11 @@ mod m4_tools {
     fn m4_1_vscode_integration_info() {
         let vscode = VSCodeIntegration::new();
         assert_eq!(vscode.name(), "vscode");
-        let paths: Vec<_> = vscode.config_locations().into_iter().map(|l| l.path).collect();
+        let paths: Vec<_> = vscode
+            .config_locations()
+            .into_iter()
+            .map(|l| l.path)
+            .collect();
         assert!(paths.contains(&".vscode/settings.json".to_string()));
     }
 
@@ -479,7 +494,11 @@ mod m4_tools {
     fn m4_2_cursor_integration_info() {
         let cursor = cursor_integration();
         assert_eq!(cursor.name(), "cursor");
-        let paths: Vec<_> = cursor.config_locations().into_iter().map(|l| l.path).collect();
+        let paths: Vec<_> = cursor
+            .config_locations()
+            .into_iter()
+            .map(|l| l.path)
+            .collect();
         assert!(paths.contains(&".cursorrules".to_string()));
     }
 
@@ -488,7 +507,11 @@ mod m4_tools {
     fn m4_3_claude_integration_info() {
         let claude = claude_integration();
         assert_eq!(claude.name(), "claude");
-        let paths: Vec<_> = claude.config_locations().into_iter().map(|l| l.path).collect();
+        let paths: Vec<_> = claude
+            .config_locations()
+            .into_iter()
+            .map(|l| l.path)
+            .collect();
         assert!(paths.contains(&"CLAUDE.md".to_string()));
     }
 
@@ -510,8 +533,7 @@ mod m4_tools {
         fs::create_dir_all(python_path.parent().unwrap()).unwrap();
         fs::write(&python_path, "mock").unwrap();
 
-        let context =
-            SyncContext::new(root).with_python(NormalizedPath::new(&python_path));
+        let context = SyncContext::new(root).with_python(NormalizedPath::new(&python_path));
         let rules = vec![];
 
         VSCodeIntegration::new().sync(&context, &rules).unwrap();
@@ -576,6 +598,47 @@ mod m5_presets {
         let registry = repo_meta::Registry::with_builtins();
         assert!(!registry.has_provider("env:nonexistent"));
         assert_eq!(registry.get_provider("env:nonexistent"), None);
+    }
+
+    /// M5.5: Superpowers provider ID
+    #[test]
+    fn m5_5_superpowers_provider_id() {
+        let provider = SuperpowersProvider::new();
+        assert_eq!(provider.id(), "claude:superpowers");
+    }
+
+    /// M5.6: Registry has superpowers provider
+    #[test]
+    fn m5_6_registry_has_superpowers_provider() {
+        let registry = repo_meta::Registry::with_builtins();
+        assert!(registry.has_provider("claude:superpowers"));
+        assert_eq!(
+            registry.get_provider("claude:superpowers"),
+            Some(&"superpowers".to_string())
+        );
+    }
+
+    /// M5.7: Superpowers check returns non-healthy when not installed
+    #[tokio::test]
+    async fn m5_7_superpowers_check_not_installed() {
+        let repo = TestRepo::new();
+        let layout = WorkspaceLayout {
+            root: NormalizedPath::new(repo.root()),
+            active_context: NormalizedPath::new(repo.root()),
+            mode: LayoutMode::Classic,
+        };
+
+        let context = Context::new(layout, HashMap::new());
+        let provider = SuperpowersProvider::new();
+
+        let report = provider.check(&context).await.unwrap();
+
+        // Should not be healthy since superpowers is not installed
+        assert_ne!(
+            report.status,
+            PresetStatus::Healthy,
+            "Expected non-healthy status when superpowers is not installed"
+        );
     }
 }
 
@@ -700,12 +763,10 @@ content = "Test content"
         repo.init_repo_manager("standard", &["antigravity"], &[]);
 
         let root = NormalizedPath::new(repo.root());
-        let rules = vec![
-            Rule {
-                id: "test-rule".to_string(),
-                content: "Test content for Antigravity".to_string(),
-            },
-        ];
+        let rules = vec![Rule {
+            id: "test-rule".to_string(),
+            content: "Test content for Antigravity".to_string(),
+        }];
         let context = SyncContext::new(root);
 
         antigravity_integration().sync(&context, &rules).unwrap();
@@ -727,12 +788,10 @@ content = "Test content"
         repo.init_repo_manager("standard", &["windsurf"], &[]);
 
         let root = NormalizedPath::new(repo.root());
-        let rules = vec![
-            Rule {
-                id: "test-rule".to_string(),
-                content: "Test content for Windsurf".to_string(),
-            },
-        ];
+        let rules = vec![Rule {
+            id: "test-rule".to_string(),
+            content: "Test content for Windsurf".to_string(),
+        }];
         let context = SyncContext::new(root);
 
         windsurf_integration().sync(&context, &rules).unwrap();
@@ -754,12 +813,10 @@ content = "Test content"
         repo.init_repo_manager("standard", &["gemini"], &[]);
 
         let root = NormalizedPath::new(repo.root());
-        let rules = vec![
-            Rule {
-                id: "test-rule".to_string(),
-                content: "Test content for Gemini".to_string(),
-            },
-        ];
+        let rules = vec![Rule {
+            id: "test-rule".to_string(),
+            content: "Test content for Gemini".to_string(),
+        }];
         let context = SyncContext::new(root);
 
         gemini_integration().sync(&context, &rules).unwrap();
@@ -822,8 +879,8 @@ content = "Test content"
     /// GAP-013: Rust env provider - now implemented
     #[tokio::test]
     async fn gap_013_rust_provider() {
-        use repo_presets::RustProvider;
         use repo_presets::PresetProvider;
+        use repo_presets::RustProvider;
 
         let provider = RustProvider::new();
         assert_eq!(provider.id(), "env:rust");
@@ -855,7 +912,10 @@ content = "Test content"
         assert!(tool_names.contains(&"git_push"), "Should have git_push");
         assert!(tool_names.contains(&"git_pull"), "Should have git_pull");
         assert!(tool_names.contains(&"git_merge"), "Should have git_merge");
-        assert!(tool_names.contains(&"branch_create"), "Should have branch_create");
+        assert!(
+            tool_names.contains(&"branch_create"),
+            "Should have branch_create"
+        );
 
         // Verify resources are loaded
         let resources = server.resources();
@@ -909,9 +969,17 @@ mod robustness {
 
         for (branch_name, should_sanitize) in test_cases {
             let slug = branch_to_directory(branch_name, NamingStrategy::Slug);
-            assert!(!slug.is_empty(), "Slug should not be empty for {}", branch_name);
+            assert!(
+                !slug.is_empty(),
+                "Slug should not be empty for {}",
+                branch_name
+            );
             if should_sanitize {
-                assert!(!slug.contains('/'), "Slug should not contain slashes: {}", slug);
+                assert!(
+                    !slug.contains('/'),
+                    "Slug should not contain slashes: {}",
+                    slug
+                );
             }
         }
     }
@@ -988,12 +1056,10 @@ mod consumer_verification {
         repo.init_repo_manager("standard", &["cursor"], &[]);
 
         let root = NormalizedPath::new(repo.root());
-        let rules = vec![
-            Rule {
-                id: "test-rule".to_string(),
-                content: "# Test Rule\n\nUse **bold** and _italic_ text.".to_string(),
-            },
-        ];
+        let rules = vec![Rule {
+            id: "test-rule".to_string(),
+            content: "# Test Rule\n\nUse **bold** and _italic_ text.".to_string(),
+        }];
         let context = SyncContext::new(root);
 
         cursor_integration().sync(&context, &rules).unwrap();
@@ -1020,12 +1086,12 @@ mod consumer_verification {
         repo.init_repo_manager("standard", &["claude"], &[]);
 
         let root = NormalizedPath::new(repo.root());
-        let rules = vec![
-            Rule {
-                id: "api-design".to_string(),
-                content: "## API Guidelines\n\n- Return JSON with data, error fields\n- Use REST conventions".to_string(),
-            },
-        ];
+        let rules = vec![Rule {
+            id: "api-design".to_string(),
+            content:
+                "## API Guidelines\n\n- Return JSON with data, error fields\n- Use REST conventions"
+                    .to_string(),
+        }];
         let context = SyncContext::new(root);
 
         claude_integration().sync(&context, &rules).unwrap();

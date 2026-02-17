@@ -54,6 +54,14 @@ impl CheckReport {
             action: ActionType::Repair,
         }
     }
+
+    pub fn broken(detail: impl Into<String>) -> Self {
+        Self {
+            status: PresetStatus::Broken,
+            details: vec![detail.into()],
+            action: ActionType::Install,
+        }
+    }
 }
 
 /// Report from applying a preset

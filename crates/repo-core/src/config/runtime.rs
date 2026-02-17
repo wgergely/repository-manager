@@ -161,10 +161,9 @@ mod tests {
         assert!(!context.has_runtime());
         assert!(!context.has_capabilities());
 
-        context.runtime.insert(
-            "python".to_string(),
-            serde_json::json!({"version": "3.12"}),
-        );
+        context
+            .runtime
+            .insert("python".to_string(), serde_json::json!({"version": "3.12"}));
         context.capabilities.push("tool:linter".to_string());
 
         assert!(context.has_runtime());

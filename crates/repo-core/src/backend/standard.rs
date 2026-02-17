@@ -26,10 +26,7 @@ impl StandardBackend {
         let git_dir = root.join(".git");
         if !git_dir.exists() {
             return Err(Error::Fs(repo_fs::Error::LayoutValidation {
-                message: format!(
-                    "Not a git repository: .git not found at {}",
-                    root.as_str()
-                ),
+                message: format!("Not a git repository: .git not found at {}", root.as_str()),
             }));
         }
 
@@ -120,11 +117,8 @@ impl ModeBackend for StandardBackend {
     }
 
     fn list_branches(&self) -> Result<Vec<BranchInfo>> {
-        let output = self.git_command(&[
-            "for-each-ref",
-            "--format=%(refname:short)",
-            "refs/heads/",
-        ])?;
+        let output =
+            self.git_command(&["for-each-ref", "--format=%(refname:short)", "refs/heads/"])?;
 
         let current = self.current_branch()?;
         let main_branch = self.main_branch_name();

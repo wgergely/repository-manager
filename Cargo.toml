@@ -18,10 +18,6 @@ serde_yaml = "0.9"
 # Format-preserving editors
 toml_edit = "0.23"
 
-# tree-sitter
-tree-sitter = "0.24"
-tree-sitter-md = "0.3"
-
 # Diffing
 similar = "2.7"
 

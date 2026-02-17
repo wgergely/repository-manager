@@ -7,6 +7,6 @@ mod builtins;
 mod store;
 mod types;
 
-pub use builtins::{builtin_registrations, BUILTIN_COUNT};
+pub use builtins::{BUILTIN_COUNT, builtin_registrations};
 pub use store::ToolRegistry;
 pub use types::{ToolCategory, ToolRegistration};

@@ -14,9 +14,12 @@ use repo_core::{
     CheckStatus, Manifest, Mode, ModeBackend, StandardBackend, SyncEngine, SyncOptions,
     WorktreeBackend,
 };
-use repo_fs::NormalizedPath;
+use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
+use repo_meta::Registry;
+use repo_presets::{Context, PresetProvider, SuperpowersProvider};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
+use std::collections::HashMap;
 
 use crate::{Error, Result};
 
@@ -44,6 +47,16 @@ pub async fn handle_tool_call(root: &Path, tool_name: &str, arguments: Value) ->
         "tool_remove" => handle_tool_remove(root, arguments).await,
         "rule_add" => handle_rule_add(root, arguments).await,
         "rule_remove" => handle_rule_remove(root, arguments).await,
+
+        // Preset Management
+        "preset_list" => handle_preset_list(root).await,
+        "preset_add" => handle_preset_add(root, arguments).await,
+        "preset_remove" => handle_preset_remove(root, arguments).await,
+
+        // Superpowers Plugin
+        "superpowers_install" => handle_superpowers_install(root, arguments).await,
+        "superpowers_status" => handle_superpowers_status(root).await,
+        "superpowers_uninstall" => handle_superpowers_uninstall(root, arguments).await,
 
         _ => Err(Error::UnknownTool(tool_name.to_string())),
     }
@@ -455,6 +468,201 @@ async fn handle_rule_remove(root: &Path, arguments: Value) -> Result<Value> {
 }
 
 // ============================================================================
+// Preset Management Handlers
+// ============================================================================
+
+/// Handle preset_list - List configured presets and available preset types
+async fn handle_preset_list(root: &Path) -> Result<Value> {
+    let normalized_root = NormalizedPath::new(root);
+    let config_path = find_config_path(&normalized_root)?;
+
+    let content = fs::read_to_string(config_path.as_ref())?;
+    let manifest: Manifest = toml::from_str(&content)?;
+
+    let configured: Vec<Value> = manifest
+        .presets
+        .iter()
+        .map(|(name, config)| {
+            json!({
+                "name": name,
+                "config": config,
+            })
+        })
+        .collect();
+
+    let registry = Registry::with_builtins();
+    let available = registry.list_presets();
+
+    Ok(json!({
+        "configured": configured,
+        "configured_count": manifest.presets.len(),
+        "available": available,
+    }))
+}
+
+/// Arguments for preset_add
+#[derive(Debug, Deserialize)]
+struct PresetAddArgs {
+    name: String,
+}
+
+/// Handle preset_add - Add a preset to the repository configuration
+async fn handle_preset_add(root: &Path, arguments: Value) -> Result<Value> {
+    let args: PresetAddArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    let normalized_root = NormalizedPath::new(root);
+    let config_path = find_config_path(&normalized_root)?;
+
+    let content = fs::read_to_string(config_path.as_ref())?;
+    let mut manifest: Manifest = toml::from_str(&content)?;
+
+    // Check if preset already exists
+    if manifest.presets.contains_key(&args.name) {
+        return Ok(json!({
+            "success": false,
+            "message": format!("Preset '{}' is already configured", args.name),
+        }));
+    }
+
+    // Add the preset with an empty config
+    manifest.presets.insert(args.name.clone(), json!({}));
+
+    let new_content = serialize_manifest(&manifest)?;
+    fs::write(config_path.as_ref(), &new_content)?;
+
+    Ok(json!({
+        "success": true,
+        "preset": args.name,
+        "message": format!("Added preset '{}'", args.name),
+    }))
+}
+
+/// Arguments for preset_remove
+#[derive(Debug, Deserialize)]
+struct PresetRemoveArgs {
+    name: String,
+}
+
+/// Handle preset_remove - Remove a preset from the repository configuration
+async fn handle_preset_remove(root: &Path, arguments: Value) -> Result<Value> {
+    let args: PresetRemoveArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    let normalized_root = NormalizedPath::new(root);
+    let config_path = find_config_path(&normalized_root)?;
+
+    let content = fs::read_to_string(config_path.as_ref())?;
+    let mut manifest: Manifest = toml::from_str(&content)?;
+
+    if manifest.presets.remove(&args.name).is_none() {
+        return Ok(json!({
+            "success": false,
+            "message": format!("Preset '{}' is not configured", args.name),
+        }));
+    }
+
+    let new_content = serialize_manifest(&manifest)?;
+    fs::write(config_path.as_ref(), &new_content)?;
+
+    Ok(json!({
+        "success": true,
+        "preset": args.name,
+        "message": format!("Removed preset '{}'", args.name),
+    }))
+}
+
+// ============================================================================
+// Superpowers Plugin Handlers
+// ============================================================================
+
+/// Create a preset context from the repository root
+fn create_preset_context(root: &Path) -> Context {
+    let normalized = NormalizedPath::new(root);
+    let layout = WorkspaceLayout {
+        root: normalized.clone(),
+        active_context: normalized,
+        mode: LayoutMode::Classic,
+    };
+    Context::new(layout, HashMap::new())
+}
+
+/// Handle superpowers_install - Install the superpowers Claude Code plugin
+async fn handle_superpowers_install(root: &Path, arguments: Value) -> Result<Value> {
+    let version = arguments
+        .get("version")
+        .and_then(|v| v.as_str())
+        .unwrap_or("latest");
+
+    let provider = SuperpowersProvider::new().with_version(version);
+    let context = create_preset_context(root);
+
+    let check = provider
+        .check(&context)
+        .await
+        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    if check.status == repo_presets::PresetStatus::Healthy {
+        return Ok(json!({
+            "success": true,
+            "message": format!("Superpowers {} is already installed and enabled", version),
+            "status": "healthy",
+        }));
+    }
+
+    let report = provider
+        .apply(&context)
+        .await
+        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    Ok(json!({
+        "success": report.success,
+        "actions": report.actions_taken,
+        "errors": report.errors,
+    }))
+}
+
+/// Handle superpowers_status - Check superpowers installation status
+async fn handle_superpowers_status(root: &Path) -> Result<Value> {
+    let provider = SuperpowersProvider::new();
+    let context = create_preset_context(root);
+
+    let check = provider
+        .check(&context)
+        .await
+        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    Ok(json!({
+        "status": format!("{:?}", check.status),
+        "healthy": check.status == repo_presets::PresetStatus::Healthy,
+        "details": check.details,
+        "action": format!("{:?}", check.action),
+    }))
+}
+
+/// Handle superpowers_uninstall - Uninstall the superpowers plugin
+async fn handle_superpowers_uninstall(root: &Path, arguments: Value) -> Result<Value> {
+    let version = arguments
+        .get("version")
+        .and_then(|v| v.as_str())
+        .unwrap_or("latest");
+
+    let provider = SuperpowersProvider::new().with_version(version);
+    let context = create_preset_context(root);
+
+    let report = provider
+        .uninstall(&context)
+        .await
+        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    Ok(json!({
+        "success": report.success,
+        "actions": report.actions_taken,
+        "errors": report.errors,
+    }))
+}
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -506,16 +714,15 @@ fn detect_mode(root: &NormalizedPath) -> Result<Mode> {
 
     // Check for config.toml to determine mode
     let config_path = find_config_path(root).ok();
-    if let Some(path) = config_path {
-        if let Ok(content) = fs::read_to_string(path.as_ref()) {
-            if let Ok(manifest) = Manifest::parse(&content) {
-                return manifest
-                    .core
-                    .mode
-                    .parse()
-                    .map_err(|_| Error::InvalidArgument("Invalid mode in config".to_string()));
-            }
-        }
+    if let Some(path) = config_path
+        && let Ok(content) = fs::read_to_string(path.as_ref())
+        && let Ok(manifest) = Manifest::parse(&content)
+    {
+        return manifest
+            .core
+            .mode
+            .parse()
+            .map_err(|_| Error::InvalidArgument("Invalid mode in config".to_string()));
     }
 
     // Default to standard mode
@@ -605,76 +812,7 @@ fn find_rules_dir(root: &NormalizedPath) -> Result<NormalizedPath> {
 
 /// Serialize a manifest back to TOML format
 fn serialize_manifest(manifest: &Manifest) -> Result<String> {
-    // Build a cleaner TOML representation
-    let mut output = String::new();
-
-    // Tools array
-    if manifest.tools.is_empty() {
-        output.push_str("tools = []\n");
-    } else {
-        output.push_str("tools = [");
-        for (i, tool) in manifest.tools.iter().enumerate() {
-            if i > 0 {
-                output.push_str(", ");
-            }
-            output.push('"');
-            output.push_str(tool);
-            output.push('"');
-        }
-        output.push_str("]\n");
-    }
-
-    // Rules array (if any)
-    if !manifest.rules.is_empty() {
-        output.push_str("rules = [");
-        for (i, rule) in manifest.rules.iter().enumerate() {
-            if i > 0 {
-                output.push_str(", ");
-            }
-            output.push('"');
-            output.push_str(rule);
-            output.push('"');
-        }
-        output.push_str("]\n");
-    }
-
-    output.push('\n');
-
-    // Core section
-    output.push_str("[core]\n");
-    output.push_str(&format!("mode = \"{}\"\n", manifest.core.mode));
-
-    // Presets (if any)
-    for (key, value) in &manifest.presets {
-        output.push('\n');
-        output.push_str(&format!("[presets.\"{}\"]\n", key));
-        if let Some(obj) = value.as_object() {
-            for (k, v) in obj {
-                let toml_value = json_to_toml_value(v);
-                output.push_str(&format!("{} = {}\n", k, toml_value));
-            }
-        }
-    }
-
-    Ok(output)
-}
-
-/// Convert a JSON value to a TOML-compatible string representation
-fn json_to_toml_value(value: &Value) -> String {
-    match value {
-        Value::String(s) => format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"")),
-        Value::Number(n) => n.to_string(),
-        Value::Bool(b) => b.to_string(),
-        Value::Array(arr) => {
-            let items: Vec<String> = arr.iter().map(json_to_toml_value).collect();
-            format!("[{}]", items.join(", "))
-        }
-        Value::Object(_) => {
-            // Nested objects would need inline tables, simplified for now
-            "{}".to_string()
-        }
-        Value::Null => "\"\"".to_string(),
-    }
+    Ok(manifest.to_toml())
 }
 
 #[cfg(test)]
@@ -688,18 +826,6 @@ mod tests {
         fs::write(
             dir.join(".repository/config.toml"),
             "tools = []\n\n[core]\nmode = \"standard\"\n",
-        )
-        .unwrap();
-    }
-
-    #[allow(dead_code)]
-    fn create_test_worktree_container(dir: &std::path::Path) {
-        fs::create_dir_all(dir.join(".gt")).unwrap();
-        fs::create_dir_all(dir.join("main")).unwrap();
-        fs::create_dir_all(dir.join(".repository")).unwrap();
-        fs::write(
-            dir.join(".repository/config.toml"),
-            "tools = []\n\n[core]\nmode = \"worktrees\"\n",
         )
         .unwrap();
     }
@@ -1023,6 +1149,7 @@ mod tests {
 
     #[test]
     fn test_json_to_toml_value() {
+        use repo_core::json_to_toml_value;
         assert_eq!(json_to_toml_value(&json!("hello")), "\"hello\"");
         assert_eq!(json_to_toml_value(&json!(42)), "42");
         assert_eq!(json_to_toml_value(&json!(true)), "true");

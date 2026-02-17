@@ -10,11 +10,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
+use crate::Result;
 use crate::backend::{ModeBackend, StandardBackend, WorktreeBackend};
 use crate::config::Manifest;
 use crate::ledger::{Ledger, ProjectionKind};
 use crate::mode::Mode;
-use crate::Result;
 use repo_fs::NormalizedPath;
 
 use super::check::{CheckReport, CheckStatus, DriftItem};
@@ -209,7 +209,10 @@ impl SyncEngine {
                         }
                     }
 
-                    ProjectionKind::TextBlock { marker, checksum: _ } => {
+                    ProjectionKind::TextBlock {
+                        marker,
+                        checksum: _,
+                    } => {
                         if !file_path.exists() {
                             missing.push(DriftItem {
                                 intent_id: intent.id.clone(),
@@ -377,7 +380,9 @@ impl SyncEngine {
                         }
                     }
                     Err(e) => {
-                        report.errors.push(format!("Failed to sync {}: {}", tool_name, e));
+                        report
+                            .errors
+                            .push(format!("Failed to sync {}: {}", tool_name, e));
                     }
                 }
             }

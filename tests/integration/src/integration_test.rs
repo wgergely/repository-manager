@@ -6,7 +6,7 @@ use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
 use repo_meta::{Registry, load_config};
 use repo_presets::{Context, PresetProvider, PresetStatus, UvProvider};
 use repo_tools::{
-    claude_integration, cursor_integration, Rule, SyncContext, ToolIntegration, VSCodeIntegration,
+    Rule, SyncContext, ToolIntegration, VSCodeIntegration, claude_integration, cursor_integration,
 };
 use std::collections::HashMap;
 use std::fs;

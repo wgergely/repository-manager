@@ -31,10 +31,6 @@ thiserror = { workspace = true }
 # Logging
 tracing = { workspace = true }
 
-# Async
-async-trait = { workspace = true }
-tokio = { workspace = true }
-
 [dev-dependencies]
 tempfile = { workspace = true }
 rstest = { workspace = true }

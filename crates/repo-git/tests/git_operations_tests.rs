@@ -1,11 +1,11 @@
 //! Tests for git push/pull/merge operations
 
 use repo_fs::NormalizedPath;
+use repo_git::NamingStrategy;
 use repo_git::classic::ClassicLayout;
 use repo_git::container::ContainerLayout;
 use repo_git::in_repo_worktrees::InRepoWorktreesLayout;
 use repo_git::provider::LayoutProvider;
-use repo_git::NamingStrategy;
 use std::fs;
 use std::process::Command;
 use tempfile::TempDir;

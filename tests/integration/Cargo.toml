@@ -11,7 +11,6 @@ repo-core = { path = "../../crates/repo-core" }
 repo-meta = { path = "../../crates/repo-meta" }
 repo-presets = { path = "../../crates/repo-presets" }
 repo-tools = { path = "../../crates/repo-tools" }
-repo-blocks = { path = "../../crates/repo-blocks" }
 repo-mcp = { path = "../../crates/repo-mcp" }
 assert_cmd = "2"
 predicates = { workspace = true }

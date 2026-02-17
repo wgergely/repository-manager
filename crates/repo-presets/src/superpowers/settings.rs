@@ -1,7 +1,7 @@
 //! Claude settings.json manipulation
 
 use crate::error::{Error, Result};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::Path;
 
 /// Enable superpowers in Claude's settings.json
@@ -50,7 +50,10 @@ pub fn disable_superpowers(settings_path: &Path, plugin_key: &str) -> Result<()>
         .map_err(|e| Error::ClaudeSettings(format!("Invalid JSON: {}", e)))?;
 
     // Remove plugin key from enabledPlugins
-    if let Some(obj) = settings.get_mut("enabledPlugins").and_then(|ep| ep.as_object_mut()) {
+    if let Some(obj) = settings
+        .get_mut("enabledPlugins")
+        .and_then(|ep| ep.as_object_mut())
+    {
         obj.remove(plugin_key);
     }
 
@@ -71,11 +74,7 @@ pub fn is_enabled(settings_path: &Path, plugin_key: &str) -> bool {
     std::fs::read_to_string(settings_path)
         .ok()
         .and_then(|content| serde_json::from_str::<Value>(&content).ok())
-        .and_then(|settings| {
-            settings.get("enabledPlugins")?
-                .get(plugin_key)?
-                .as_bool()
-        })
+        .and_then(|settings| settings.get("enabledPlugins")?.get(plugin_key)?.as_bool())
         .unwrap_or(false)
 }
 

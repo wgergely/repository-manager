@@ -6,7 +6,7 @@
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::handlers::handle_tool_call;
 use crate::protocol::{
@@ -14,8 +14,8 @@ use crate::protocol::{
     ServerCapabilities, ServerInfo, ToolCallParams, ToolsCapability,
 };
 use crate::resource_handlers::read_resource;
-use crate::resources::{get_resource_definitions, ResourceDefinition};
-use crate::tools::{get_tool_definitions, ToolDefinition, ToolResult};
+use crate::resources::{ResourceDefinition, get_resource_definitions};
+use crate::tools::{ToolDefinition, ToolResult, get_tool_definitions};
 use crate::{Error, Result};
 
 /// MCP Server for Repository Manager
@@ -111,11 +111,8 @@ impl RepoMcpServer {
                 }
                 Ok(_) => {} // No response needed (notifications)
                 Err(e) => {
-                    let error_response = JsonRpcResponse::error(
-                        None,
-                        -32603,
-                        format!("Internal error: {}", e),
-                    );
+                    let error_response =
+                        JsonRpcResponse::error(None, -32603, format!("Internal error: {}", e));
                     let json_str = serde_json::to_string(&error_response)?;
                     writeln!(stdout, "{}", json_str)?;
                     stdout.flush()?;
@@ -147,7 +144,10 @@ impl RepoMcpServer {
             "tools/list" => self.handle_tools_list(request.id).await?,
             "tools/call" => self.handle_tools_call(request.id, request.params).await?,
             "resources/list" => self.handle_resources_list(request.id).await?,
-            "resources/read" => self.handle_resources_read(request.id, request.params).await?,
+            "resources/read" => {
+                self.handle_resources_read(request.id, request.params)
+                    .await?
+            }
             _ => JsonRpcResponse::error(
                 request.id,
                 -32601,
@@ -200,28 +200,33 @@ impl RepoMcpServer {
             })
             .collect();
 
-        Ok(JsonRpcResponse::success(id, json!({ "tools": tools_value })))
+        Ok(JsonRpcResponse::success(
+            id,
+            json!({ "tools": tools_value }),
+        ))
     }
 
     /// Handle tools/call request
     ///
     /// Executes the requested tool and returns the result.
-    async fn handle_tools_call(
-        &self,
-        id: Option<Value>,
-        params: Value,
-    ) -> Result<JsonRpcResponse> {
+    async fn handle_tools_call(&self, id: Option<Value>, params: Value) -> Result<JsonRpcResponse> {
         let tool_params: ToolCallParams = serde_json::from_value(params)?;
 
         match handle_tool_call(&self.root, &tool_params.name, tool_params.arguments).await {
             Ok(result) => {
                 // Convert Value result to ToolResult format
                 let tool_result = ToolResult::text(serde_json::to_string_pretty(&result)?);
-                Ok(JsonRpcResponse::success(id, serde_json::to_value(tool_result)?))
+                Ok(JsonRpcResponse::success(
+                    id,
+                    serde_json::to_value(tool_result)?,
+                ))
             }
             Err(e) => {
                 let tool_result = ToolResult::error(format!("{}", e));
-                Ok(JsonRpcResponse::success(id, serde_json::to_value(tool_result)?))
+                Ok(JsonRpcResponse::success(
+                    id,
+                    serde_json::to_value(tool_result)?,
+                ))
             }
         }
     }
@@ -330,7 +335,7 @@ mod tests {
 
         // Should have loaded tools
         assert!(!server.tools().is_empty());
-        assert_eq!(server.tools().len(), 14); // 4 repo + 3 branch + 3 git + 4 config
+        assert_eq!(server.tools().len(), 20); // 4 repo + 3 branch + 3 git + 4 config + 3 preset + 3 superpowers
 
         // Verify some expected tools
         let tool_names: Vec<&str> = server.tools().iter().map(|t| t.name.as_str()).collect();
@@ -437,8 +442,7 @@ mod tests {
         let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
         server.initialize().await.unwrap();
 
-        let request =
-            r#"{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"unknown_tool","arguments":{}}}"#;
+        let request = r#"{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"unknown_tool","arguments":{}}}"#;
 
         let response = server.handle_message(request).await.unwrap();
         // Tool errors are returned as successful responses with is_error: true
@@ -452,8 +456,7 @@ mod tests {
         let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
         server.initialize().await.unwrap();
 
-        let request =
-            r#"{"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"repo://config"}}"#;
+        let request = r#"{"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"repo://config"}}"#;
 
         let response = server.handle_message(request).await.unwrap();
         assert!(response.contains("contents"));
@@ -466,8 +469,7 @@ mod tests {
         let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
         server.initialize().await.unwrap();
 
-        let request =
-            r#"{"jsonrpc":"2.0","id":7,"method":"resources/read","params":{"uri":"repo://unknown"}}"#;
+        let request = r#"{"jsonrpc":"2.0","id":7,"method":"resources/read","params":{"uri":"repo://unknown"}}"#;
 
         let response = server.handle_message(request).await.unwrap();
         assert!(response.contains("error"));

@@ -21,7 +21,8 @@ use uuid::Uuid;
 
 /// Write content to a file safely (with symlink protection)
 fn safe_write(path: &NormalizedPath, content: &str) -> Result<()> {
-    repo_fs::io::write_text(path, content).map_err(|e| Error::Io(std::io::Error::other(e.to_string())))
+    repo_fs::io::write_text(path, content)
+        .map_err(|e| Error::Io(std::io::Error::other(e.to_string())))
 }
 
 /// Synchronizes tool configurations
@@ -182,7 +183,10 @@ impl ToolSyncer {
 
         // Create backup before deleting (unless dry-run)
         if !self.dry_run && !files_to_backup.is_empty() {
-            match self.backup_manager.create_backup(tool_name, &files_to_backup) {
+            match self
+                .backup_manager
+                .create_backup(tool_name, &files_to_backup)
+            {
                 Ok(backup) => {
                     actions.push(format!(
                         "Created backup for {} ({} files)",
@@ -222,7 +226,11 @@ impl ToolSyncer {
     }
 
     /// Remove a tool with option to skip backup
-    pub fn remove_tool_no_backup(&self, tool_name: &str, ledger: &mut Ledger) -> Result<Vec<String>> {
+    pub fn remove_tool_no_backup(
+        &self,
+        tool_name: &str,
+        ledger: &mut Ledger,
+    ) -> Result<Vec<String>> {
         let mut actions = Vec::new();
         let intent_id = format!("tool:{}", tool_name);
 
@@ -312,10 +320,11 @@ impl ToolSyncer {
 
             // Sync the tool - this creates the config file with managed blocks
             if !self.dry_run
-                && let Err(e) = integration.sync(&context, &[initial_rule]) {
-                    tracing::warn!("Failed to sync tool {}: {}", tool_name, e);
-                    return vec![];
-                }
+                && let Err(e) = integration.sync(&context, &[initial_rule])
+            {
+                tracing::warn!("Failed to sync tool {}: {}", tool_name, e);
+                return vec![];
+            }
 
             // Return the config locations for ledger tracking
             integration
@@ -365,14 +374,18 @@ impl ToolSyncer {
         let context = SyncContext::new(self.root.clone());
 
         if self.dry_run {
-            actions.push(format!("[dry-run] Would sync {} rules to {}", rules.len(), tool_name));
+            actions.push(format!(
+                "[dry-run] Would sync {} rules to {}",
+                rules.len(),
+                tool_name
+            ));
             return Ok(actions);
         }
 
         // Sync rules using the integration
-        integration.sync(&context, rules).map_err(|e| {
-            Error::Io(std::io::Error::other(format!("Tool sync failed: {}", e)))
-        })?;
+        integration
+            .sync(&context, rules)
+            .map_err(|e| Error::Io(std::io::Error::other(format!("Tool sync failed: {}", e))))?;
 
         // Create projections for ledger
         let mut projections = Vec::new();
@@ -419,7 +432,6 @@ impl ToolSyncer {
         self.dispatcher.list_available()
     }
 }
-
 
 #[cfg(test)]
 mod tests {

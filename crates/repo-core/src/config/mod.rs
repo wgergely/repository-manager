@@ -39,6 +39,6 @@ mod manifest;
 mod resolver;
 mod runtime;
 
-pub use manifest::Manifest;
+pub use manifest::{Manifest, json_to_toml_value};
 pub use resolver::{ConfigResolver, ResolvedConfig};
 pub use runtime::RuntimeContext;

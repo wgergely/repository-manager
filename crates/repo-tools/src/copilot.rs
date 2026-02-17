@@ -6,7 +6,9 @@
 //! Reference: https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot
 
 use crate::generic::GenericToolIntegration;
-use repo_meta::schema::{ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta};
+use repo_meta::schema::{
+    ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta,
+};
 
 /// Creates a GitHub Copilot integration.
 ///

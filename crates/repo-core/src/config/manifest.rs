@@ -104,6 +104,57 @@ impl Manifest {
         }
     }
 
+    /// Serialize this manifest to a clean TOML string
+    ///
+    /// Produces a readable TOML representation with tools and rules before
+    /// the `[core]` section (required for correct parsing as top-level keys).
+    pub fn to_toml(&self) -> String {
+        let mut content = String::new();
+
+        // tools array - must be BEFORE [core] section to be top-level
+        if !self.tools.is_empty() {
+            content.push_str("tools = [");
+            let tools_str: Vec<String> = self.tools.iter().map(|t| format!("\"{}\"", t)).collect();
+            content.push_str(&tools_str.join(", "));
+            content.push_str("]\n");
+        }
+
+        // rules array - must be BEFORE [core] section to be top-level
+        if !self.rules.is_empty() {
+            content.push_str("rules = [");
+            let rules_str: Vec<String> = self.rules.iter().map(|r| format!("\"{}\"", r)).collect();
+            content.push_str(&rules_str.join(", "));
+            content.push_str("]\n");
+        }
+
+        // Add blank line before [core] if we had top-level keys
+        if !self.tools.is_empty() || !self.rules.is_empty() {
+            content.push('\n');
+        }
+
+        // [core] section
+        content.push_str("[core]\n");
+        content.push_str(&format!("mode = \"{}\"\n", self.core.mode));
+
+        // [presets] section
+        if !self.presets.is_empty() {
+            content.push('\n');
+            content.push_str("[presets]\n");
+            for (name, value) in &self.presets {
+                if value.is_object()
+                    && value.as_object().is_some_and(|o| o.is_empty())
+                {
+                    content.push_str(&format!("\"{}\" = {{}}\n", name));
+                } else {
+                    let toml_value = json_to_toml_value(value);
+                    content.push_str(&format!("\"{}\" = {}\n", name, toml_value));
+                }
+            }
+        }
+
+        content
+    }
+
     /// Merge another manifest into this one
     ///
     /// The `other` manifest takes precedence for scalar values.
@@ -143,6 +194,31 @@ impl Manifest {
         for rule in &other.rules {
             if !self.rules.contains(rule) {
                 self.rules.push(rule.clone());
+            }
+        }
+    }
+}
+
+/// Convert a JSON value to a TOML-compatible string representation
+pub fn json_to_toml_value(value: &Value) -> String {
+    match value {
+        Value::Null => "\"\"".to_string(),
+        Value::Bool(b) => b.to_string(),
+        Value::Number(n) => n.to_string(),
+        Value::String(s) => format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"")),
+        Value::Array(arr) => {
+            let items: Vec<String> = arr.iter().map(json_to_toml_value).collect();
+            format!("[{}]", items.join(", "))
+        }
+        Value::Object(obj) => {
+            if obj.is_empty() {
+                "{}".to_string()
+            } else {
+                let pairs: Vec<String> = obj
+                    .iter()
+                    .map(|(k, v)| format!("{} = {}", k, json_to_toml_value(v)))
+                    .collect();
+                format!("{{ {} }}", pairs.join(", "))
             }
         }
     }

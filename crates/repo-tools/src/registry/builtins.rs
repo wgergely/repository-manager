@@ -153,10 +153,22 @@ mod tests {
     fn test_category_counts() {
         let regs = builtin_registrations();
 
-        let ide_count = regs.iter().filter(|r| r.category == ToolCategory::Ide).count();
-        let cli_count = regs.iter().filter(|r| r.category == ToolCategory::CliAgent).count();
-        let auto_count = regs.iter().filter(|r| r.category == ToolCategory::Autonomous).count();
-        let copilot_count = regs.iter().filter(|r| r.category == ToolCategory::Copilot).count();
+        let ide_count = regs
+            .iter()
+            .filter(|r| r.category == ToolCategory::Ide)
+            .count();
+        let cli_count = regs
+            .iter()
+            .filter(|r| r.category == ToolCategory::CliAgent)
+            .count();
+        let auto_count = regs
+            .iter()
+            .filter(|r| r.category == ToolCategory::Autonomous)
+            .count();
+        let copilot_count = regs
+            .iter()
+            .filter(|r| r.category == ToolCategory::Copilot)
+            .count();
 
         assert_eq!(ide_count, 6);
         assert_eq!(cli_count, 3);

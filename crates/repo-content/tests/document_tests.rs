@@ -1,8 +1,8 @@
 //! Tests for Document
 
+use repo_content::Document;
 use repo_content::block::BlockLocation;
 use repo_content::format::Format;
-use repo_content::Document;
 use uuid::Uuid;
 
 #[test]

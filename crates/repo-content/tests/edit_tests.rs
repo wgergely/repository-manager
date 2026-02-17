@@ -114,9 +114,7 @@ fn test_edit_inverse_path_set() {
     };
 
     let inverse = edit.inverse();
-    assert!(
-        matches!(inverse.kind, EditKind::PathSet { ref path } if path == "config.key")
-    );
+    assert!(matches!(inverse.kind, EditKind::PathSet { ref path } if path == "config.key"));
     assert_eq!(inverse.span, 10..19); // Spans the new content length (9 chars)
     assert_eq!(inverse.old_content, "new_value");
     assert_eq!(inverse.new_content, "old_value");
@@ -134,9 +132,7 @@ fn test_edit_inverse_path_remove() {
     };
 
     let inverse = edit.inverse();
-    assert!(
-        matches!(inverse.kind, EditKind::PathSet { ref path } if path == "config.key")
-    );
+    assert!(matches!(inverse.kind, EditKind::PathSet { ref path } if path == "config.key"));
     assert_eq!(inverse.span, 10..10); // Zero-width insertion point
     assert_eq!(inverse.old_content, "");
     assert_eq!(inverse.new_content, "removed_value");

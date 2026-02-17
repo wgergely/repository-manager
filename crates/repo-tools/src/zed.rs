@@ -5,7 +5,9 @@
 //! Reference: https://zed.dev/docs/ai/rules
 
 use crate::generic::GenericToolIntegration;
-use repo_meta::schema::{ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta};
+use repo_meta::schema::{
+    ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta,
+};
 
 /// Creates a Zed editor integration.
 ///
@@ -27,9 +29,7 @@ pub fn zed_integration() -> GenericToolIntegration {
         integration: ToolIntegrationConfig {
             config_path: ".rules".into(),
             config_type: ConfigType::Text,
-            additional_paths: vec![
-                ".zed/settings.json".into(),
-            ],
+            additional_paths: vec![".zed/settings.json".into()],
         },
         capabilities: ToolCapabilities {
             supports_custom_instructions: true,

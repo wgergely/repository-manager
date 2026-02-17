@@ -76,16 +76,12 @@ impl RuleRegistry {
     /// Add a new rule to the registry
     ///
     /// Generates a UUID and saves the registry.
-    pub fn add_rule(
-        &mut self,
-        id: &str,
-        content: &str,
-        tags: Vec<String>,
-    ) -> Result<&Rule> {
+    pub fn add_rule(&mut self, id: &str, content: &str, tags: Vec<String>) -> Result<&Rule> {
         let rule = Rule::new(id, content, tags);
         self.rules.push(rule);
         self.save()?;
-        self.rules.last()
+        self.rules
+            .last()
             .ok_or_else(|| crate::Error::InternalError {
                 message: "rules vector unexpectedly empty after push".to_string(),
             })
@@ -115,7 +111,10 @@ impl RuleRegistry {
             self.save()?;
             Ok(())
         } else {
-            Err(crate::Error::NotFound(format!("Rule with UUID {} not found", uuid)))
+            Err(crate::Error::NotFound(format!(
+                "Rule with UUID {} not found",
+                uuid
+            )))
         }
     }
 
@@ -204,7 +203,9 @@ mod tests {
         // Create first
         {
             let mut registry = RuleRegistry::new(path.clone());
-            registry.rules.push(Rule::new("existing", "content", vec![]));
+            registry
+                .rules
+                .push(Rule::new("existing", "content", vec![]));
             registry.save().unwrap();
         }
 

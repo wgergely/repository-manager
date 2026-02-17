@@ -21,11 +21,7 @@ const CONFIG_PATH: &str = ".repository/config.toml";
 ///
 /// Adds a tool to the repository's config.toml
 pub fn run_add_tool(path: &Path, name: &str) -> Result<()> {
-    println!(
-        "{} Adding tool: {}",
-        "=>".blue().bold(),
-        name.cyan()
-    );
+    println!("{} Adding tool: {}", "=>".blue().bold(), name.cyan());
 
     // Validate tool name
     let tool_registry = ToolRegistry::with_builtins();
@@ -71,11 +67,7 @@ pub fn run_add_tool(path: &Path, name: &str) -> Result<()> {
 ///
 /// Removes a tool from the repository's config.toml
 pub fn run_remove_tool(path: &Path, name: &str) -> Result<()> {
-    println!(
-        "{} Removing tool: {}",
-        "=>".blue().bold(),
-        name.cyan()
-    );
+    println!("{} Removing tool: {}", "=>".blue().bold(), name.cyan());
 
     let config_path = NormalizedPath::new(path.join(CONFIG_PATH));
 
@@ -105,11 +97,7 @@ pub fn run_remove_tool(path: &Path, name: &str) -> Result<()> {
 ///
 /// Adds a preset to the repository's config.toml
 pub fn run_add_preset(path: &Path, name: &str) -> Result<()> {
-    println!(
-        "{} Adding preset: {}",
-        "=>".blue().bold(),
-        name.cyan()
-    );
+    println!("{} Adding preset: {}", "=>".blue().bold(), name.cyan());
 
     // Validate preset name
     let registry = Registry::with_builtins();
@@ -153,11 +141,7 @@ pub fn run_add_preset(path: &Path, name: &str) -> Result<()> {
 ///
 /// Removes a preset from the repository's config.toml
 pub fn run_remove_preset(path: &Path, name: &str) -> Result<()> {
-    println!(
-        "{} Removing preset: {}",
-        "=>".blue().bold(),
-        name.cyan()
-    );
+    println!("{} Removing preset: {}", "=>".blue().bold(), name.cyan());
 
     let config_path = NormalizedPath::new(path.join(CONFIG_PATH));
 
@@ -233,21 +217,13 @@ fn trigger_sync_and_report(path: &Path) -> Result<()> {
             }
             if !report.success {
                 for error in &report.errors {
-                    eprintln!(
-                        "   {} {}",
-                        "!".red(),
-                        error
-                    );
+                    eprintln!("   {} {}", "!".red(), error);
                 }
             }
             Ok(())
         }
         Err(e) => {
-            eprintln!(
-                "{} Sync failed: {}",
-                "warning:".yellow().bold(),
-                e
-            );
+            eprintln!("{} Sync failed: {}", "warning:".yellow().bold(), e);
             // Don't fail the overall operation - the config change succeeded
             Ok(())
         }
@@ -256,79 +232,9 @@ fn trigger_sync_and_report(path: &Path) -> Result<()> {
 
 /// Generate TOML content from a manifest
 ///
-/// Produces a clean, readable TOML representation of the manifest.
-/// Note: tools and rules must come BEFORE [core] section to be parsed as top-level.
+/// Delegates to `Manifest::to_toml()` for the shared serialization logic.
 fn generate_manifest_toml(manifest: &Manifest) -> String {
-    let mut content = String::new();
-
-    // tools array - must be BEFORE [core] section to be top-level
-    if !manifest.tools.is_empty() {
-        content.push_str("tools = [");
-        let tools_str: Vec<String> = manifest.tools.iter().map(|t| format!("\"{}\"", t)).collect();
-        content.push_str(&tools_str.join(", "));
-        content.push_str("]\n");
-    }
-
-    // rules array - must be BEFORE [core] section to be top-level
-    if !manifest.rules.is_empty() {
-        content.push_str("rules = [");
-        let rules_str: Vec<String> = manifest.rules.iter().map(|r| format!("\"{}\"", r)).collect();
-        content.push_str(&rules_str.join(", "));
-        content.push_str("]\n");
-    }
-
-    // Add blank line before [core] if we had top-level keys
-    if !manifest.tools.is_empty() || !manifest.rules.is_empty() {
-        content.push('\n');
-    }
-
-    // [core] section
-    content.push_str("[core]\n");
-    content.push_str(&format!("mode = \"{}\"\n", manifest.core.mode));
-
-    // [presets] section
-    if !manifest.presets.is_empty() {
-        content.push('\n');
-        content.push_str("[presets]\n");
-        for (name, value) in &manifest.presets {
-            // Handle preset values
-            if value.is_object() && value.as_object().map(|o| o.is_empty()).unwrap_or(false) {
-                // Empty object - write as inline table
-                content.push_str(&format!("\"{}\" = {{}}\n", name));
-            } else {
-                // Non-empty value - serialize it
-                let toml_value = json_to_toml_value(value);
-                content.push_str(&format!("\"{}\" = {}\n", name, toml_value));
-            }
-        }
-    }
-
-    content
-}
-
-/// Convert a JSON value to a TOML string representation
-fn json_to_toml_value(value: &serde_json::Value) -> String {
-    match value {
-        serde_json::Value::Null => "{}".to_string(),
-        serde_json::Value::Bool(b) => b.to_string(),
-        serde_json::Value::Number(n) => n.to_string(),
-        serde_json::Value::String(s) => format!("\"{}\"", s),
-        serde_json::Value::Array(arr) => {
-            let items: Vec<String> = arr.iter().map(json_to_toml_value).collect();
-            format!("[{}]", items.join(", "))
-        }
-        serde_json::Value::Object(obj) => {
-            if obj.is_empty() {
-                "{}".to_string()
-            } else {
-                let pairs: Vec<String> = obj
-                    .iter()
-                    .map(|(k, v)| format!("{} = {}", k, json_to_toml_value(v)))
-                    .collect();
-                format!("{{ {} }}", pairs.join(", "))
-            }
-        }
-    }
+    manifest.to_toml()
 }
 
 #[cfg(test)]

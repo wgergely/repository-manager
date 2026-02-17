@@ -2,7 +2,7 @@
 
 use crate::context::Context;
 use crate::error::{Error, Result};
-use crate::provider::{ActionType, ApplyReport, CheckReport, PresetProvider, PresetStatus};
+use crate::provider::{ApplyReport, CheckReport, PresetProvider};
 use async_trait::async_trait;
 use repo_fs::NormalizedPath;
 use std::path::Path;
@@ -148,17 +148,15 @@ impl Default for VenvProvider {
 #[async_trait]
 impl PresetProvider for VenvProvider {
     fn id(&self) -> &str {
-        "env:python"
+        "env:python-venv"
     }
 
     async fn check(&self, context: &Context) -> Result<CheckReport> {
         // First check if python is available
         if !self.check_python_available().await {
-            return Ok(CheckReport {
-                status: PresetStatus::Broken,
-                details: vec!["Python not found. Install Python 3.3+ to use venv.".to_string()],
-                action: ActionType::Install,
-            });
+            return Ok(CheckReport::broken(
+                "Python not found. Install Python 3.3+ to use venv.",
+            ));
         }
 
         // Check if venv exists
@@ -201,13 +199,13 @@ mod tests {
     #[test]
     fn test_venv_provider_id() {
         let provider = VenvProvider::new();
-        assert_eq!(provider.id(), "env:python");
+        assert_eq!(provider.id(), "env:python-venv");
     }
 
     #[test]
     fn test_venv_provider_default() {
-        let provider = VenvProvider::default();
-        assert_eq!(provider.id(), "env:python");
+        let provider = VenvProvider;
+        assert_eq!(provider.id(), "env:python-venv");
     }
 
     #[test]
@@ -274,7 +272,9 @@ mod tests {
         let temp = TempDir::new().unwrap();
 
         // Create a tagged venv
-        let venv_path = provider.create_tagged_sync(temp.path(), "check-test").unwrap();
+        let venv_path = provider
+            .create_tagged_sync(temp.path(), "check-test")
+            .unwrap();
 
         // Verify it exists
         assert!(provider.check_venv_at_path(&venv_path));

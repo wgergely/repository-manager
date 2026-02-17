@@ -81,7 +81,10 @@ impl ToolIntegration for VSCodeIntegration {
     }
 
     fn config_locations(&self) -> Vec<ConfigLocation> {
-        vec![ConfigLocation::file(".vscode/settings.json", ConfigType::Json)]
+        vec![ConfigLocation::file(
+            ".vscode/settings.json",
+            ConfigType::Json,
+        )]
     }
 
     fn sync(&self, context: &SyncContext, _rules: &[Rule]) -> Result<()> {

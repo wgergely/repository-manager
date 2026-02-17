@@ -58,11 +58,7 @@ pub fn run_branch_add(path: &Path, name: &str, base: Option<&str>) -> Result<()>
             );
         }
         Mode::Standard => {
-            println!(
-                "{} Branch {} created.",
-                "OK".green().bold(),
-                name.cyan()
-            );
+            println!("{} Branch {} created.", "OK".green().bold(), name.cyan());
         }
     }
 
@@ -78,11 +74,7 @@ pub fn run_branch_remove(path: &Path, name: &str) -> Result<()> {
     let mode = detect_mode(&root)?;
     let backend = create_backend(&root, mode)?;
 
-    println!(
-        "{} Removing branch {}...",
-        "=>".blue().bold(),
-        name.cyan()
-    );
+    println!("{} Removing branch {}...", "=>".blue().bold(), name.cyan());
 
     backend.delete_branch(name)?;
 
@@ -95,11 +87,7 @@ pub fn run_branch_remove(path: &Path, name: &str) -> Result<()> {
             );
         }
         Mode::Standard => {
-            println!(
-                "{} Branch {} removed.",
-                "OK".green().bold(),
-                name.cyan()
-            );
+            println!("{} Branch {} removed.", "OK".green().bold(), name.cyan());
         }
     }
 
@@ -132,11 +120,7 @@ pub fn run_branch_checkout(path: &Path, name: &str) -> Result<()> {
                 working_dir.as_str().yellow()
             );
             println!();
-            println!(
-                "  {} {}",
-                "cd".dimmed(),
-                working_dir.as_str().cyan()
-            );
+            println!("  {} {}", "cd".dimmed(), working_dir.as_str().cyan());
         }
         Mode::Standard => {
             println!(

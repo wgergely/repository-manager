@@ -1,4 +1,4 @@
 //! Projection writing module
 mod writer;
 
-pub use writer::{compute_checksum, ProjectionWriter};
+pub use writer::{ProjectionWriter, compute_checksum};

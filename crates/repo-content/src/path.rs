@@ -317,10 +317,7 @@ mod tests {
         let path = parse_path("items[0]");
         assert_eq!(
             path,
-            vec![
-                PathSegment::Key("items".to_string()),
-                PathSegment::Index(0),
-            ]
+            vec![PathSegment::Key("items".to_string()), PathSegment::Index(0),]
         );
     }
 

@@ -45,4 +45,4 @@ pub use error::{Error, Result};
 pub use loader::DefinitionLoader;
 pub use registry::Registry;
 pub use schema::{PresetDefinition, RuleDefinition, ToolDefinition};
-pub use validation::{ToolRegistry, PresetRegistry};
+pub use validation::{PresetRegistry, ToolRegistry};

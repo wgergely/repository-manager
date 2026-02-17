@@ -1,7 +1,7 @@
 //! Tests for Mode abstraction and backends
 
-use repo_core::mode::Mode;
 use repo_core::backend::{BranchInfo, ModeBackend, StandardBackend, WorktreeBackend};
+use repo_core::mode::Mode;
 use repo_fs::NormalizedPath;
 use std::fs;
 use tempfile::TempDir;
@@ -127,8 +127,9 @@ fn setup_worktree_container() -> TempDir {
     // Create a .git file in main that points to .gt
     fs::write(
         dir.path().join("main/.git"),
-        format!("gitdir: {}/.gt", dir.path().display())
-    ).unwrap();
+        format!("gitdir: {}/.gt", dir.path().display()),
+    )
+    .unwrap();
 
     // Create basic git structure in .gt
     fs::write(dir.path().join(".gt/HEAD"), "ref: refs/heads/main\n").unwrap();
@@ -201,8 +202,9 @@ fn test_worktree_backend_with_specific_worktree() {
     fs::create_dir(temp.path().join("feature-x")).unwrap();
     fs::write(
         temp.path().join("feature-x/.git"),
-        format!("gitdir: {}/.gt/worktrees/feature-x", temp.path().display())
-    ).unwrap();
+        format!("gitdir: {}/.gt/worktrees/feature-x", temp.path().display()),
+    )
+    .unwrap();
 
     let container = NormalizedPath::new(temp.path());
     let feature_worktree = NormalizedPath::new(temp.path().join("feature-x"));

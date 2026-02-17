@@ -2,7 +2,7 @@
 
 use crate::context::Context;
 use crate::error::{Error, Result};
-use crate::provider::{ActionType, ApplyReport, CheckReport, PresetProvider, PresetStatus};
+use crate::provider::{ApplyReport, CheckReport, PresetProvider};
 use async_trait::async_trait;
 use std::process::Stdio;
 use tokio::process::Command;
@@ -58,11 +58,9 @@ impl PresetProvider for UvProvider {
     async fn check(&self, context: &Context) -> Result<CheckReport> {
         // First check if uv is available
         if !self.check_uv_available().await {
-            return Ok(CheckReport {
-                status: PresetStatus::Broken,
-                details: vec!["uv not found. Install uv: https://docs.astral.sh/uv/".to_string()],
-                action: ActionType::Install,
-            });
+            return Ok(CheckReport::broken(
+                "uv not found. Install uv: https://docs.astral.sh/uv/",
+            ));
         }
 
         // Check if venv exists

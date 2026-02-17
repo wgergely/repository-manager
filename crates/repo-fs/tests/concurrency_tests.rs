@@ -3,7 +3,7 @@
 //! Verifies that the fs2-based locking in write_atomic prevents
 //! data corruption under concurrent access.
 
-use repo_fs::{io, NormalizedPath, RobustnessConfig};
+use repo_fs::{NormalizedPath, RobustnessConfig, io};
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
@@ -93,11 +93,7 @@ fn test_concurrent_writes_to_different_files_all_succeed() {
     // All writes to different files should succeed
     let results = results.lock().unwrap();
     for (thread_id, success) in results.iter() {
-        assert!(
-            *success,
-            "Write from thread {} should succeed",
-            thread_id
-        );
+        assert!(*success, "Write from thread {} should succeed", thread_id);
     }
 }
 

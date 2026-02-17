@@ -311,11 +311,13 @@ impl Document {
             Format::Toml => {
                 // Convert JSON to TOML
                 let toml_value: toml::Value = json_to_toml(normalized)?;
-                Ok(toml::to_string_pretty(&toml_value).map_err(|e| Error::parse("TOML", e.to_string()))?)
+                Ok(toml::to_string_pretty(&toml_value)
+                    .map_err(|e| Error::parse("TOML", e.to_string()))?)
             }
             Format::Yaml => {
                 // Convert JSON to YAML
-                Ok(serde_yaml::to_string(normalized).map_err(|e| Error::parse("YAML", e.to_string()))?)
+                Ok(serde_yaml::to_string(normalized)
+                    .map_err(|e| Error::parse("YAML", e.to_string()))?)
             }
             Format::Markdown | Format::PlainText => {
                 // For text formats, we can't really re-render from normalized

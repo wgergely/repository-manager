@@ -121,15 +121,9 @@ pub enum SemanticChange {
         new: serde_json::Value,
     },
     /// Block added (for Markdown/text)
-    BlockAdded {
-        uuid: Option<Uuid>,
-        content: String,
-    },
+    BlockAdded { uuid: Option<Uuid>, content: String },
     /// Block removed
-    BlockRemoved {
-        uuid: Option<Uuid>,
-        content: String,
-    },
+    BlockRemoved { uuid: Option<Uuid>, content: String },
     /// Block content changed
     BlockModified {
         uuid: Option<Uuid>,
@@ -177,7 +171,13 @@ fn diff_values_with_depth(
                 match new_obj.get(key) {
                     Some(new_value) => {
                         // Key exists in both - recurse
-                        diff_values_with_depth(old_value, new_value, child_path, changes, depth + 1);
+                        diff_values_with_depth(
+                            old_value,
+                            new_value,
+                            child_path,
+                            changes,
+                            depth + 1,
+                        );
                     }
                     None => {
                         // Key removed

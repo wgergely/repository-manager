@@ -44,8 +44,8 @@ impl FormatHandler for YamlHandler {
     }
 
     fn parse(&self, source: &str) -> Result<Box<dyn std::any::Any + Send + Sync>> {
-        let value: YamlValue = serde_yaml::from_str(source)
-            .map_err(|e| Error::parse("YAML", e.to_string()))?;
+        let value: YamlValue =
+            serde_yaml::from_str(source).map_err(|e| Error::parse("YAML", e.to_string()))?;
         Ok(Box::new(value))
     }
 
@@ -175,8 +175,8 @@ impl FormatHandler for YamlHandler {
     }
 
     fn normalize(&self, source: &str) -> Result<serde_json::Value> {
-        let yaml_value: YamlValue = serde_yaml::from_str(source)
-            .map_err(|e| Error::parse("YAML", e.to_string()))?;
+        let yaml_value: YamlValue =
+            serde_yaml::from_str(source).map_err(|e| Error::parse("YAML", e.to_string()))?;
 
         fn yaml_to_json_sorted(value: &YamlValue) -> serde_json::Value {
             match value {
@@ -226,10 +226,7 @@ impl FormatHandler for YamlHandler {
     fn render(&self, parsed: &dyn std::any::Any) -> Result<String> {
         parsed
             .downcast_ref::<YamlValue>()
-            .map(|value| {
-                serde_yaml::to_string(value)
-                    .unwrap_or_else(|_| String::new())
-            })
+            .map(|value| serde_yaml::to_string(value).unwrap_or_else(|_| String::new()))
             .ok_or_else(|| Error::parse("YAML", "invalid internal state"))
     }
 }

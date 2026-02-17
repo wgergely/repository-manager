@@ -118,7 +118,10 @@ impl WorktreeBackend {
     /// Parse git worktree list output.
     fn parse_worktree_list(&self) -> Result<Vec<(NormalizedPath, String, bool)>> {
         // Use porcelain format for reliable parsing
-        let output = self.git_command_in_worktree(&self.current_worktree, &["worktree", "list", "--porcelain"])?;
+        let output = self.git_command_in_worktree(
+            &self.current_worktree,
+            &["worktree", "list", "--porcelain"],
+        )?;
 
         let mut worktrees = Vec::new();
         let mut current_path: Option<NormalizedPath> = None;
@@ -190,13 +193,7 @@ impl ModeBackend for WorktreeBackend {
                 worktree_path.as_str(),
                 base_branch,
             ],
-            None => vec![
-                "worktree",
-                "add",
-                "-b",
-                name,
-                worktree_path.as_str(),
-            ],
+            None => vec!["worktree", "add", "-b", name, worktree_path.as_str()],
         };
 
         self.git_command_in_worktree(&self.current_worktree, &args)?;
@@ -227,10 +224,7 @@ impl ModeBackend for WorktreeBackend {
         )?;
 
         // Also try to delete the branch
-        let _ = self.git_command_in_worktree(
-            &self.current_worktree,
-            &["branch", "-d", name],
-        );
+        let _ = self.git_command_in_worktree(&self.current_worktree, &["branch", "-d", name]);
 
         Ok(())
     }

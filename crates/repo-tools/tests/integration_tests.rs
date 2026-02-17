@@ -4,8 +4,8 @@
 
 use repo_fs::NormalizedPath;
 use repo_tools::{
-    claude_integration, copilot_integration, cursor_integration, windsurf_integration,
-    Rule, SyncContext, ToolDispatcher, ToolIntegration, VSCodeIntegration,
+    Rule, SyncContext, ToolDispatcher, ToolIntegration, VSCodeIntegration, claude_integration,
+    copilot_integration, cursor_integration, windsurf_integration,
 };
 use std::fs;
 use tempfile::TempDir;
@@ -50,7 +50,10 @@ mod cursor_tests {
         let integration = dispatcher.get_integration("cursor").unwrap();
 
         let context = SyncContext::new(NormalizedPath::new(temp.path()));
-        let rules = vec![create_rule("typescript-style", "Use strict TypeScript mode.")];
+        let rules = vec![create_rule(
+            "typescript-style",
+            "Use strict TypeScript mode.",
+        )];
 
         integration.sync(&context, &rules).unwrap();
 
@@ -59,7 +62,10 @@ mod cursor_tests {
             content.contains("<!-- repo:block:typescript-style -->"),
             "Should contain block marker"
         );
-        assert!(content.contains("TypeScript"), "Should contain rule content");
+        assert!(
+            content.contains("TypeScript"),
+            "Should contain rule content"
+        );
     }
 
     #[test]
@@ -198,10 +204,7 @@ This is my custom documentation that should be preserved.
         // User content should be preserved
         assert!(content.contains("My Project"), "Title should be preserved");
         // Rule should be added
-        assert!(
-            content.contains("Test instruction"),
-            "Rule should be added"
-        );
+        assert!(content.contains("Test instruction"), "Rule should be added");
     }
 
     #[test]
@@ -270,7 +273,10 @@ mod copilot_tests {
         );
 
         let content = fs::read_to_string(&instructions).unwrap();
-        assert!(content.contains("TypeScript"), "Should contain rule content");
+        assert!(
+            content.contains("TypeScript"),
+            "Should contain rule content"
+        );
     }
 
     #[test]
@@ -286,10 +292,7 @@ mod copilot_tests {
 
         integration.sync(&context, &rules).unwrap();
 
-        assert!(temp
-            .path()
-            .join(".github/copilot-instructions.md")
-            .exists());
+        assert!(temp.path().join(".github/copilot-instructions.md").exists());
     }
 }
 
@@ -388,7 +391,10 @@ mod windsurf_tests {
         integration.sync(&context, &rules).unwrap();
 
         let content = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
-        assert!(content.contains("type hints"), "Should contain rule content");
+        assert!(
+            content.contains("type hints"),
+            "Should contain rule content"
+        );
     }
 
     #[test]
@@ -629,8 +635,14 @@ mod cross_tool_tests {
         let third_content = fs::read_to_string(temp.path().join(".cursorrules")).unwrap();
 
         // All syncs should produce identical output
-        assert_eq!(first_content, second_content, "Second sync should match first");
-        assert_eq!(second_content, third_content, "Third sync should match second");
+        assert_eq!(
+            first_content, second_content,
+            "Second sync should match first"
+        );
+        assert_eq!(
+            second_content, third_content,
+            "Third sync should match second"
+        );
 
         // Should only have one block, not duplicates
         assert_eq!(

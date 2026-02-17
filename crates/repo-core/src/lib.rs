@@ -45,11 +45,11 @@ pub mod sync;
 
 pub use backend::{BranchInfo, ModeBackend, StandardBackend, WorktreeBackend};
 pub use backup::{BackupManager, BackupMetadata, ToolBackup};
-pub use config::{ConfigResolver, Manifest, ResolvedConfig, RuntimeContext};
+pub use config::{ConfigResolver, Manifest, ResolvedConfig, RuntimeContext, json_to_toml_value};
 pub use error::{Error, Result};
 pub use ledger::{Intent, Ledger, Projection, ProjectionKind};
 pub use mode::Mode;
-pub use projection::{compute_checksum, ProjectionWriter};
+pub use projection::{ProjectionWriter, compute_checksum};
 pub use rules::{Rule, RuleRegistry};
 pub use sync::{
     CheckReport, CheckStatus, DriftItem, RuleFile, RuleSyncer, SyncEngine, SyncOptions, SyncReport,
@@ -72,7 +72,8 @@ mod tests {
             display
         );
         assert!(
-            display.to_lowercase().contains("config") || display.to_lowercase().contains("not found"),
+            display.to_lowercase().contains("config")
+                || display.to_lowercase().contains("not found"),
             "Error display should mention config or not found, got: {}",
             display
         );

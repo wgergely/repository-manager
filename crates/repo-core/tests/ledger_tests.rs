@@ -22,7 +22,10 @@ fn test_ledger_add_intent() {
 
     assert_eq!(ledger.intents().len(), 1);
     assert!(ledger.get_intent(uuid).is_some());
-    assert_eq!(ledger.get_intent(uuid).unwrap().id, "rule:python/style/snake-case");
+    assert_eq!(
+        ledger.get_intent(uuid).unwrap().id,
+        "rule:python/style/snake-case"
+    );
 }
 
 #[test]
@@ -57,7 +60,10 @@ fn test_ledger_find_by_rule() {
     let mut ledger = Ledger::new();
 
     let intent1 = Intent::new("rule:python/style/snake-case".to_string(), json!({}));
-    let intent2 = Intent::new("rule:python/style/snake-case".to_string(), json!({"strict": true}));
+    let intent2 = Intent::new(
+        "rule:python/style/snake-case".to_string(),
+        json!({"strict": true}),
+    );
     let intent3 = Intent::new("rule:rust/style/naming".to_string(), json!({}));
 
     ledger.add_intent(intent1);
@@ -219,7 +225,10 @@ fn test_projection_kinds() {
     assert_eq!(text_block.tool, "cursor");
     assert_eq!(text_block.file, PathBuf::from(".cursor/rules/test.mdc"));
     match &text_block.kind {
-        ProjectionKind::TextBlock { marker: m, checksum } => {
+        ProjectionKind::TextBlock {
+            marker: m,
+            checksum,
+        } => {
             assert_eq!(m, &marker);
             assert_eq!(checksum, "checksum123");
         }
@@ -259,10 +268,7 @@ fn test_projection_kinds() {
 
 #[test]
 fn test_intent_creation() {
-    let intent = Intent::new(
-        "rule:test/example".to_string(),
-        json!({"key": "value"}),
-    );
+    let intent = Intent::new("rule:test/example".to_string(), json!({"key": "value"}));
 
     assert_eq!(intent.id, "rule:test/example");
     assert!(!intent.uuid.is_nil());
@@ -271,11 +277,7 @@ fn test_intent_creation() {
 
     // Test with_uuid constructor
     let fixed_uuid = Uuid::new_v4();
-    let intent2 = Intent::with_uuid(
-        "rule:test/example2".to_string(),
-        fixed_uuid,
-        json!({}),
-    );
+    let intent2 = Intent::with_uuid("rule:test/example2".to_string(), fixed_uuid, json!({}));
     assert_eq!(intent2.uuid, fixed_uuid);
 }
 

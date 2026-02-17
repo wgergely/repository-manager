@@ -5,7 +5,6 @@ pub type Result<T> = std::result::Result<T, CliError>;
 
 /// Errors that can occur in CLI operations
 #[derive(Debug, thiserror::Error)]
-#[allow(dead_code)] // User variant will be used as CLI is implemented
 pub enum CliError {
     /// Error from repo-core
     #[error(transparent)]
@@ -42,7 +41,6 @@ pub enum CliError {
 
 impl CliError {
     /// Create a new user error with the given message
-    #[allow(dead_code)] // Will be used as CLI commands are implemented
     pub fn user(message: impl Into<String>) -> Self {
         Self::User {
             message: message.into(),

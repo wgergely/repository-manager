@@ -5,7 +5,9 @@
 //! Reference: https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/context-project-rules.html
 
 use crate::generic::GenericToolIntegration;
-use repo_meta::schema::{ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta};
+use repo_meta::schema::{
+    ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta,
+};
 
 /// Creates an Amazon Q Developer integration.
 ///

@@ -14,7 +14,13 @@ use serde_json::{Value, json};
 /// Sanitize a string for use as a filename.
 fn sanitize_filename(s: &str) -> String {
     s.chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect()
 }
 
@@ -107,11 +113,10 @@ impl GenericToolIntegration {
 
         // Create directory if it doesn't exist
         if !dir_path.exists() {
-            std::fs::create_dir_all(dir_path.as_ref())
-                .map_err(|e| crate::Error::SyncFailed {
-                    tool: self.definition.meta.slug.clone(),
-                    message: format!("Failed to create directory: {}", e),
-                })?;
+            std::fs::create_dir_all(dir_path.as_ref()).map_err(|e| crate::Error::SyncFailed {
+                tool: self.definition.meta.slug.clone(),
+                message: format!("Failed to create directory: {}", e),
+            })?;
         }
 
         // Write each rule to a separate file

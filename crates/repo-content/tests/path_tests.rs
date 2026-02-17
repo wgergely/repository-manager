@@ -18,7 +18,10 @@ fn test_get_path_nested() {
     let source = r#"{"config": {"database": {"host": "localhost", "port": 5432}}}"#;
     let doc = Document::parse(source).unwrap();
 
-    assert_eq!(doc.get_path("config.database.host"), Some(json!("localhost")));
+    assert_eq!(
+        doc.get_path("config.database.host"),
+        Some(json!("localhost"))
+    );
     assert_eq!(doc.get_path("config.database.port"), Some(json!(5432)));
     assert_eq!(doc.get_path("config.database.missing"), None);
 }

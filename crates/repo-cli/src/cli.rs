@@ -322,8 +322,19 @@ mod tests {
     #[test]
     fn parse_init_command_with_options() {
         let cli = Cli::parse_from([
-            "repo", "init", "project", "--mode", "worktree", "--tools", "eslint", "--tools", "prettier",
-            "--presets", "typescript", "--remote", "https://github.com/user/repo.git",
+            "repo",
+            "init",
+            "project",
+            "--mode",
+            "worktree",
+            "--tools",
+            "eslint",
+            "--tools",
+            "prettier",
+            "--presets",
+            "typescript",
+            "--remote",
+            "https://github.com/user/repo.git",
         ]);
         match cli.command {
             Some(Commands::Init {
@@ -365,25 +376,46 @@ mod tests {
     #[test]
     fn parse_sync_command() {
         let cli = Cli::parse_from(["repo", "sync"]);
-        assert!(matches!(cli.command, Some(Commands::Sync { dry_run: false, json: false })));
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Sync {
+                dry_run: false,
+                json: false
+            })
+        ));
     }
 
     #[test]
     fn parse_sync_command_dry_run() {
         let cli = Cli::parse_from(["repo", "sync", "--dry-run"]);
-        assert!(matches!(cli.command, Some(Commands::Sync { dry_run: true, json: false })));
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Sync {
+                dry_run: true,
+                json: false
+            })
+        ));
     }
 
     #[test]
     fn parse_sync_command_json() {
         let cli = Cli::parse_from(["repo", "sync", "--json"]);
-        assert!(matches!(cli.command, Some(Commands::Sync { dry_run: false, json: true })));
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Sync {
+                dry_run: false,
+                json: true
+            })
+        ));
     }
 
     #[test]
     fn parse_fix_command() {
         let cli = Cli::parse_from(["repo", "fix"]);
-        assert!(matches!(cli.command, Some(Commands::Fix { dry_run: false })));
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Fix { dry_run: false })
+        ));
     }
 
     #[test]
@@ -561,7 +593,10 @@ mod tests {
         let cli = Cli::parse_from(["repo", "push"]);
         assert!(matches!(
             cli.command,
-            Some(Commands::Push { remote: None, branch: None })
+            Some(Commands::Push {
+                remote: None,
+                branch: None
+            })
         ));
     }
 
@@ -582,7 +617,10 @@ mod tests {
         let cli = Cli::parse_from(["repo", "pull"]);
         assert!(matches!(
             cli.command,
-            Some(Commands::Pull { remote: None, branch: None })
+            Some(Commands::Pull {
+                remote: None,
+                branch: None
+            })
         ));
     }
 
@@ -600,7 +638,10 @@ mod tests {
     #[test]
     fn parse_list_tools_command() {
         let cli = Cli::parse_from(["repo", "list-tools"]);
-        assert!(matches!(cli.command, Some(Commands::ListTools { category: None })));
+        assert!(matches!(
+            cli.command,
+            Some(Commands::ListTools { category: None })
+        ));
     }
 
     #[test]
@@ -623,7 +664,10 @@ mod tests {
     #[test]
     fn parse_status_command() {
         let cli = Cli::parse_from(["repo", "status"]);
-        assert!(matches!(cli.command, Some(Commands::Status { json: false })));
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Status { json: false })
+        ));
     }
 
     #[test]

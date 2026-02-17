@@ -3,7 +3,9 @@
 //! Manages `GEMINI.md` file using managed blocks for rule content.
 
 use crate::generic::GenericToolIntegration;
-use repo_meta::schema::{ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta};
+use repo_meta::schema::{
+    ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta,
+};
 
 /// Creates a Gemini CLI integration.
 ///

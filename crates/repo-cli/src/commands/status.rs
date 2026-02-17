@@ -92,17 +92,13 @@ fn count_rules(rules_dir: &NormalizedPath) -> usize {
     }
 
     // Fall back to counting .md files in the rules directory
-    if rules_dir.exists() {
-        if let Ok(entries) = std::fs::read_dir(rules_dir.as_ref()) {
-            return entries
-                .filter_map(|e| e.ok())
-                .filter(|e| {
-                    e.path()
-                        .extension()
-                        .is_some_and(|ext| ext == "md")
-                })
-                .count();
-        }
+    if rules_dir.exists()
+        && let Ok(entries) = std::fs::read_dir(rules_dir.as_ref())
+    {
+        return entries
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
+            .count();
     }
 
     0
@@ -127,11 +123,7 @@ fn print_human_status(status: &StatusInfo, mode: &Mode) {
     if status.tools.is_empty() {
         println!("  {}: {}", "Tools".bold(), "none".dimmed());
     } else {
-        println!(
-            "  {}: {}",
-            "Tools".bold(),
-            status.tools.join(", ").green()
-        );
+        println!("  {}: {}", "Tools".bold(), status.tools.join(", ").green());
     }
 
     // Rules

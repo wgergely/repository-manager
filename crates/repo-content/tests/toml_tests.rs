@@ -76,7 +76,12 @@ fn test_toml_insert_block() {
 
     let source = "[package]\nname = \"test\"\n";
     let (result, _edit) = handler
-        .insert_block(source, uuid, "[managed]\nkey = \"value\"", BlockLocation::End)
+        .insert_block(
+            source,
+            uuid,
+            "[managed]\nkey = \"value\"",
+            BlockLocation::End,
+        )
         .unwrap();
 
     assert!(result.contains("# repo:block:"));

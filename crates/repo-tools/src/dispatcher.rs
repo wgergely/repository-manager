@@ -15,7 +15,7 @@ use crate::gemini::gemini_integration;
 use crate::generic::GenericToolIntegration;
 use crate::integration::{Rule, SyncContext, ToolIntegration};
 use crate::jetbrains::jetbrains_integration;
-use crate::registry::{ToolRegistration, ToolRegistry, BUILTIN_COUNT};
+use crate::registry::{BUILTIN_COUNT, ToolRegistration, ToolRegistry};
 use crate::roo::roo_integration;
 use crate::vscode::VSCodeIntegration;
 use crate::windsurf::windsurf_integration;

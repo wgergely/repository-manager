@@ -16,7 +16,6 @@ pub struct InitConfig {
     pub tools: Vec<String>,
     pub presets: Vec<String>,
     pub remote: Option<String>,
-    #[allow(dead_code)]
     pub interactive: bool,
 }
 
@@ -188,14 +187,14 @@ pub fn generate_config(mode: &str, tools: &[String], presets: &[String]) -> Stri
 
 /// Initialize git in the given directory
 fn init_git(path: &Path) -> Result<()> {
-    let output = Command::new("git")
-        .arg("init")
-        .current_dir(path)
-        .output()?;
+    let output = Command::new("git").arg("init").current_dir(path).output()?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(CliError::user(format!("Failed to initialize git: {}", stderr)));
+        return Err(CliError::user(format!(
+            "Failed to initialize git: {}",
+            stderr
+        )));
     }
 
     Ok(())
@@ -408,7 +407,10 @@ mod tests {
 
         // Verify main/ directory exists for worktree mode
         let main_dir = path.join("main");
-        assert!(main_dir.exists(), "main/ directory should exist for worktree mode");
+        assert!(
+            main_dir.exists(),
+            "main/ directory should exist for worktree mode"
+        );
         assert!(main_dir.is_dir(), "main should be a directory");
     }
 
@@ -422,7 +424,10 @@ mod tests {
 
         // Verify main/ directory does NOT exist for standard mode
         let main_dir = path.join("main");
-        assert!(!main_dir.exists(), "main/ directory should NOT exist for standard mode");
+        assert!(
+            !main_dir.exists(),
+            "main/ directory should NOT exist for standard mode"
+        );
     }
 
     #[test]
@@ -468,6 +473,9 @@ mod tests {
 
         // Verify marker file still exists (git was not reinitialized)
         let marker = path.join(".git").join("marker");
-        assert!(marker.exists(), "marker file should still exist - git should not be reinitialized");
+        assert!(
+            marker.exists(),
+            "marker file should still exist - git should not be reinitialized"
+        );
     }
 }

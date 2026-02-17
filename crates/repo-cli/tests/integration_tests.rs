@@ -94,10 +94,7 @@ fn test_init_default_mode_is_worktrees() {
     let dir = tempdir().unwrap();
 
     let mut cmd = repo_cmd();
-    cmd.current_dir(dir.path())
-        .arg("init")
-        .assert()
-        .success();
+    cmd.current_dir(dir.path()).arg("init").assert().success();
 
     let config_content = fs::read_to_string(dir.path().join(".repository/config.toml")).unwrap();
     assert!(config_content.contains("mode = \"worktrees\""));
@@ -129,7 +126,9 @@ fn test_init_with_tools() {
 
     let mut cmd = repo_cmd();
     cmd.current_dir(dir.path())
-        .args(["init", "--mode", "standard", "--tools", "vscode", "--tools", "cursor"])
+        .args([
+            "init", "--mode", "standard", "--tools", "vscode", "--tools", "cursor",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("vscode"))
@@ -147,7 +146,15 @@ fn test_init_with_presets() {
 
     let mut cmd = repo_cmd();
     cmd.current_dir(dir.path())
-        .args(["init", "--mode", "standard", "--presets", "typescript", "--presets", "react"])
+        .args([
+            "init",
+            "--mode",
+            "standard",
+            "--presets",
+            "typescript",
+            "--presets",
+            "react",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("typescript"))
@@ -166,9 +173,12 @@ fn test_init_with_tools_and_presets() {
     cmd.current_dir(dir.path())
         .args([
             "init",
-            "--mode", "standard",
-            "--tools", "eslint",
-            "--presets", "typescript",
+            "--mode",
+            "standard",
+            "--tools",
+            "eslint",
+            "--presets",
+            "typescript",
         ])
         .assert()
         .success();
@@ -551,10 +561,7 @@ fn test_sync_creates_ledger() {
 
     // Run sync
     let mut cmd = repo_cmd();
-    cmd.current_dir(dir.path())
-        .arg("sync")
-        .assert()
-        .success();
+    cmd.current_dir(dir.path()).arg("sync").assert().success();
 
     // Ledger should now exist
     assert!(dir.path().join(".repository/ledger.toml").exists());
@@ -573,10 +580,7 @@ fn test_sync_idempotent() {
 
     // First sync
     let mut cmd = repo_cmd();
-    cmd.current_dir(dir.path())
-        .arg("sync")
-        .assert()
-        .success();
+    cmd.current_dir(dir.path()).arg("sync").assert().success();
 
     // Second sync - should succeed with "already synchronized"
     let mut cmd = repo_cmd();
@@ -666,7 +670,8 @@ fn test_branch_list_on_fresh_repo() {
     // Branch list - we don't check result as it depends on git state
     // The command should at least not panic
     let mut cmd = repo_cmd();
-    let _ = cmd.current_dir(dir.path())
+    let _ = cmd
+        .current_dir(dir.path())
         .args(["branch", "list"])
         .assert();
 }
@@ -778,17 +783,11 @@ fn test_full_workflow_init_add_check_sync() {
 
     // 4. Check
     let mut cmd = repo_cmd();
-    cmd.current_dir(dir.path())
-        .arg("check")
-        .assert()
-        .success();
+    cmd.current_dir(dir.path()).arg("check").assert().success();
 
     // 5. Sync
     let mut cmd = repo_cmd();
-    cmd.current_dir(dir.path())
-        .arg("sync")
-        .assert()
-        .success();
+    cmd.current_dir(dir.path()).arg("sync").assert().success();
 
     // Verify final state
     let config_content = fs::read_to_string(dir.path().join(".repository/config.toml")).unwrap();
@@ -874,7 +873,12 @@ fn test_e2e_init_add_rule_creates_rule_file() {
     // 2. Add a rule
     let mut cmd = repo_cmd();
     cmd.current_dir(dir.path())
-        .args(["add-rule", "test-rule", "--instruction", "Test instruction for testing"])
+        .args([
+            "add-rule",
+            "test-rule",
+            "--instruction",
+            "Test instruction for testing",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("test-rule"))
@@ -905,9 +909,12 @@ fn test_e2e_add_rule_with_tags() {
         .args([
             "add-rule",
             "python-style",
-            "--instruction", "Use snake_case for variables",
-            "-t", "python",
-            "-t", "style",
+            "--instruction",
+            "Use snake_case for variables",
+            "-t",
+            "python",
+            "-t",
+            "style",
         ])
         .assert()
         .success();
@@ -1004,7 +1011,10 @@ fn test_e2e_backup_on_tool_removal() {
 
     // Verify cursor is in initial config
     let initial_config = fs::read_to_string(dir.path().join(".repository/config.toml")).unwrap();
-    assert!(initial_config.contains("\"cursor\""), "Initial config should contain cursor");
+    assert!(
+        initial_config.contains("\"cursor\""),
+        "Initial config should contain cursor"
+    );
 
     // 3. Remove the cursor tool
     let mut cmd = repo_cmd();
@@ -1046,10 +1056,7 @@ fn test_e2e_context_detection_from_subdirectory() {
 
     // 3. Run check from subdirectory - should find repo root
     let mut cmd = repo_cmd();
-    cmd.current_dir(&subdir)
-        .arg("check")
-        .assert()
-        .success();
+    cmd.current_dir(&subdir).arg("check").assert().success();
 }
 
 #[test]
@@ -1059,7 +1066,9 @@ fn test_e2e_worktree_mode_init() {
     // 1. Init in worktree mode
     let mut cmd = repo_cmd();
     cmd.current_dir(dir.path())
-        .args(["init", "--mode", "worktree", "--tools", "cursor", "--tools", "claude"])
+        .args([
+            "init", "--mode", "worktree", "--tools", "cursor", "--tools", "claude",
+        ])
         .assert()
         .success();
 
@@ -1082,11 +1091,8 @@ fn test_e2e_full_workflow_multiple_tools() {
     let mut cmd = repo_cmd();
     cmd.current_dir(dir.path())
         .args([
-            "init",
-            "--mode", "standard",
-            "--tools", "cursor",
-            "--tools", "claude",
-            "--tools", "vscode",
+            "init", "--mode", "standard", "--tools", "cursor", "--tools", "claude", "--tools",
+            "vscode",
         ])
         .assert()
         .success();
@@ -1106,17 +1112,11 @@ fn test_e2e_full_workflow_multiple_tools() {
 
     // 3. Check status
     let mut cmd = repo_cmd();
-    cmd.current_dir(dir.path())
-        .arg("check")
-        .assert()
-        .success();
+    cmd.current_dir(dir.path()).arg("check").assert().success();
 
     // 4. Sync
     let mut cmd = repo_cmd();
-    cmd.current_dir(dir.path())
-        .arg("sync")
-        .assert()
-        .success();
+    cmd.current_dir(dir.path()).arg("sync").assert().success();
 
     // 5. Verify ledger created
     assert!(dir.path().join(".repository/ledger.toml").exists());

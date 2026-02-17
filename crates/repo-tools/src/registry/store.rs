@@ -98,7 +98,9 @@ impl Default for ToolRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use repo_meta::schema::{ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta};
+    use repo_meta::schema::{
+        ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta,
+    };
 
     fn make_def(slug: &str) -> ToolDefinition {
         ToolDefinition {

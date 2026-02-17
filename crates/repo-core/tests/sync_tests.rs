@@ -1,9 +1,9 @@
 //! Tests for the SyncEngine
 
 use pretty_assertions::assert_eq;
+use repo_core::Mode;
 use repo_core::ledger::{Intent, Ledger, Projection};
 use repo_core::sync::{CheckReport, CheckStatus, DriftItem, SyncEngine};
-use repo_core::Mode;
 use repo_fs::NormalizedPath;
 use serde_json::json;
 use std::fs;
@@ -172,7 +172,11 @@ fn test_check_detects_text_block_marker_missing() {
     // Create the config file without the marker
     let config_dir = temp.path().join(".cursor").join("rules");
     fs::create_dir_all(&config_dir).unwrap();
-    fs::write(config_dir.join("test.mdc"), "# Some content without marker\n").unwrap();
+    fs::write(
+        config_dir.join("test.mdc"),
+        "# Some content without marker\n",
+    )
+    .unwrap();
 
     let marker = Uuid::new_v4();
 
@@ -213,7 +217,10 @@ fn test_check_healthy_when_text_block_marker_present() {
     fs::create_dir_all(&config_dir).unwrap();
     fs::write(
         config_dir.join("test.mdc"),
-        format!("# Some content\n<!-- BEGIN {} -->\nblock content\n<!-- END {} -->\n", marker, marker),
+        format!(
+            "# Some content\n<!-- BEGIN {} -->\nblock content\n<!-- END {} -->\n",
+            marker, marker
+        ),
     )
     .unwrap();
 

@@ -159,10 +159,12 @@ enabled = true
         let result = handler.write_block("", uuid, "setting = \"value\"");
         let parsed: toml::Table = result.parse().unwrap();
 
-        assert!(parsed
-            .get(MANAGED_TABLE)
-            .and_then(|m| m.get(&uuid.to_string()))
-            .is_some());
+        assert!(
+            parsed
+                .get(MANAGED_TABLE)
+                .and_then(|m| m.get(uuid.to_string()))
+                .is_some()
+        );
     }
 
     #[test]
@@ -181,16 +183,15 @@ version = "1.0"
 
         // User table preserved
         assert!(parsed.get("project").is_some());
-        assert_eq!(
-            parsed["project"]["name"].as_str().unwrap(),
-            "test"
-        );
+        assert_eq!(parsed["project"]["name"].as_str().unwrap(), "test");
 
         // Managed block added
-        assert!(parsed
-            .get(MANAGED_TABLE)
-            .and_then(|m| m.get(&uuid.to_string()))
-            .is_some());
+        assert!(
+            parsed
+                .get(MANAGED_TABLE)
+                .and_then(|m| m.get(uuid.to_string()))
+                .is_some()
+        );
     }
 
     #[test]
@@ -252,9 +253,17 @@ b = 2
 
         // Other block still exists
         let managed = parsed.get(MANAGED_TABLE).unwrap().as_table().unwrap();
-        assert!(managed.get("6ba7b810-9dad-11d1-80b4-00c04fd430c8").is_some());
+        assert!(
+            managed
+                .get("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+                .is_some()
+        );
         // Removed block is gone
-        assert!(managed.get("550e8400-e29b-41d4-a716-446655440000").is_none());
+        assert!(
+            managed
+                .get("550e8400-e29b-41d4-a716-446655440000")
+                .is_none()
+        );
     }
 
     #[test]

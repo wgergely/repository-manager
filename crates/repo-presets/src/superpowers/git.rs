@@ -36,17 +36,19 @@ pub fn clone_repo(url: &str, dest: &Path, tag: Option<&str>) -> Result<()> {
             message: format!("Tag {} not found: {}", tag_name, e),
         })?;
 
-        repo.checkout_tree(&object, None).map_err(|e| Error::GitClone {
-            url: url.to_string(),
-            message: format!("Failed to checkout {}: {}", tag_name, e),
-        })?;
+        repo.checkout_tree(&object, None)
+            .map_err(|e| Error::GitClone {
+                url: url.to_string(),
+                message: format!("Failed to checkout {}: {}", tag_name, e),
+            })?;
 
         // Set HEAD to the tag
         if let Some(ref_name) = reference {
             repo.set_head(ref_name.name().unwrap_or(tag_name))
         } else {
             repo.set_head_detached(object.id())
-        }.map_err(|e| Error::GitClone {
+        }
+        .map_err(|e| Error::GitClone {
             url: url.to_string(),
             message: format!("Failed to set HEAD: {}", e),
         })?;

@@ -3,8 +3,7 @@
 use std::sync::OnceLock;
 
 use crate::{
-    Error, Result,
-    helpers,
+    Error, Result, helpers,
     naming::{NamingStrategy, branch_to_directory},
     provider::{LayoutProvider, WorktreeInfo},
 };
@@ -148,16 +147,20 @@ impl LayoutProvider for ContainerLayout {
             None => self.current_branch()?,
         };
 
-        let mut remote = repo.find_remote(remote_name).map_err(|_| Error::RemoteNotFound {
-            name: remote_name.to_string(),
-        })?;
+        let mut remote = repo
+            .find_remote(remote_name)
+            .map_err(|_| Error::RemoteNotFound {
+                name: remote_name.to_string(),
+            })?;
 
         let refspec = format!("refs/heads/{}:refs/heads/{}", branch_name, branch_name);
 
         // Push using default options (relies on credential helpers)
-        remote.push(&[&refspec], None).map_err(|e| Error::PushFailed {
-            message: e.message().to_string(),
-        })?;
+        remote
+            .push(&[&refspec], None)
+            .map_err(|e| Error::PushFailed {
+                message: e.message().to_string(),
+            })?;
 
         Ok(())
     }
@@ -171,9 +174,11 @@ impl LayoutProvider for ContainerLayout {
         };
 
         // Fetch from remote
-        let mut remote = repo.find_remote(remote_name).map_err(|_| Error::RemoteNotFound {
-            name: remote_name.to_string(),
-        })?;
+        let mut remote = repo
+            .find_remote(remote_name)
+            .map_err(|_| Error::RemoteNotFound {
+                name: remote_name.to_string(),
+            })?;
 
         remote
             .fetch(&[&branch_name], None, None)
@@ -182,9 +187,11 @@ impl LayoutProvider for ContainerLayout {
             })?;
 
         // Get FETCH_HEAD
-        let fetch_head = repo.find_reference("FETCH_HEAD").map_err(|e| Error::PullFailed {
-            message: format!("Could not find FETCH_HEAD: {}", e.message()),
-        })?;
+        let fetch_head = repo
+            .find_reference("FETCH_HEAD")
+            .map_err(|e| Error::PullFailed {
+                message: format!("Could not find FETCH_HEAD: {}", e.message()),
+            })?;
 
         let fetch_commit = fetch_head.peel_to_commit().map_err(|e| Error::PullFailed {
             message: format!("Could not resolve FETCH_HEAD: {}", e.message()),
@@ -195,7 +202,8 @@ impl LayoutProvider for ContainerLayout {
         let head_commit = head.peel_to_commit()?;
 
         // Check if we can fast-forward
-        let (merge_analysis, _) = repo.merge_analysis(&[&repo.find_annotated_commit(fetch_commit.id())?])?;
+        let (merge_analysis, _) =
+            repo.merge_analysis(&[&repo.find_annotated_commit(fetch_commit.id())?])?;
 
         if merge_analysis.is_up_to_date() {
             // Already up to date
@@ -206,7 +214,10 @@ impl LayoutProvider for ContainerLayout {
             // Fast-forward merge
             let refname = format!("refs/heads/{}", branch_name);
             let mut reference = repo.find_reference(&refname)?;
-            reference.set_target(fetch_commit.id(), &format!("pull: fast-forward to {}", fetch_commit.id()))?;
+            reference.set_target(
+                fetch_commit.id(),
+                &format!("pull: fast-forward to {}", fetch_commit.id()),
+            )?;
 
             // Update working directory in main worktree
             let main_repo = Repository::open(self.main_dir.to_native())?;
@@ -229,11 +240,11 @@ impl LayoutProvider for ContainerLayout {
         let repo = self.open_repo()?;
 
         // Find the source branch
-        let source_branch = repo
-            .find_branch(source, BranchType::Local)
-            .map_err(|_| Error::BranchNotFound {
-                name: source.to_string(),
-            })?;
+        let source_branch =
+            repo.find_branch(source, BranchType::Local)
+                .map_err(|_| Error::BranchNotFound {
+                    name: source.to_string(),
+                })?;
 
         let source_commit = source_branch.get().peel_to_commit()?;
         let annotated_commit = repo.find_annotated_commit(source_commit.id())?;
@@ -251,7 +262,10 @@ impl LayoutProvider for ContainerLayout {
             let current_branch = self.current_branch()?;
             let refname = format!("refs/heads/{}", current_branch);
             let mut reference = repo.find_reference(&refname)?;
-            reference.set_target(source_commit.id(), &format!("merge {}: fast-forward", source))?;
+            reference.set_target(
+                source_commit.id(),
+                &format!("merge {}: fast-forward", source),
+            )?;
 
             // Update working directory in main worktree
             let main_repo = Repository::open(self.main_dir.to_native())?;
@@ -263,7 +277,11 @@ impl LayoutProvider for ContainerLayout {
         let main_repo = Repository::open(self.main_dir.to_native())?;
 
         let mut merge_opts = MergeOptions::new();
-        main_repo.merge(&[&main_repo.find_annotated_commit(source_commit.id())?], Some(&mut merge_opts), None)?;
+        main_repo.merge(
+            &[&main_repo.find_annotated_commit(source_commit.id())?],
+            Some(&mut merge_opts),
+            None,
+        )?;
 
         // Check for conflicts
         let mut index = main_repo.index()?;

@@ -5,7 +5,9 @@
 //! Reference: https://aider.chat/docs/config/aider_conf.html
 
 use crate::generic::GenericToolIntegration;
-use repo_meta::schema::{ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta};
+use repo_meta::schema::{
+    ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta,
+};
 
 /// Creates an Aider integration.
 ///
@@ -25,9 +27,7 @@ pub fn aider_integration() -> GenericToolIntegration {
         integration: ToolIntegrationConfig {
             config_path: ".aider.conf.yml".into(),
             config_type: ConfigType::Yaml,
-            additional_paths: vec![
-                "CONVENTIONS.md".into(),
-            ],
+            additional_paths: vec!["CONVENTIONS.md".into()],
         },
         capabilities: ToolCapabilities {
             supports_custom_instructions: true,

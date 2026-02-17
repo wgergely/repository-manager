@@ -1,7 +1,7 @@
 //! Shared HTML comment block operations for PlainText and Markdown handlers
 
-use std::sync::LazyLock;
 use regex::Regex;
+use std::sync::LazyLock;
 use uuid::Uuid;
 
 use crate::block::{BlockLocation, ManagedBlock};
@@ -10,9 +10,8 @@ use crate::error::{Error, Result};
 use crate::format::CommentStyle;
 
 /// Pattern to match block start markers and capture the UUID
-pub static BLOCK_START_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"<!--\s*repo:block:([0-9a-f-]{36})\s*-->").unwrap()
-});
+pub static BLOCK_START_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"<!--\s*repo:block:([0-9a-f-]{36})\s*-->").unwrap());
 
 /// Find all managed blocks using HTML comment markers
 pub fn find_blocks(source: &str) -> Vec<ManagedBlock> {
@@ -177,7 +176,8 @@ mod tests {
             Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
             "new block",
             BlockLocation::End,
-        ).unwrap();
+        )
+        .unwrap();
         assert!(result.contains("existing content"));
         assert!(result.contains("new block"));
         assert!(result.contains("<!-- repo:block:550e8400"));

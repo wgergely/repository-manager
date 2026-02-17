@@ -18,11 +18,18 @@ fn validate_rule_id(id: &str) -> Result<()> {
         return Err(CliError::user("Rule ID cannot exceed 64 characters"));
     }
     if id.contains('/') || id.contains('\\') || id.contains("..") {
-        return Err(CliError::user("Rule ID cannot contain path separators or '..'"));
+        return Err(CliError::user(
+            "Rule ID cannot contain path separators or '..'",
+        ));
     }
     // Only allow alphanumeric, hyphens, and underscores
-    if !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
-        return Err(CliError::user("Rule ID can only contain alphanumeric characters, hyphens, and underscores"));
+    if !id
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(CliError::user(
+            "Rule ID can only contain alphanumeric characters, hyphens, and underscores",
+        ));
     }
     Ok(())
 }
@@ -131,7 +138,12 @@ mod tests {
         let path = temp_dir.path();
         create_test_repo(path);
 
-        let result = run_add_rule(path, "python-style", "Use snake_case for variables.", vec![]);
+        let result = run_add_rule(
+            path,
+            "python-style",
+            "Use snake_case for variables.",
+            vec![],
+        );
         assert!(result.is_ok());
 
         // Verify rule file was created

@@ -27,7 +27,6 @@ pub enum RepoContext {
     NotARepo,
 }
 
-#[allow(dead_code)]
 impl RepoContext {
     /// Get the repository root path (container root for worktrees, repo root for standard)
     pub fn root_path(&self) -> Option<&Path> {

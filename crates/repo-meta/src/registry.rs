@@ -40,11 +40,13 @@ impl Registry {
     /// - `env:python` -> `uv`
     /// - `env:node` -> `node`
     /// - `env:rust` -> `rust`
+    /// - `claude:superpowers` -> `superpowers`
     pub fn with_builtins() -> Self {
         let mut registry = Self::new();
         registry.register("env:python", "uv");
         registry.register("env:node", "node");
         registry.register("env:rust", "rust");
+        registry.register("claude:superpowers", "superpowers");
         registry
     }
 
@@ -131,6 +133,11 @@ mod tests {
         assert_eq!(registry.get_provider("env:node"), Some(&"node".to_string()));
         assert!(registry.has_provider("env:rust"));
         assert_eq!(registry.get_provider("env:rust"), Some(&"rust".to_string()));
+        assert!(registry.has_provider("claude:superpowers"));
+        assert_eq!(
+            registry.get_provider("claude:superpowers"),
+            Some(&"superpowers".to_string())
+        );
     }
 
     #[test]

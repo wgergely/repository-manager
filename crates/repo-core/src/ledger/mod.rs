@@ -187,7 +187,10 @@ mod tests {
     #[test]
     fn ledger_round_trips_through_toml() {
         let mut ledger = Ledger::new();
-        ledger.add_intent(Intent::new("rule:test".to_string(), json!({"key": "value"})));
+        ledger.add_intent(Intent::new(
+            "rule:test".to_string(),
+            json!({"key": "value"}),
+        ));
 
         let serialized = toml::to_string(&ledger).unwrap();
         let deserialized: Ledger = toml::from_str(&serialized).unwrap();

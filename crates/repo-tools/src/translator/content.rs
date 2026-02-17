@@ -93,8 +93,8 @@ mod tests {
     fn test_with_mcp_servers() {
         use serde_json::json;
 
-        let content = TranslatedContent::empty()
-            .with_mcp_servers(json!({"server1": {"command": "test"}}));
+        let content =
+            TranslatedContent::empty().with_mcp_servers(json!({"server1": {"command": "test"}}));
 
         assert!(!content.is_empty());
         assert!(content.mcp_servers.is_some());

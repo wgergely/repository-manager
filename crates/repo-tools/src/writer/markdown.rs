@@ -5,7 +5,7 @@
 use super::{ConfigWriter, SchemaKeys};
 use crate::error::Result;
 use crate::translator::TranslatedContent;
-use repo_fs::{io, NormalizedPath};
+use repo_fs::{NormalizedPath, io};
 
 /// Markers for the managed section.
 const MANAGED_START: &str = "<!-- repo:managed:start -->";

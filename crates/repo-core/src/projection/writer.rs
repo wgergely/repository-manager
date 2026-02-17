@@ -11,7 +11,8 @@ use uuid::Uuid;
 
 /// Write content to a file safely (with symlink protection)
 fn safe_write(path: &NormalizedPath, content: &str) -> Result<()> {
-    repo_fs::io::write_text(path, content).map_err(|e| Error::Io(std::io::Error::other(e.to_string())))
+    repo_fs::io::write_text(path, content)
+        .map_err(|e| Error::Io(std::io::Error::other(e.to_string())))
 }
 
 /// Writes projections to filesystem
@@ -44,9 +45,7 @@ impl ProjectionWriter {
 
         match &projection.kind {
             ProjectionKind::FileManaged { .. } => self.remove_managed_file(&file_path),
-            ProjectionKind::TextBlock { marker, .. } => {
-                self.remove_text_block(&file_path, *marker)
-            }
+            ProjectionKind::TextBlock { marker, .. } => self.remove_text_block(&file_path, *marker),
             ProjectionKind::JsonKey { path, .. } => self.remove_json_key(&file_path, path),
         }
     }
@@ -79,9 +78,13 @@ impl ProjectionWriter {
 
         let new_content = if existing.contains(&marker_start) {
             // Replace existing block
-            let start_idx = existing.find(&marker_start)
+            let start_idx = existing
+                .find(&marker_start)
                 .ok_or_else(|| Error::InternalError {
-                    message: format!("marker_start not found despite contains() check: {}", marker_start),
+                    message: format!(
+                        "marker_start not found despite contains() check: {}",
+                        marker_start
+                    ),
                 })?;
             let end_idx = existing
                 .find(&marker_end)
@@ -106,19 +109,17 @@ impl ProjectionWriter {
         };
 
         if self.dry_run {
-            return Ok(format!("[dry-run] Would update block {} in {}", marker, path));
+            return Ok(format!(
+                "[dry-run] Would update block {} in {}",
+                marker, path
+            ));
         }
 
         safe_write(path, &new_content)?;
         Ok(format!("Updated block {} in {}", marker, path))
     }
 
-    fn write_json_key(
-        &self,
-        path: &NormalizedPath,
-        key_path: &str,
-        value: &str,
-    ) -> Result<String> {
+    fn write_json_key(&self, path: &NormalizedPath, key_path: &str, value: &str) -> Result<String> {
         let existing = if path.exists() {
             fs::read_to_string(path.as_ref())?
         } else {
@@ -176,17 +177,26 @@ impl ProjectionWriter {
             return Ok(format!("Block {} not found in {}", marker, path));
         }
 
-        let start_idx = existing.find(&marker_start)
+        let start_idx = existing
+            .find(&marker_start)
             .ok_or_else(|| Error::InternalError {
-                message: format!("marker_start not found despite contains() check: {}", marker_start),
+                message: format!(
+                    "marker_start not found despite contains() check: {}",
+                    marker_start
+                ),
             })?;
         let end_idx = existing
             .find(&marker_end)
             .map(|i| i + marker_end.len())
-            .ok_or_else(|| Error::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("Malformed text block: start marker found but end marker missing for {}", marker),
-            )))?;
+            .ok_or_else(|| {
+                Error::Io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "Malformed text block: start marker found but end marker missing for {}",
+                        marker
+                    ),
+                ))
+            })?;
 
         let new_content = format!("{}{}", &existing[..start_idx], &existing[end_idx..])
             .trim()

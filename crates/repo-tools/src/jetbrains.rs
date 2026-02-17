@@ -5,7 +5,9 @@
 //! Reference: https://www.jetbrains.com/help/ai-assistant/configure-project-rules.html
 
 use crate::generic::GenericToolIntegration;
-use repo_meta::schema::{ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta};
+use repo_meta::schema::{
+    ConfigType, ToolCapabilities, ToolDefinition, ToolIntegrationConfig, ToolMeta,
+};
 
 /// Creates a JetBrains AI Assistant integration.
 ///
@@ -26,9 +28,7 @@ pub fn jetbrains_integration() -> GenericToolIntegration {
         integration: ToolIntegrationConfig {
             config_path: ".aiassistant/rules/".into(),
             config_type: ConfigType::Markdown,
-            additional_paths: vec![
-                ".aiignore".into(),
-            ],
+            additional_paths: vec![".aiignore".into()],
         },
         capabilities: ToolCapabilities {
             supports_custom_instructions: true,

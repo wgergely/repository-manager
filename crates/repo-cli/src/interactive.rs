@@ -61,9 +61,7 @@ pub fn interactive_init(default_name: &str) -> Result<InitConfig> {
         .interact()?;
 
     let remote = if add_remote {
-        let url: String = Input::new()
-            .with_prompt("Remote URL")
-            .interact_text()?;
+        let url: String = Input::new().with_prompt("Remote URL").interact_text()?;
         if url.trim().is_empty() {
             None
         } else {
