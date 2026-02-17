@@ -32,10 +32,10 @@
 //! - `preset_add` - Add a preset to configuration
 //! - `preset_remove` - Remove a preset from configuration
 //!
-//! ## Superpowers Plugin
-//! - `superpowers_install` - Install the superpowers Claude Code plugin
-//! - `superpowers_status` - Check superpowers installation status
-//! - `superpowers_uninstall` - Uninstall the superpowers plugin
+//! ## Plugins
+//! - `plugins_install` - Install a Claude Code plugin
+//! - `plugins_status` - Check plugin installation status
+//! - `plugins_uninstall` - Uninstall a plugin
 
 use serde::{Deserialize, Serialize};
 
@@ -335,10 +335,10 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                 "required": ["name"]
             }),
         },
-        // Superpowers Plugin
+        // Plugins
         ToolDefinition {
-            name: "superpowers_install".to_string(),
-            description: "Install the superpowers Claude Code plugin".to_string(),
+            name: "plugins_install".to_string(),
+            description: "Install a Claude Code plugin".to_string(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -350,16 +350,16 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
-            name: "superpowers_status".to_string(),
-            description: "Check superpowers plugin installation status".to_string(),
+            name: "plugins_status".to_string(),
+            description: "Check plugin installation status".to_string(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {}
             }),
         },
         ToolDefinition {
-            name: "superpowers_uninstall".to_string(),
-            description: "Uninstall the superpowers Claude Code plugin".to_string(),
+            name: "plugins_uninstall".to_string(),
+            description: "Uninstall a Claude Code plugin".to_string(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -401,15 +401,15 @@ mod tests {
         assert!(names.contains(&"preset_list"));
         assert!(names.contains(&"preset_add"));
         assert!(names.contains(&"preset_remove"));
-        assert!(names.contains(&"superpowers_install"));
-        assert!(names.contains(&"superpowers_status"));
-        assert!(names.contains(&"superpowers_uninstall"));
+        assert!(names.contains(&"plugins_install"));
+        assert!(names.contains(&"plugins_status"));
+        assert!(names.contains(&"plugins_uninstall"));
     }
 
     #[test]
     fn test_tool_definitions_count() {
         let tools = get_tool_definitions();
-        // 4 repo lifecycle + 3 branch + 3 git + 4 config + 3 preset + 3 superpowers = 20 tools
+        // 4 repo lifecycle + 3 branch + 3 git + 4 config + 3 preset + 3 plugins = 20 tools
         assert_eq!(tools.len(), 20);
     }
 
