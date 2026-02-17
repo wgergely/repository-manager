@@ -26,7 +26,7 @@ mod cursor_tests {
     use super::*;
 
     #[test]
-    fn test_cursor_creates_cursorrules_file() {
+    fn test_cursor_creates_cursorrules_with_content() {
         let temp = TempDir::new().unwrap();
 
         let dispatcher = ToolDispatcher::new();
@@ -37,9 +37,19 @@ mod cursor_tests {
 
         integration.sync(&context, &rules).unwrap();
 
-        // .cursorrules file should exist
-        let rules_file = temp.path().join(".cursorrules");
-        assert!(rules_file.exists(), ".cursorrules should be created");
+        let content = fs::read_to_string(temp.path().join(".cursorrules")).unwrap();
+        assert!(
+            content.contains("Use snake_case for variables."),
+            "Rule content must be written to file"
+        );
+        assert!(
+            content.contains("<!-- repo:block:python-style -->"),
+            "Must have block start marker"
+        );
+        assert!(
+            content.contains("<!-- /repo:block:python-style -->"),
+            "Must have block end marker"
+        );
     }
 
     #[test]
@@ -110,7 +120,7 @@ mod cursor_tests {
     }
 
     #[test]
-    fn test_cursor_via_factory_function() {
+    fn test_cursor_via_factory_function_writes_content() {
         let temp = TempDir::new().unwrap();
 
         let integration = cursor_integration();
@@ -121,7 +131,9 @@ mod cursor_tests {
 
         integration.sync(&context, &rules).unwrap();
 
-        assert!(temp.path().join(".cursorrules").exists());
+        let content = fs::read_to_string(temp.path().join(".cursorrules")).unwrap();
+        assert!(content.contains("Test content"), "Factory function integration must produce correct content");
+        assert!(content.contains("<!-- repo:block:test -->"), "Factory function integration must use managed blocks");
     }
 }
 
@@ -133,7 +145,7 @@ mod claude_tests {
     use super::*;
 
     #[test]
-    fn test_claude_creates_claude_md() {
+    fn test_claude_creates_claude_md_with_content() {
         let temp = TempDir::new().unwrap();
 
         let dispatcher = ToolDispatcher::new();
@@ -144,8 +156,10 @@ mod claude_tests {
 
         integration.sync(&context, &rules).unwrap();
 
-        let claude_md = temp.path().join("CLAUDE.md");
-        assert!(claude_md.exists(), "CLAUDE.md should be created");
+        let content = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
+        assert!(content.contains("Use clear, concise code."), "Rule content must be written");
+        assert!(content.contains("<!-- repo:block:style -->"), "Must have block start marker");
+        assert!(content.contains("<!-- /repo:block:style -->"), "Must have block end marker");
     }
 
     #[test]
@@ -208,7 +222,7 @@ This is my custom documentation that should be preserved.
     }
 
     #[test]
-    fn test_claude_via_factory_function() {
+    fn test_claude_via_factory_function_writes_content() {
         let temp = TempDir::new().unwrap();
 
         let integration = claude_integration();
@@ -219,7 +233,9 @@ This is my custom documentation that should be preserved.
 
         integration.sync(&context, &rules).unwrap();
 
-        assert!(temp.path().join("CLAUDE.md").exists());
+        let content = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
+        assert!(content.contains("Test content"), "Factory function integration must produce correct content");
+        assert!(content.contains("<!-- repo:block:test -->"), "Factory function integration must use managed blocks");
     }
 }
 
@@ -231,7 +247,7 @@ mod copilot_tests {
     use super::*;
 
     #[test]
-    fn test_copilot_creates_github_directory() {
+    fn test_copilot_creates_instructions_with_content() {
         let temp = TempDir::new().unwrap();
 
         // Create .github directory (copilot expects it to exist or creates it)
@@ -245,14 +261,22 @@ mod copilot_tests {
 
         integration.sync(&context, &rules).unwrap();
 
+        let content = fs::read_to_string(
+            temp.path().join(".github/copilot-instructions.md"),
+        )
+        .unwrap();
         assert!(
-            temp.path().join(".github").exists(),
-            ".github directory should exist"
+            content.contains("Follow conventions."),
+            "Rule content must be written to copilot instructions"
+        );
+        assert!(
+            content.contains("style"),
+            "Rule id must appear in copilot instructions"
         );
     }
 
     #[test]
-    fn test_copilot_creates_instructions_file() {
+    fn test_copilot_instructions_file_has_managed_blocks() {
         let temp = TempDir::new().unwrap();
 
         // Create .github directory
@@ -266,21 +290,21 @@ mod copilot_tests {
 
         integration.sync(&context, &rules).unwrap();
 
-        let instructions = temp.path().join(".github").join("copilot-instructions.md");
-        assert!(
-            instructions.exists(),
-            "copilot-instructions.md should exist"
-        );
+        let content = fs::read_to_string(
+            temp.path().join(".github/copilot-instructions.md"),
+        )
+        .unwrap();
 
-        let content = fs::read_to_string(&instructions).unwrap();
-        assert!(
-            content.contains("TypeScript"),
-            "Should contain rule content"
-        );
+        // Copilot uses non-raw mode so content includes headers
+        assert!(content.contains("Use TypeScript strict mode."), "Rule content must be present");
+        assert!(content.contains("coding"), "Rule id must appear in content");
+        // Copilot uses managed blocks (markdown type uses same as text)
+        assert!(content.contains("<!-- repo:block:coding -->"), "Must have block start marker");
+        assert!(content.contains("<!-- /repo:block:coding -->"), "Must have block end marker");
     }
 
     #[test]
-    fn test_copilot_via_factory_function() {
+    fn test_copilot_via_factory_function_writes_content() {
         let temp = TempDir::new().unwrap();
         fs::create_dir_all(temp.path().join(".github")).unwrap();
 
@@ -292,7 +316,12 @@ mod copilot_tests {
 
         integration.sync(&context, &rules).unwrap();
 
-        assert!(temp.path().join(".github/copilot-instructions.md").exists());
+        let content = fs::read_to_string(
+            temp.path().join(".github/copilot-instructions.md"),
+        )
+        .unwrap();
+        assert!(content.contains("Test content"), "Factory function integration must produce correct content");
+        assert!(content.contains("<!-- repo:block:test -->"), "Factory function integration must use managed blocks");
     }
 }
 
@@ -304,7 +333,7 @@ mod vscode_tests {
     use super::*;
 
     #[test]
-    fn test_vscode_creates_vscode_directory() {
+    fn test_vscode_creates_valid_settings_json() {
         let temp = TempDir::new().unwrap();
 
         let dispatcher = ToolDispatcher::new();
@@ -315,14 +344,14 @@ mod vscode_tests {
 
         integration.sync(&context, &rules).unwrap();
 
-        assert!(
-            temp.path().join(".vscode").exists(),
-            ".vscode directory should exist"
-        );
+        // Verify valid JSON object is created
+        let content = fs::read_to_string(temp.path().join(".vscode/settings.json")).unwrap();
+        let settings: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert!(settings.is_object(), "settings.json must be a valid JSON object");
     }
 
     #[test]
-    fn test_vscode_creates_settings_json() {
+    fn test_vscode_settings_json_has_python_path() {
         let temp = TempDir::new().unwrap();
 
         let dispatcher = ToolDispatcher::new();
@@ -333,25 +362,37 @@ mod vscode_tests {
 
         integration.sync(&context, &[]).unwrap();
 
-        let settings_path = temp.path().join(".vscode/settings.json");
-        assert!(settings_path.exists(), "settings.json should be created");
+        let content = fs::read_to_string(temp.path().join(".vscode/settings.json")).unwrap();
+        let settings: serde_json::Value = serde_json::from_str(&content).unwrap();
 
-        let content = fs::read_to_string(&settings_path).unwrap();
-        assert!(content.contains("python.defaultInterpreterPath"));
+        // Verify the JSON object has the python path as a string value
+        assert!(settings.is_object(), "settings.json must be a JSON object");
+        assert!(
+            settings["python.defaultInterpreterPath"].is_string(),
+            "python path must be a string type"
+        );
+        assert_eq!(
+            settings["python.defaultInterpreterPath"], "/usr/bin/python3",
+            "python path must match the provided value"
+        );
     }
 
     #[test]
-    fn test_vscode_via_struct() {
+    fn test_vscode_via_struct_produces_valid_json() {
         let temp = TempDir::new().unwrap();
 
         let integration = VSCodeIntegration::new();
         assert_eq!(integration.name(), "vscode");
 
-        let context = SyncContext::new(NormalizedPath::new(temp.path()));
+        let python_path = NormalizedPath::new("/test/python");
+        let context = SyncContext::new(NormalizedPath::new(temp.path())).with_python(python_path);
 
         integration.sync(&context, &[]).unwrap();
 
-        assert!(temp.path().join(".vscode/settings.json").exists());
+        let content = fs::read_to_string(temp.path().join(".vscode/settings.json")).unwrap();
+        let settings: serde_json::Value = serde_json::from_str(&content).unwrap();
+        assert!(settings.is_object(), "settings.json must be a valid JSON object");
+        assert_eq!(settings["python.defaultInterpreterPath"], "/test/python");
     }
 }
 
@@ -363,7 +404,7 @@ mod windsurf_tests {
     use super::*;
 
     #[test]
-    fn test_windsurf_creates_windsurfrules() {
+    fn test_windsurf_creates_windsurfrules_with_content() {
         let temp = TempDir::new().unwrap();
 
         let dispatcher = ToolDispatcher::new();
@@ -374,8 +415,10 @@ mod windsurf_tests {
 
         integration.sync(&context, &rules).unwrap();
 
-        let windsurf_rules = temp.path().join(".windsurfrules");
-        assert!(windsurf_rules.exists(), ".windsurfrules should exist");
+        let content = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
+        assert!(content.contains("Be concise."), "Rule content must be written");
+        assert!(content.contains("<!-- repo:block:style -->"), "Must have block start marker");
+        assert!(content.contains("<!-- /repo:block:style -->"), "Must have block end marker");
     }
 
     #[test]
@@ -423,7 +466,7 @@ mod windsurf_tests {
     }
 
     #[test]
-    fn test_windsurf_via_factory_function() {
+    fn test_windsurf_via_factory_function_writes_content() {
         let temp = TempDir::new().unwrap();
 
         let integration = windsurf_integration();
@@ -434,7 +477,9 @@ mod windsurf_tests {
 
         integration.sync(&context, &rules).unwrap();
 
-        assert!(temp.path().join(".windsurfrules").exists());
+        let content = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
+        assert!(content.contains("Test content"), "Factory function integration must produce correct content");
+        assert!(content.contains("<!-- repo:block:test -->"), "Factory function integration must use managed blocks");
     }
 }
 
@@ -517,7 +562,7 @@ mod dispatcher_tests {
     }
 
     #[test]
-    fn test_dispatcher_sync_all_tools() {
+    fn test_dispatcher_sync_all_tools_writes_content() {
         let temp = TempDir::new().unwrap();
 
         // Create .github for copilot
@@ -544,10 +589,15 @@ mod dispatcher_tests {
         assert!(synced.contains(&"claude".to_string()));
         assert!(synced.contains(&"windsurf".to_string()));
 
-        // Verify files were created
-        assert!(temp.path().join(".cursorrules").exists());
-        assert!(temp.path().join("CLAUDE.md").exists());
-        assert!(temp.path().join(".windsurfrules").exists());
+        // Verify files contain the shared rule content
+        let cursor_content = fs::read_to_string(temp.path().join(".cursorrules")).unwrap();
+        assert!(cursor_content.contains("Shared rule content"), "Cursor must have shared rule");
+
+        let claude_content = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
+        assert!(claude_content.contains("Shared rule content"), "Claude must have shared rule");
+
+        let windsurf_content = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
+        assert!(windsurf_content.contains("Shared rule content"), "Windsurf must have shared rule");
     }
 
     #[test]
@@ -651,5 +701,168 @@ mod cross_tool_tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn test_cross_tool_sync_does_not_interfere() {
+        // Sync claude, then cursor, then claude again - verify they don't interfere
+        let temp = TempDir::new().unwrap();
+
+        let dispatcher = ToolDispatcher::new();
+        let context = SyncContext::new(NormalizedPath::new(temp.path()));
+
+        let rules_v1 = vec![create_rule("shared", "Version 1 content")];
+        let rules_v2 = vec![create_rule("shared", "Version 2 content")];
+
+        // Step 1: Sync claude with v1
+        let claude = dispatcher.get_integration("claude").unwrap();
+        claude.sync(&context, &rules_v1).unwrap();
+
+        let claude_v1 = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
+        assert!(claude_v1.contains("Version 1 content"));
+
+        // Step 2: Sync cursor (different file) with v1
+        let cursor = dispatcher.get_integration("cursor").unwrap();
+        cursor.sync(&context, &rules_v1).unwrap();
+
+        // Claude's file should be UNTOUCHED by cursor sync
+        let claude_after_cursor = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
+        assert_eq!(
+            claude_v1, claude_after_cursor,
+            "Syncing cursor must not modify CLAUDE.md"
+        );
+
+        // Step 3: Sync claude with v2
+        claude.sync(&context, &rules_v2).unwrap();
+
+        let claude_v2 = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
+        assert!(claude_v2.contains("Version 2 content"));
+        assert!(!claude_v2.contains("Version 1 content"));
+
+        // Cursor's file should be UNTOUCHED by claude re-sync
+        let cursor_content = fs::read_to_string(temp.path().join(".cursorrules")).unwrap();
+        assert!(
+            cursor_content.contains("Version 1 content"),
+            "Cursor file must retain v1 content after claude re-sync"
+        );
+    }
+
+    #[test]
+    fn test_sync_all_idempotency() {
+        // Run sync_all twice with same rules, verify identical output
+        let temp = TempDir::new().unwrap();
+
+        let dispatcher = ToolDispatcher::new();
+        let context = SyncContext::new(NormalizedPath::new(temp.path()));
+        let rules = vec![
+            create_rule("rule-a", "Content A"),
+            create_rule("rule-b", "Content B"),
+        ];
+        let tools = vec![
+            "cursor".to_string(),
+            "claude".to_string(),
+            "windsurf".to_string(),
+        ];
+
+        // First sync
+        dispatcher.sync_all(&context, &tools, &rules).unwrap();
+        let cursor_1 = fs::read_to_string(temp.path().join(".cursorrules")).unwrap();
+        let claude_1 = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
+        let windsurf_1 = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
+
+        // Second sync with identical rules
+        dispatcher.sync_all(&context, &tools, &rules).unwrap();
+        let cursor_2 = fs::read_to_string(temp.path().join(".cursorrules")).unwrap();
+        let claude_2 = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
+        let windsurf_2 = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
+
+        assert_eq!(cursor_1, cursor_2, "Cursor must be idempotent across sync_all");
+        assert_eq!(claude_1, claude_2, "Claude must be idempotent across sync_all");
+        assert_eq!(windsurf_1, windsurf_2, "Windsurf must be idempotent across sync_all");
+    }
+
+    #[test]
+    fn test_sync_all_skips_unknown_tools_without_affecting_others() {
+        // Verify unknown tools are silently skipped, and other tools still sync correctly
+        let temp = TempDir::new().unwrap();
+
+        let dispatcher = ToolDispatcher::new();
+        let context = SyncContext::new(NormalizedPath::new(temp.path()));
+        let rules = vec![create_rule("test-rule", "Test content for partial sync")];
+
+        let synced = dispatcher
+            .sync_all(
+                &context,
+                &[
+                    "cursor".to_string(),
+                    "nonexistent-tool-xyz".to_string(),
+                    "claude".to_string(),
+                ],
+                &rules,
+            )
+            .unwrap();
+
+        // Unknown tools skipped, known tools synced
+        assert_eq!(synced.len(), 2);
+        assert!(synced.contains(&"cursor".to_string()));
+        assert!(synced.contains(&"claude".to_string()));
+
+        // Verify content was actually written for the known tools
+        let cursor_content = fs::read_to_string(temp.path().join(".cursorrules")).unwrap();
+        assert!(cursor_content.contains("Test content for partial sync"));
+
+        let claude_content = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
+        assert!(claude_content.contains("Test content for partial sync"));
+    }
+
+    #[test]
+    fn test_tools_write_to_separate_files() {
+        // Verify that cursor, claude, and windsurf each write to their own file
+        // and don't share or corrupt each other's files
+        let temp = TempDir::new().unwrap();
+
+        let dispatcher = ToolDispatcher::new();
+        let context = SyncContext::new(NormalizedPath::new(temp.path()));
+
+        // Give each tool a DIFFERENT rule so we can distinguish
+        let cursor = dispatcher.get_integration("cursor").unwrap();
+        cursor
+            .sync(
+                &context,
+                &[create_rule("tool-specific", "CURSOR-ONLY-CONTENT")],
+            )
+            .unwrap();
+
+        let claude = dispatcher.get_integration("claude").unwrap();
+        claude
+            .sync(
+                &context,
+                &[create_rule("tool-specific", "CLAUDE-ONLY-CONTENT")],
+            )
+            .unwrap();
+
+        let windsurf = dispatcher.get_integration("windsurf").unwrap();
+        windsurf
+            .sync(
+                &context,
+                &[create_rule("tool-specific", "WINDSURF-ONLY-CONTENT")],
+            )
+            .unwrap();
+
+        // Verify each file has ONLY its own content
+        let cursor_content = fs::read_to_string(temp.path().join(".cursorrules")).unwrap();
+        assert!(cursor_content.contains("CURSOR-ONLY-CONTENT"));
+        assert!(!cursor_content.contains("CLAUDE-ONLY-CONTENT"));
+        assert!(!cursor_content.contains("WINDSURF-ONLY-CONTENT"));
+
+        let claude_content = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
+        assert!(claude_content.contains("CLAUDE-ONLY-CONTENT"));
+        assert!(!claude_content.contains("CURSOR-ONLY-CONTENT"));
+        assert!(!claude_content.contains("WINDSURF-ONLY-CONTENT"));
+
+        let windsurf_content = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
+        assert!(windsurf_content.contains("WINDSURF-ONLY-CONTENT"));
+        assert!(!windsurf_content.contains("CURSOR-ONLY-CONTENT"));
+        assert!(!windsurf_content.contains("CLAUDE-ONLY-CONTENT"));
     }
 }

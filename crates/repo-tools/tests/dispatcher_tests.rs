@@ -146,7 +146,24 @@ fn test_generic_integration_json_with_schema_keys() {
     let content = fs::read_to_string(temp.path().join("custom.json")).unwrap();
     let json: serde_json::Value = serde_json::from_str(&content).unwrap();
 
-    assert!(json.get("customInstructions").is_some());
+    // Verify JSON is a valid object
+    assert!(json.is_object(), "Output must be a JSON object");
+
+    // Verify customInstructions is a string containing the rule content
+    assert!(
+        json["customInstructions"].is_string(),
+        "customInstructions must be a string, got: {:?}",
+        json["customInstructions"]
+    );
+    let instructions = json["customInstructions"].as_str().unwrap();
+    assert!(
+        instructions.contains("Content 1"),
+        "customInstructions must contain rule content, got: {}",
+        instructions
+    );
+
+    // Verify pythonPath is a string with the correct value
+    assert!(json["pythonPath"].is_string(), "pythonPath must be a string");
     assert_eq!(json["pythonPath"], "/usr/bin/python3");
 }
 
@@ -198,12 +215,27 @@ fn test_generic_integration_preserves_existing_json() {
     let content = fs::read_to_string(&config_path).unwrap();
     let json: serde_json::Value = serde_json::from_str(&content).unwrap();
 
-    // Existing values preserved
-    assert_eq!(json["editor.fontSize"], 14);
-    assert_eq!(json["existingKey"], "existingValue");
+    // Verify JSON is a valid object
+    assert!(json.is_object(), "Output must be a JSON object");
 
-    // New value added
-    assert!(json.get("instructions").is_some());
+    // Existing values preserved with correct types
+    assert_eq!(json["editor.fontSize"], 14);
+    assert!(json["editor.fontSize"].is_number(), "Preserved number must remain a number");
+    assert_eq!(json["existingKey"], "existingValue");
+    assert!(json["existingKey"].is_string(), "Preserved string must remain a string");
+
+    // New value added with correct type and content
+    assert!(
+        json["instructions"].is_string(),
+        "instructions must be a string, got: {:?}",
+        json["instructions"]
+    );
+    let instructions = json["instructions"].as_str().unwrap();
+    assert!(
+        instructions.contains("New content"),
+        "instructions must contain the rule content, got: {}",
+        instructions
+    );
 }
 
 #[test]
@@ -307,9 +339,12 @@ fn test_sync_all_with_schema_tools() {
     assert!(synced.contains(&"cursor".to_string()));
     assert!(synced.contains(&"windsurf".to_string()));
 
-    // Verify files were created
-    assert!(temp.path().join(".cursorrules").exists());
-    assert!(temp.path().join(".windsurfrules").exists());
+    // Verify files contain rule content (not just existence)
+    let cursor_content = fs::read_to_string(temp.path().join(".cursorrules")).unwrap();
+    assert!(cursor_content.contains("Test rule content"), "Cursor must contain rule content");
+
+    let windsurf_content = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
+    assert!(windsurf_content.contains("Test rule content"), "Windsurf must contain rule content");
 }
 
 #[test]

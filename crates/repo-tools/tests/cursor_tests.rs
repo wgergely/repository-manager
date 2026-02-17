@@ -21,7 +21,7 @@ fn test_cursor_config_locations() {
 }
 
 #[test]
-fn test_cursor_creates_cursorrules() {
+fn test_cursor_creates_cursorrules_with_correct_content() {
     let temp_dir = TempDir::new().unwrap();
     let root = NormalizedPath::new(temp_dir.path());
 
@@ -34,8 +34,19 @@ fn test_cursor_creates_cursorrules() {
     let integration = cursor_integration();
     integration.sync(&context, &rules).unwrap();
 
-    let cursorrules_path = temp_dir.path().join(".cursorrules");
-    assert!(cursorrules_path.exists());
+    let content = fs::read_to_string(temp_dir.path().join(".cursorrules")).unwrap();
+
+    // Verify managed block structure with correct markers and content
+    assert!(content.contains("<!-- repo:block:test-rule -->"));
+    assert!(content.contains("Test rule content"));
+    assert!(content.contains("<!-- /repo:block:test-rule -->"));
+
+    // Verify block ordering
+    let open_pos = content.find("<!-- repo:block:test-rule -->").unwrap();
+    let content_pos = content.find("Test rule content").unwrap();
+    let close_pos = content.find("<!-- /repo:block:test-rule -->").unwrap();
+    assert!(open_pos < content_pos);
+    assert!(content_pos < close_pos);
 }
 
 #[test]

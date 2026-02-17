@@ -24,7 +24,7 @@ fn test_claude_config_locations() {
 }
 
 #[test]
-fn test_claude_creates_claude_md() {
+fn test_claude_creates_claude_md_with_correct_content() {
     let temp_dir = TempDir::new().unwrap();
     let root = NormalizedPath::new(temp_dir.path());
 
@@ -38,7 +38,19 @@ fn test_claude_creates_claude_md() {
     integration.sync(&context, &rules).unwrap();
 
     let claude_md_path = temp_dir.path().join("CLAUDE.md");
-    assert!(claude_md_path.exists());
+    let content = fs::read_to_string(&claude_md_path).unwrap();
+
+    // Verify managed block structure: open marker, content, close marker
+    assert!(content.contains("<!-- repo:block:project-info -->"));
+    assert!(content.contains("This is a test project."));
+    assert!(content.contains("<!-- /repo:block:project-info -->"));
+
+    // Verify block ordering: open marker comes before content, content before close marker
+    let open_pos = content.find("<!-- repo:block:project-info -->").unwrap();
+    let content_pos = content.find("This is a test project.").unwrap();
+    let close_pos = content.find("<!-- /repo:block:project-info -->").unwrap();
+    assert!(open_pos < content_pos, "Open marker should precede content");
+    assert!(content_pos < close_pos, "Content should precede close marker");
 }
 
 #[test]
@@ -239,8 +251,8 @@ fn example() {
 }
 
 #[test]
-fn test_claude_without_python_path() {
-    // Claude integration shouldn't require python path
+fn test_claude_without_python_path_still_writes_rules() {
+    // Claude integration shouldn't require python path and should still write content
     let temp_dir = TempDir::new().unwrap();
     let root = NormalizedPath::new(temp_dir.path());
 
@@ -251,7 +263,10 @@ fn test_claude_without_python_path() {
     }];
 
     let integration = claude_integration();
-    let result = integration.sync(&context, &rules);
+    integration.sync(&context, &rules).unwrap();
 
-    assert!(result.is_ok());
+    let content = fs::read_to_string(temp_dir.path().join("CLAUDE.md")).unwrap();
+    assert!(content.contains("<!-- repo:block:test -->"));
+    assert!(content.contains("Test content"));
+    assert!(content.contains("<!-- /repo:block:test -->"));
 }

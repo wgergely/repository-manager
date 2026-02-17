@@ -31,8 +31,58 @@ async fn test_check_when_not_installed() {
 
     let report = provider.check(&context).await.unwrap();
 
-    // Should be Missing since we haven't installed
+    // Should be Missing since we haven't installed, and details should explain why
     assert_eq!(report.status, PresetStatus::Missing);
+    assert!(
+        !report.details.is_empty(),
+        "Missing status should include details about what's missing"
+    );
+    assert!(
+        report.details[0].contains("not installed"),
+        "Details should mention 'not installed', got: {:?}",
+        report.details
+    );
+}
+
+#[tokio::test]
+async fn test_check_report_includes_version_info() {
+    let temp = TempDir::new().unwrap();
+    let context = create_test_context(&temp);
+    let provider = SuperpowersProvider::new().with_version("v4.1.1");
+
+    let report = provider.check(&context).await.unwrap();
+
+    // When missing, details should reference the specific version
+    if report.status == PresetStatus::Missing {
+        assert!(
+            report.details.iter().any(|d| d.contains("v4.1.1")),
+            "Missing report should reference the requested version, got: {:?}",
+            report.details
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_with_version_changes_version() {
+    let provider = SuperpowersProvider::new().with_version("v4.0.0");
+    assert_eq!(provider.version, "v4.0.0");
+
+    let provider = provider.with_version("v5.0.0");
+    assert_eq!(provider.version, "v5.0.0");
+}
+
+#[tokio::test]
+async fn test_uninstall_when_not_installed_succeeds() {
+    let temp = TempDir::new().unwrap();
+    let context = create_test_context(&temp);
+    let provider = SuperpowersProvider::new();
+
+    // Uninstalling when nothing is installed should succeed gracefully
+    let report = provider.uninstall(&context).await.unwrap();
+    assert!(
+        report.success,
+        "Uninstall should succeed even if nothing is installed"
+    );
 }
 
 #[tokio::test]

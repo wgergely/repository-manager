@@ -19,10 +19,15 @@ fn test_concurrent_writes_no_corruption() {
     let writes_per_thread = 20;
     let barrier = Arc::new(Barrier::new(num_threads));
 
+    let success_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let failure_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+
     let handles: Vec<_> = (0..num_threads)
         .map(|thread_id| {
             let path = Arc::clone(&path);
             let barrier = Arc::clone(&barrier);
+            let successes = Arc::clone(&success_count);
+            let failures = Arc::clone(&failure_count);
 
             thread::spawn(move || {
                 // Synchronize all threads to start simultaneously
@@ -30,8 +35,14 @@ fn test_concurrent_writes_no_corruption() {
 
                 for i in 0..writes_per_thread {
                     let content = format!("thread{}:write{}\n", thread_id, i);
-                    // Some writes may fail due to lock timeout - that's acceptable
-                    let _ = io::write_text(&path, &content);
+                    match io::write_text(&path, &content) {
+                        Ok(_) => {
+                            successes.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        }
+                        Err(_) => {
+                            failures.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        }
+                    }
                 }
             })
         })
@@ -40,6 +51,22 @@ fn test_concurrent_writes_no_corruption() {
     for handle in handles {
         handle.join().expect("Thread should not panic");
     }
+
+    let total_successes = success_count.load(std::sync::atomic::Ordering::Relaxed);
+    let total_failures = failure_count.load(std::sync::atomic::Ordering::Relaxed);
+    let total_attempts = num_threads * writes_per_thread;
+
+    assert_eq!(
+        total_successes + total_failures,
+        total_attempts,
+        "All attempts must be accounted for"
+    );
+
+    // At least some writes must succeed - a total failure indicates a bug
+    assert!(
+        total_successes > 0,
+        "At least some concurrent writes must succeed (got {total_successes}/{total_attempts})"
+    );
 
     // Verify file exists and contains valid content (not corrupted/interleaved)
     let content = std::fs::read_to_string(&file_path).unwrap();

@@ -143,19 +143,93 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn test_resolved_config_default() {
-        let config = ResolvedConfig::default();
-        assert_eq!(config.mode, "standard");
-        assert!(config.presets.is_empty());
+    fn resolve_returns_defaults_when_no_config_exists() {
+        let temp_dir = TempDir::new().unwrap();
+        let root = NormalizedPath::new(temp_dir.path());
+        let resolver = ConfigResolver::new(root);
+
+        assert!(!resolver.has_config());
+        assert!(!resolver.has_local_overrides());
+
+        let config = resolver.resolve().unwrap();
+        // With no config files, resolve should return defaults
         assert!(config.tools.is_empty());
         assert!(config.rules.is_empty());
+        assert!(config.presets.is_empty());
     }
 
     #[test]
-    fn test_config_resolver_new() {
+    fn resolve_loads_repo_config_toml() {
         let temp_dir = TempDir::new().unwrap();
+        let repo_dir = temp_dir.path().join(".repository");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+
+        let config_content = r#"
+tools = ["cursor", "vscode"]
+rules = ["no-unsafe"]
+
+[core]
+mode = "standard"
+
+[presets."env:python"]
+version = "3.12"
+"#;
+        std::fs::write(repo_dir.join("config.toml"), config_content).unwrap();
+
         let root = NormalizedPath::new(temp_dir.path());
-        let resolver = ConfigResolver::new(root.clone());
-        assert_eq!(resolver.root().as_str(), root.as_str());
+        let resolver = ConfigResolver::new(root);
+
+        assert!(resolver.has_config());
+
+        let config = resolver.resolve().unwrap();
+        assert_eq!(config.mode, "standard");
+        assert_eq!(config.tools, vec!["cursor", "vscode"]);
+        assert_eq!(config.rules, vec!["no-unsafe"]);
+        assert_eq!(config.presets["env:python"]["version"], "3.12");
+    }
+
+    #[test]
+    fn resolve_merges_local_overrides_on_top_of_repo_config() {
+        let temp_dir = TempDir::new().unwrap();
+        let repo_dir = temp_dir.path().join(".repository");
+        std::fs::create_dir_all(&repo_dir).unwrap();
+
+        // Base config
+        let base_content = r#"
+tools = ["cursor"]
+
+[core]
+mode = "standard"
+
+[presets."env:python"]
+version = "3.11"
+debug = false
+"#;
+        std::fs::write(repo_dir.join("config.toml"), base_content).unwrap();
+
+        // Local overrides: override python version, add a tool
+        let local_content = r#"
+tools = ["vscode"]
+
+[presets."env:python"]
+version = "3.12"
+"#;
+        std::fs::write(repo_dir.join("config.local.toml"), local_content).unwrap();
+
+        let root = NormalizedPath::new(temp_dir.path());
+        let resolver = ConfigResolver::new(root);
+
+        assert!(resolver.has_config());
+        assert!(resolver.has_local_overrides());
+
+        let config = resolver.resolve().unwrap();
+
+        // Local override should override python version
+        assert_eq!(config.presets["env:python"]["version"], "3.12");
+        // But base-only fields should be preserved (deep merge)
+        assert_eq!(config.presets["env:python"]["debug"], false);
+        // Tools should be merged (both cursor and vscode)
+        assert!(config.tools.contains(&"cursor".to_string()));
+        assert!(config.tools.contains(&"vscode".to_string()));
     }
 }

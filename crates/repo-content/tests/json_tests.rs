@@ -183,17 +183,40 @@ fn test_json_normalize_arrays() {
 }
 
 #[test]
-fn test_json_render() {
+fn test_json_parse_render_round_trip_preserves_all_values() {
+    // C7: Full round-trip: parse -> render -> re-parse -> compare normalized values
     let handler = JsonHandler::new();
 
-    let source = r#"{"name": "test", "value": 42}"#;
+    let source = r#"{"name": "test", "value": 42, "nested": {"a": [1, 2, 3], "b": true}}"#;
+
+    // Parse original
     let parsed = handler.parse(source).unwrap();
     let rendered = handler.render(parsed.as_ref()).unwrap();
 
-    // Rendered output should be valid JSON
-    let reparsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
-    assert_eq!(reparsed.get("name"), Some(&json!("test")));
-    assert_eq!(reparsed.get("value"), Some(&json!(42)));
+    // Re-parse the rendered output
+    let reparsed = handler.parse(&rendered).unwrap();
+    let re_rendered = handler.render(reparsed.as_ref()).unwrap();
+
+    // Normalize both and compare: the semantic content must be identical
+    let norm1 = handler.normalize(source).unwrap();
+    let norm2 = handler.normalize(&rendered).unwrap();
+    assert_eq!(
+        norm1, norm2,
+        "Normalized values must match after parse->render round-trip"
+    );
+
+    // Double round-trip should be stable (render is idempotent)
+    assert_eq!(
+        rendered, re_rendered,
+        "Rendering must be idempotent (render(parse(render(parse(x)))) == render(parse(x)))"
+    );
+
+    // Verify specific values survived
+    let reparsed_val: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+    assert_eq!(reparsed_val["name"], "test");
+    assert_eq!(reparsed_val["value"], 42);
+    assert_eq!(reparsed_val["nested"]["a"], json!([1, 2, 3]));
+    assert_eq!(reparsed_val["nested"]["b"], true);
 }
 
 #[test]

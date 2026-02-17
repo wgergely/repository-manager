@@ -491,16 +491,14 @@ mode = "standard"
     // Sync should succeed (dry_run doesn't write, so no serialization issues)
     assert!(report.success, "Sync should succeed");
 
-    // Verify that the tools were processed (they won't have actual configs,
-    // but the sync should not fail due to config parsing)
-    // The actions should reference the tool names if they were read correctly
-    let combined_output = format!("{:?}", report.actions);
-
-    // If tools were read correctly, we should see them mentioned in the dry-run output
-    // (e.g., "[dry-run] Would create .claude/config.json")
+    // Verify that the tools were processed by checking action strings directly.
+    // At least one action should reference a configured tool name.
+    let mentions_tool = report.actions.iter().any(|action| {
+        action.contains("claude") || action.contains("cursor")
+    });
     assert!(
-        combined_output.contains("claude") || combined_output.contains("cursor"),
-        "Tools should be read from config - got actions: {:?}",
+        mentions_tool,
+        "At least one action should reference a configured tool. Actions: {:?}",
         report.actions
     );
 }
