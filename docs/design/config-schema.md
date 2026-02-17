@@ -26,36 +26,23 @@ We adopt a modular, file-based configuration approach using **TOML** for its str
 
 ## 1. The Manifest (`config.toml`)
 
-This file defines the high-level configuration of the repository.
+This file defines the high-level configuration of the repository. It is parsed into the `Manifest` struct in `repo-core/src/config/manifest.rs`.
+
+**Important**: `tools` and `rules` are top-level arrays that must appear before any `[section]` headers in the TOML file. There is no `[active]`, `[project]`, or `[sync]` section.
 
 ```toml
+# Top-level arrays (must appear before [core])
+tools = ["claude", "cursor", "vscode"]
+rules = ["python-style", "no-api-keys"]
+
 [core]
-# Version of the repo-manager schema
-version = "1.0"
-# "standard" or "worktrees"
+# "standard" or "worktrees" (default: "worktrees")
 mode = "worktrees"
 
-[project]
-name = "repository-manager"
-slug = "repo-man"
-
-[active]
-# Tools that are enabled for this workspace. 
-# The CLI will read schemas from .repository/tools/<name>.toml
-tools = ["claude", "cursor", "vscode", "kdb"]
-
-# Presets apply a bundle of tools and initial rules
-# Can be a simple list of names (using defaults)
-presets = ["rust", "agentic-core"]
-
-[presets.config]
-# Or detailed configuration for specific presets
-"env:python" = { provider = "uv", version = "3.12" }
-
-
-[sync]
-# Strategy for updating files: 'overwrite', 'merge', 'smart-append'
-strategy = "smart-append"
+[presets]
+# Preset configurations keyed by "type:name"
+"env:python" = { version = "3.12" }
+"rust" = {}
 ```
 
 ## 2. Tool Registration (`tools/*.toml`)
@@ -214,55 +201,41 @@ This schema aligns with the Rust-based modular architecture and supports the req
 
 ## 6. Rust Data Structures
 
-To verify feasibility, here is how the schema maps to Rust structs using `serde`.
+These are the actual structs from the codebase (see `repo-core/src/config/manifest.rs`).
 
 ```rust
-// config.toml
-#[derive(Debug, Deserialize, Serialize)]
-pub struct RepositoryConfig {
-    pub core: CoreConfig,
-    pub active: ActiveConfig,
+// config.toml -> Manifest (repo-core/src/config/manifest.rs)
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Manifest {
+    #[serde(default)]
+    pub core: CoreSection,
+    #[serde(default)]
+    pub presets: HashMap<String, Value>,  // keyed by "type:name", e.g. "env:python"
+    #[serde(default)]
+    pub tools: Vec<String>,              // top-level array
+    #[serde(default)]
+    pub rules: Vec<String>,              // top-level array
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct CoreConfig {
-    pub version: String,
-    pub mode: RepositoryMode, // Enum: Normal, Worktree
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoreSection {
+    #[serde(default = "default_mode")]  // defaults to "worktrees"
+    pub mode: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ActiveConfig {
-    pub tools: Vec<String>,
-    pub presets: Vec<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct PresetConfig {
-    #[serde(flatten)]
-    pub overrides: HashMap<String, toml::Value>,
-}
-
-// tools/*.toml
+// tools/*.toml -> ToolDefinition (repo-meta/src/schema.rs)
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ToolDefinition {
     pub meta: ToolMeta,
-    pub integration: ToolIntegration,
+    pub integration: ToolIntegrationConfig,
     pub capabilities: ToolCapabilities,
+    pub schema_keys: Option<SchemaKeys>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ToolIntegration {
+pub struct ToolIntegrationConfig {
     pub config_path: String,
-    #[serde(rename = "type")]
-    pub config_type: ConfigType, // Enum: Json, Text, Toml
-}
-
-// rules/*.toml
-#[derive(Debug, Deserialize, Serialize)]
-pub struct RuleDefinition {
-    pub meta: RuleMeta,
-    pub content: RuleContent,
-    pub examples: Option<RuleExamples>,
-    pub targets: Option<RuleTargets>,
+    pub config_type: ConfigType,  // Enum: Json, Text, Toml
+    pub additional_paths: Vec<String>,
 }
 ```
