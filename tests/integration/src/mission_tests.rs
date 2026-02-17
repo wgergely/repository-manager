@@ -187,6 +187,7 @@ mod m1_init {
         let content = fs::read_to_string(repo.root().join(".repository/config.toml")).unwrap();
         let manifest = Manifest::parse(&content).unwrap();
         assert!(manifest.presets.contains_key("env:python"));
+    }
 }
 
 // =============================================================================
