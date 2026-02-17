@@ -1679,6 +1679,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "clap",
+ "repo-agent",
  "repo-core",
  "repo-fs",
  "repo-git",

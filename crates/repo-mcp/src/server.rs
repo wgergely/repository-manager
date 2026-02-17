@@ -335,7 +335,7 @@ mod tests {
 
         // Should have loaded tools
         assert!(!server.tools().is_empty());
-        assert_eq!(server.tools().len(), 20); // 4 repo + 3 branch + 3 git + 4 config + 3 preset + 3 superpowers
+        assert_eq!(server.tools().len(), 25); // 4 repo + 3 branch + 3 git + 4 config + 3 preset + 5 agent + 3 superpowers
 
         // Verify some expected tools
         let tool_names: Vec<&str> = server.tools().iter().map(|t| t.name.as_str()).collect();
