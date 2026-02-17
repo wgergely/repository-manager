@@ -202,6 +202,7 @@ fn cmd_branch(action: BranchAction) -> Result<()> {
         BranchAction::Remove { name } => commands::run_branch_remove(&cwd, &name),
         BranchAction::List => commands::run_branch_list(&cwd),
         BranchAction::Checkout { name } => commands::run_branch_checkout(&cwd, &name),
+        BranchAction::Rename { old, new } => commands::run_branch_rename(&cwd, &old, &new),
     }
 }
 

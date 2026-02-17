@@ -63,6 +63,10 @@ impl TestRepo {
     }
 
     /// Initialize with repository manager config
+    ///
+    /// Writes config.toml in the correct Manifest format:
+    /// - Top-level `tools = [...]` and `presets = [...]`
+    /// - `[core]` section with `mode`
     pub fn init_repo_manager(&mut self, mode: &str, tools: &[&str], presets: &[&str]) {
         let repo_dir = self.root().join(".repository");
         fs::create_dir_all(&repo_dir).unwrap();
@@ -79,14 +83,7 @@ impl TestRepo {
             .join(", ");
 
         let config = format!(
-            r#"[core]
-version = "1.0"
-mode = "{mode}"
-
-[active]
-tools = [{tools_str}]
-presets = [{presets_str}]
-"#
+            "tools = [{tools_str}]\npresets = [{presets_str}]\n\n[core]\nmode = \"{mode}\"\n"
         );
 
         fs::write(repo_dir.join("config.toml"), config).unwrap();

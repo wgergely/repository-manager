@@ -258,6 +258,15 @@ pub enum BranchAction {
         /// Branch name to checkout
         name: String,
     },
+
+    /// Rename a branch (and its worktree in worktrees mode)
+    Rename {
+        /// Current branch name
+        old: String,
+
+        /// New branch name
+        new: String,
+    },
 }
 
 /// Superpowers plugin actions
@@ -652,6 +661,20 @@ mod tests {
                 action: BranchAction::List
             })
         ));
+    }
+
+    #[test]
+    fn parse_branch_rename_command() {
+        let cli = Cli::parse_from(["repo", "branch", "rename", "old-name", "new-name"]);
+        match cli.command {
+            Some(Commands::Branch {
+                action: BranchAction::Rename { old, new },
+            }) => {
+                assert_eq!(old, "old-name");
+                assert_eq!(new, "new-name");
+            }
+            _ => panic!("Expected Branch Rename command"),
+        }
     }
 
     #[test]

@@ -98,4 +98,10 @@ pub trait ModeBackend: Send + Sync {
     /// In Standard mode, this performs a `git checkout`.
     /// In Worktrees mode, this returns the path to the worktree (creating it if needed).
     fn switch_branch(&self, name: &str) -> Result<NormalizedPath>;
+
+    /// Rename a branch.
+    ///
+    /// In Standard mode, this renames the git branch.
+    /// In Worktrees mode, this renames both the branch and moves the worktree directory.
+    fn rename_branch(&self, old_name: &str, new_name: &str) -> Result<()>;
 }

@@ -134,6 +134,47 @@ pub fn run_branch_checkout(path: &Path, name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Run the branch rename command.
+///
+/// Renames a branch. In Standard mode, renames the git branch.
+/// In Worktrees mode, renames the branch and moves the worktree directory.
+pub fn run_branch_rename(path: &Path, old_name: &str, new_name: &str) -> Result<()> {
+    let root = NormalizedPath::new(path);
+    let mode = detect_mode(&root)?;
+    let backend = create_backend(&root, mode)?;
+
+    println!(
+        "{} Renaming branch {} to {}...",
+        "=>".blue().bold(),
+        old_name.cyan(),
+        new_name.cyan()
+    );
+
+    backend.rename_branch(old_name, new_name)?;
+
+    match mode {
+        Mode::Worktrees => {
+            let new_path = root.join(new_name);
+            println!(
+                "{} Branch renamed to {} (worktree at {})",
+                "OK".green().bold(),
+                new_name.cyan(),
+                new_path.as_str().yellow()
+            );
+        }
+        Mode::Standard => {
+            println!(
+                "{} Branch renamed from {} to {}.",
+                "OK".green().bold(),
+                old_name.cyan(),
+                new_name.cyan()
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// Run the branch list command.
 ///
 /// Lists all branches. Shows branch names with markers for current and main branches.
@@ -336,6 +377,52 @@ mod tests {
             assert!(
                 stdout.contains("feature-test"),
                 "Branch should have been created"
+            );
+        }
+    }
+
+    #[test]
+    fn test_branch_rename_standard() {
+        let temp = setup_git_repo();
+        let path = temp.path();
+
+        // Create config with standard mode
+        let repo_dir = path.join(".repository");
+        fs::create_dir_all(&repo_dir).unwrap();
+        fs::write(
+            repo_dir.join("config.toml"),
+            "[core]\nmode = \"standard\"\n",
+        )
+        .unwrap();
+
+        // Create a branch first
+        let add_result = run_branch_add(path, "feature-rename-test", Some("main"));
+        if add_result.is_ok() {
+            // Rename it
+            let result = run_branch_rename(path, "feature-rename-test", "renamed-branch");
+            assert!(result.is_ok(), "Branch rename should succeed");
+
+            // Verify old branch no longer exists and new one does
+            let output = Command::new("git")
+                .args(["branch", "--list", "renamed-branch"])
+                .current_dir(path)
+                .output()
+                .expect("Failed to list branches");
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(
+                stdout.contains("renamed-branch"),
+                "Renamed branch should exist"
+            );
+
+            let output = Command::new("git")
+                .args(["branch", "--list", "feature-rename-test"])
+                .current_dir(path)
+                .output()
+                .expect("Failed to list branches");
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(
+                !stdout.contains("feature-rename-test"),
+                "Old branch name should no longer exist"
             );
         }
     }
