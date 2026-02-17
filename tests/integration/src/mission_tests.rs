@@ -63,6 +63,11 @@ impl TestRepo {
     }
 
     /// Initialize with repository manager config
+    ///
+    /// Writes config.toml in the correct Manifest format:
+    /// - Top-level `tools = [...]`
+    /// - `[core]` section with `mode`
+    /// - `[presets]` section as a table with each preset as a key
     pub fn init_repo_manager(&mut self, mode: &str, tools: &[&str], presets: &[&str]) {
         let repo_dir = self.root().join(".repository");
         fs::create_dir_all(&repo_dir).unwrap();
@@ -72,22 +77,15 @@ impl TestRepo {
             .map(|t| format!("\"{}\"", t))
             .collect::<Vec<_>>()
             .join(", ");
-        let presets_str = presets
-            .iter()
-            .map(|p| format!("\"{}\"", p))
-            .collect::<Vec<_>>()
-            .join(", ");
 
-        let config = format!(
-            r#"[core]
-version = "1.0"
-mode = "{mode}"
+        let mut config = format!("tools = [{tools_str}]\n\n[core]\nmode = \"{mode}\"\n");
 
-[active]
-tools = [{tools_str}]
-presets = [{presets_str}]
-"#
-        );
+        if !presets.is_empty() {
+            config.push_str("\n[presets]\n");
+            for preset in presets {
+                config.push_str(&format!("\"{}\" = {{}}\n", preset));
+            }
+        }
 
         fs::write(repo_dir.join("config.toml"), config).unwrap();
         self.initialized = true;
@@ -164,25 +162,31 @@ mod m1_init {
     /// M1.3: Init with tools records them in config
     #[test]
     fn m1_3_init_with_tools_records_in_config() {
+        use repo_core::Manifest;
+
         let mut repo = TestRepo::new();
         repo.init_git();
         repo.init_repo_manager("standard", &["vscode", "cursor", "claude"], &[]);
 
-        let config = load_config(&NormalizedPath::new(repo.root())).unwrap();
-        assert!(config.active.tools.contains(&"vscode".to_string()));
-        assert!(config.active.tools.contains(&"cursor".to_string()));
-        assert!(config.active.tools.contains(&"claude".to_string()));
+        let content = fs::read_to_string(repo.root().join(".repository/config.toml")).unwrap();
+        let manifest = Manifest::parse(&content).unwrap();
+        assert!(manifest.tools.contains(&"vscode".to_string()));
+        assert!(manifest.tools.contains(&"cursor".to_string()));
+        assert!(manifest.tools.contains(&"claude".to_string()));
     }
 
     /// M1.4: Init with presets records them in config
     #[test]
     fn m1_4_init_with_presets_records_in_config() {
+        use repo_core::Manifest;
+
         let mut repo = TestRepo::new();
         repo.init_git();
         repo.init_repo_manager("standard", &[], &["env:python"]);
 
-        let config = load_config(&NormalizedPath::new(repo.root())).unwrap();
-        assert!(config.active.presets.contains(&"env:python".to_string()));
+        let content = fs::read_to_string(repo.root().join(".repository/config.toml")).unwrap();
+        let manifest = Manifest::parse(&content).unwrap();
+        assert!(manifest.presets.contains_key("env:python"));
     }
 }
 
@@ -698,38 +702,131 @@ mod gaps {
     #[allow(unused_imports)]
     use super::*;
 
-    /// GAP-004: sync() should apply projections and create tool configs
-    /// TODO: Enable when sync applies projections beyond just creating the ledger
-    #[test]
-    #[ignore = "GAP-004: sync() does not yet apply projections to create tool configs"]
-    fn gap_004_sync_applies_projections() {
-        let mut repo = TestRepo::new();
-        repo.init_git();
-        repo.init_repo_manager("standard", &["vscode"], &[]);
+    /// Helper: write a config.toml in the Manifest format that SyncEngine expects.
+    ///
+    /// The `init_repo_manager` helper writes `[active] tools = [...]` which does not
+    /// match the `Manifest` struct (top-level `tools = [...]`). This helper writes the
+    /// correct format so SyncEngine can parse it.
+    fn write_manifest_config(root: &Path, mode: &str, tools: &[&str]) {
+        let repo_dir = root.join(".repository");
+        fs::create_dir_all(&repo_dir).unwrap();
 
-        // Add a rule to config (simulating add-rule)
-        let rules_dir = repo.root().join(".repository/rules");
-        fs::create_dir_all(&rules_dir).unwrap();
-        fs::write(
-            rules_dir.join("test-rule.toml"),
-            r#"
-id = "test-rule"
-content = "Test content"
-"#,
-        )
-        .unwrap();
+        let tools_str = tools
+            .iter()
+            .map(|t| format!("\"{}\"", t))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let config = format!(
+            "tools = [{tools_str}]\n\n[core]\nmode = \"{mode}\"\n"
+        );
+
+        fs::write(repo_dir.join("config.toml"), config).unwrap();
+    }
+
+    /// GAP-004: sync() should apply projections and create tool configs
+    ///
+    /// Validates the end-to-end sync pipeline:
+    ///   config.toml with tools -> SyncEngine::sync() -> tool config files on disk
+    ///
+    /// Tests that vscode, cursor, and claude tools all produce their expected config files.
+    #[test]
+    fn gap_004_sync_applies_projections() {
+        let repo = TestRepo::new();
+        repo.init_git();
+        write_manifest_config(repo.root(), "standard", &["vscode", "cursor", "claude"]);
 
         let root = NormalizedPath::new(repo.root());
         let engine = SyncEngine::new(root, Mode::Standard).unwrap();
 
-        // Sync should create tool configs based on rules
-        let _report = engine.sync().unwrap();
+        let report = engine.sync().unwrap();
+        assert!(report.success, "Sync should succeed: {:?}", report.errors);
+        assert!(!report.actions.is_empty(), "Sync should report actions");
 
-        // Correct behavior: sync should create .vscode/settings.json
-        let vscode_exists = repo.root().join(".vscode/settings.json").exists();
+        // Verify tool config files were created
         assert!(
-            vscode_exists,
-            "sync() should create .vscode/settings.json when vscode tool is configured"
+            repo.root().join(".vscode/settings.json").exists(),
+            ".vscode/settings.json should be created for vscode tool"
+        );
+        assert!(
+            repo.root().join(".cursorrules").exists(),
+            ".cursorrules should be created for cursor tool"
+        );
+        assert!(
+            repo.root().join("CLAUDE.md").exists(),
+            "CLAUDE.md should be created for claude tool"
+        );
+
+        // Verify files have content
+        let vscode_content =
+            fs::read_to_string(repo.root().join(".vscode/settings.json")).unwrap();
+        assert!(!vscode_content.is_empty(), "VSCode settings should have content");
+
+        let cursor_content = fs::read_to_string(repo.root().join(".cursorrules")).unwrap();
+        assert!(!cursor_content.is_empty(), "Cursor rules should have content");
+
+        let claude_content = fs::read_to_string(repo.root().join("CLAUDE.md")).unwrap();
+        assert!(!claude_content.is_empty(), "CLAUDE.md should have content");
+
+        // Verify ledger was created
+        assert!(
+            repo.root().join(".repository/ledger.toml").exists(),
+            "Ledger should be created after sync"
+        );
+    }
+
+    /// Integration test: sync creates config for a single tool
+    #[test]
+    fn sync_creates_config_for_single_tool() {
+        let repo = TestRepo::new();
+        repo.init_git();
+        write_manifest_config(repo.root(), "standard", &["cursor"]);
+
+        let root = NormalizedPath::new(repo.root());
+        let engine = SyncEngine::new(root, Mode::Standard).unwrap();
+        let report = engine.sync().unwrap();
+
+        assert!(report.success, "Sync should succeed: {:?}", report.errors);
+        assert!(
+            repo.root().join(".cursorrules").exists(),
+            ".cursorrules should be created for cursor tool"
+        );
+    }
+
+    /// Integration test: sync with rules writes rule content to tool configs
+    #[test]
+    fn sync_with_rules_includes_rule_content() {
+        let repo = TestRepo::new();
+        repo.init_git();
+        write_manifest_config(repo.root(), "standard", &["cursor"]);
+
+        // Add a rule to the registry
+        let rules_dir = repo.root().join(".repository/rules");
+        fs::create_dir_all(&rules_dir).unwrap();
+
+        use repo_core::rules::RuleRegistry;
+        let registry_path = rules_dir.join("registry.toml");
+        let mut registry = RuleRegistry::new(registry_path);
+        registry
+            .add_rule(
+                "test-rule",
+                "Always use descriptive variable names",
+                vec![],
+            )
+            .unwrap();
+
+        let root = NormalizedPath::new(repo.root());
+        let engine = SyncEngine::new(root, Mode::Standard).unwrap();
+        let report = engine.sync().unwrap();
+
+        assert!(report.success, "Sync should succeed: {:?}", report.errors);
+
+        // Verify the rule content appears in the cursor config
+        let content = fs::read_to_string(repo.root().join(".cursorrules")).unwrap();
+        assert!(
+            content.contains("descriptive variable names"),
+            "Rule content should appear in .cursorrules, got: {}",
+            content
         );
     }
 

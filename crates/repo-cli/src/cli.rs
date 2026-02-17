@@ -98,27 +98,44 @@ pub enum Commands {
     /// Examples:
     ///   repo add-tool claude    # Add Claude Code support
     ///   repo add-tool cursor    # Add Cursor IDE support
+    ///   repo add-tool cursor --dry-run  # Preview without changing
     AddTool {
         /// Name of the tool (use 'repo list-tools' to see options)
         name: String,
+
+        /// Preview changes without applying them
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Remove a tool from the repository
     RemoveTool {
         /// Name of the tool to remove
         name: String,
+
+        /// Preview changes without applying them
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Add a preset to the repository
     AddPreset {
         /// Name of the preset to add
         name: String,
+
+        /// Preview changes without applying them
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Remove a preset from the repository
     RemovePreset {
         /// Name of the preset to remove
         name: String,
+
+        /// Preview changes without applying them
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Add a rule to the repository
@@ -240,6 +257,15 @@ pub enum BranchAction {
     Checkout {
         /// Branch name to checkout
         name: String,
+    },
+
+    /// Rename a branch (and its worktree in worktrees mode)
+    Rename {
+        /// Current branch name
+        old: String,
+
+        /// New branch name
+        new: String,
     },
 }
 
@@ -428,7 +454,22 @@ mod tests {
     fn parse_add_tool_command() {
         let cli = Cli::parse_from(["repo", "add-tool", "eslint"]);
         match cli.command {
-            Some(Commands::AddTool { name }) => assert_eq!(name, "eslint"),
+            Some(Commands::AddTool { name, dry_run }) => {
+                assert_eq!(name, "eslint");
+                assert!(!dry_run);
+            }
+            _ => panic!("Expected AddTool command"),
+        }
+    }
+
+    #[test]
+    fn parse_add_tool_command_dry_run() {
+        let cli = Cli::parse_from(["repo", "add-tool", "eslint", "--dry-run"]);
+        match cli.command {
+            Some(Commands::AddTool { name, dry_run }) => {
+                assert_eq!(name, "eslint");
+                assert!(dry_run);
+            }
             _ => panic!("Expected AddTool command"),
         }
     }
@@ -437,7 +478,22 @@ mod tests {
     fn parse_remove_tool_command() {
         let cli = Cli::parse_from(["repo", "remove-tool", "eslint"]);
         match cli.command {
-            Some(Commands::RemoveTool { name }) => assert_eq!(name, "eslint"),
+            Some(Commands::RemoveTool { name, dry_run }) => {
+                assert_eq!(name, "eslint");
+                assert!(!dry_run);
+            }
+            _ => panic!("Expected RemoveTool command"),
+        }
+    }
+
+    #[test]
+    fn parse_remove_tool_command_dry_run() {
+        let cli = Cli::parse_from(["repo", "remove-tool", "eslint", "--dry-run"]);
+        match cli.command {
+            Some(Commands::RemoveTool { name, dry_run }) => {
+                assert_eq!(name, "eslint");
+                assert!(dry_run);
+            }
             _ => panic!("Expected RemoveTool command"),
         }
     }
@@ -446,7 +502,22 @@ mod tests {
     fn parse_add_preset_command() {
         let cli = Cli::parse_from(["repo", "add-preset", "typescript"]);
         match cli.command {
-            Some(Commands::AddPreset { name }) => assert_eq!(name, "typescript"),
+            Some(Commands::AddPreset { name, dry_run }) => {
+                assert_eq!(name, "typescript");
+                assert!(!dry_run);
+            }
+            _ => panic!("Expected AddPreset command"),
+        }
+    }
+
+    #[test]
+    fn parse_add_preset_command_dry_run() {
+        let cli = Cli::parse_from(["repo", "add-preset", "typescript", "--dry-run"]);
+        match cli.command {
+            Some(Commands::AddPreset { name, dry_run }) => {
+                assert_eq!(name, "typescript");
+                assert!(dry_run);
+            }
             _ => panic!("Expected AddPreset command"),
         }
     }
@@ -455,7 +526,22 @@ mod tests {
     fn parse_remove_preset_command() {
         let cli = Cli::parse_from(["repo", "remove-preset", "typescript"]);
         match cli.command {
-            Some(Commands::RemovePreset { name }) => assert_eq!(name, "typescript"),
+            Some(Commands::RemovePreset { name, dry_run }) => {
+                assert_eq!(name, "typescript");
+                assert!(!dry_run);
+            }
+            _ => panic!("Expected RemovePreset command"),
+        }
+    }
+
+    #[test]
+    fn parse_remove_preset_command_dry_run() {
+        let cli = Cli::parse_from(["repo", "remove-preset", "typescript", "--dry-run"]);
+        match cli.command {
+            Some(Commands::RemovePreset { name, dry_run }) => {
+                assert_eq!(name, "typescript");
+                assert!(dry_run);
+            }
             _ => panic!("Expected RemovePreset command"),
         }
     }
@@ -575,6 +661,20 @@ mod tests {
                 action: BranchAction::List
             })
         ));
+    }
+
+    #[test]
+    fn parse_branch_rename_command() {
+        let cli = Cli::parse_from(["repo", "branch", "rename", "old-name", "new-name"]);
+        match cli.command {
+            Some(Commands::Branch {
+                action: BranchAction::Rename { old, new },
+            }) => {
+                assert_eq!(old, "old-name");
+                assert_eq!(new, "new-name");
+            }
+            _ => panic!("Expected Branch Rename command"),
+        }
     }
 
     #[test]

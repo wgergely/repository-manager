@@ -147,6 +147,17 @@ impl ModeBackend for StandardBackend {
         self.git_command(&["checkout", name])?;
         Ok(self.root.clone())
     }
+
+    fn rename_branch(&self, old_name: &str, new_name: &str) -> Result<()> {
+        if !self.branch_exists(old_name) {
+            return Err(Error::Git(repo_git::Error::BranchNotFound {
+                name: old_name.to_string(),
+            }));
+        }
+
+        self.git_command(&["branch", "-m", old_name, new_name])?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

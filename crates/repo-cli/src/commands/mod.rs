@@ -11,7 +11,7 @@ pub mod superpowers;
 pub mod sync;
 pub mod tool;
 
-pub use branch::{run_branch_add, run_branch_checkout, run_branch_list, run_branch_remove};
+pub use branch::{run_branch_add, run_branch_checkout, run_branch_list, run_branch_remove, run_branch_rename};
 pub use diff::run_diff;
 pub use git::{run_merge, run_pull, run_push};
 pub use init::run_init;

@@ -257,6 +257,38 @@ impl ModeBackend for WorktreeBackend {
             Ok(worktree_path)
         }
     }
+
+    fn rename_branch(&self, old_name: &str, new_name: &str) -> Result<()> {
+        let main_branch = self.main_branch_name();
+        if old_name == main_branch {
+            return Err(Error::SyncError {
+                message: format!("Cannot rename main branch: {}", old_name),
+            });
+        }
+
+        let old_worktree_path = self.worktree_path(old_name);
+        if !old_worktree_path.exists() {
+            return Err(Error::Git(repo_git::Error::WorktreeNotFound {
+                name: old_name.to_string(),
+            }));
+        }
+
+        let new_worktree_path = self.worktree_path(new_name);
+
+        // Rename the git branch
+        self.git_command_in_worktree(
+            &self.current_worktree,
+            &["branch", "-m", old_name, new_name],
+        )?;
+
+        // Move the worktree directory
+        self.git_command_in_worktree(
+            &self.current_worktree,
+            &["worktree", "move", old_worktree_path.as_str(), new_worktree_path.as_str()],
+        )?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

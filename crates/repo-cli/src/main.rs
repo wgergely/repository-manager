@@ -69,10 +69,10 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::Check => cmd_check(),
         Commands::Sync { dry_run, json } => cmd_sync(dry_run, json),
         Commands::Fix { dry_run } => cmd_fix(dry_run),
-        Commands::AddTool { name } => cmd_add_tool(&name),
-        Commands::RemoveTool { name } => cmd_remove_tool(&name),
-        Commands::AddPreset { name } => cmd_add_preset(&name),
-        Commands::RemovePreset { name } => cmd_remove_preset(&name),
+        Commands::AddTool { name, dry_run } => cmd_add_tool(&name, dry_run),
+        Commands::RemoveTool { name, dry_run } => cmd_remove_tool(&name, dry_run),
+        Commands::AddPreset { name, dry_run } => cmd_add_preset(&name, dry_run),
+        Commands::RemovePreset { name, dry_run } => cmd_remove_preset(&name, dry_run),
         Commands::AddRule {
             id,
             instruction,
@@ -152,24 +152,24 @@ fn cmd_fix(dry_run: bool) -> Result<()> {
     commands::run_fix(&cwd, dry_run)
 }
 
-fn cmd_add_tool(name: &str) -> Result<()> {
+fn cmd_add_tool(name: &str, dry_run: bool) -> Result<()> {
     let cwd = std::env::current_dir()?;
-    commands::run_add_tool(&cwd, name)
+    commands::run_add_tool(&cwd, name, dry_run)
 }
 
-fn cmd_remove_tool(name: &str) -> Result<()> {
+fn cmd_remove_tool(name: &str, dry_run: bool) -> Result<()> {
     let cwd = std::env::current_dir()?;
-    commands::run_remove_tool(&cwd, name)
+    commands::run_remove_tool(&cwd, name, dry_run)
 }
 
-fn cmd_add_preset(name: &str) -> Result<()> {
+fn cmd_add_preset(name: &str, dry_run: bool) -> Result<()> {
     let cwd = std::env::current_dir()?;
-    commands::run_add_preset(&cwd, name)
+    commands::run_add_preset(&cwd, name, dry_run)
 }
 
-fn cmd_remove_preset(name: &str) -> Result<()> {
+fn cmd_remove_preset(name: &str, dry_run: bool) -> Result<()> {
     let cwd = std::env::current_dir()?;
-    commands::run_remove_preset(&cwd, name)
+    commands::run_remove_preset(&cwd, name, dry_run)
 }
 
 fn cmd_add_rule(id: &str, instruction: &str, tags: Vec<String>) -> Result<()> {
@@ -202,6 +202,7 @@ fn cmd_branch(action: BranchAction) -> Result<()> {
         BranchAction::Remove { name } => commands::run_branch_remove(&cwd, &name),
         BranchAction::List => commands::run_branch_list(&cwd),
         BranchAction::Checkout { name } => commands::run_branch_checkout(&cwd, &name),
+        BranchAction::Rename { old, new } => commands::run_branch_rename(&cwd, &old, &new),
     }
 }
 
@@ -251,7 +252,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         create_minimal_repo(temp_dir.path(), "standard");
 
-        let result = commands::run_add_tool(temp_dir.path(), "eslint");
+        let result = commands::run_add_tool(temp_dir.path(), "eslint", false);
         assert!(result.is_ok());
     }
 
@@ -261,9 +262,9 @@ mod tests {
         create_minimal_repo(temp_dir.path(), "standard");
 
         // First add the tool
-        commands::run_add_tool(temp_dir.path(), "eslint").unwrap();
+        commands::run_add_tool(temp_dir.path(), "eslint", false).unwrap();
         // Then remove it
-        let result = commands::run_remove_tool(temp_dir.path(), "eslint");
+        let result = commands::run_remove_tool(temp_dir.path(), "eslint", false);
         assert!(result.is_ok());
     }
 
@@ -272,7 +273,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         create_minimal_repo(temp_dir.path(), "standard");
 
-        let result = commands::run_add_preset(temp_dir.path(), "typescript");
+        let result = commands::run_add_preset(temp_dir.path(), "typescript", false);
         assert!(result.is_ok());
     }
 
@@ -282,9 +283,9 @@ mod tests {
         create_minimal_repo(temp_dir.path(), "standard");
 
         // First add the preset
-        commands::run_add_preset(temp_dir.path(), "typescript").unwrap();
+        commands::run_add_preset(temp_dir.path(), "typescript", false).unwrap();
         // Then remove it
-        let result = commands::run_remove_preset(temp_dir.path(), "typescript");
+        let result = commands::run_remove_preset(temp_dir.path(), "typescript", false);
         assert!(result.is_ok());
     }
 

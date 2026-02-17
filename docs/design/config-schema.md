@@ -22,22 +22,23 @@ We adopt a modular, file-based configuration approach using **TOML** for the man
 
 ## 1. The Manifest (`config.toml`)
 
-This file defines the high-level configuration of the repository. Tools and rules are top-level arrays. The `[core]` section contains only the workspace mode. Presets are defined as `[presets."type:name"]` table entries.
+This file defines the high-level configuration of the repository. It is parsed into the `Manifest` struct in `repo-core/src/config/manifest.rs`.
+
+**Important**: `tools` and `rules` are top-level arrays that must appear before any `[section]` headers in the TOML file. (In TOML, once a `[section]` header appears, subsequent keys belong to that section. Placing `tools` and `rules` first ensures they are parsed as top-level fields of the `Manifest` struct, not nested under `[core]`.) There is no `[active]`, `[project]`, or `[sync]` section.
 
 ```toml
-# Top-level arrays: tools and rules to enable
-tools = ["cursor", "claude", "vscode"]
+# Top-level arrays (must appear before [core])
+tools = ["claude", "cursor", "vscode"]
 rules = ["python-style", "no-api-keys"]
 
 [core]
-mode = "standard"  # or "worktrees" (default: "worktrees")
+# "standard" or "worktrees" (default: "worktrees")
+mode = "worktrees"
 
-[presets."env:python"]
-version = "3.12"
-provider = "uv"
-
-[presets."env:node"]
-version = "20"
+[presets]
+# Preset configurations keyed by "type:name"
+"env:python" = { version = "3.12" }
+"rust" = {}
 ```
 
 ### Manifest Fields

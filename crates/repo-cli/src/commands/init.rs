@@ -64,6 +64,28 @@ pub fn run_init(cwd: &Path, config: InitConfig) -> Result<PathBuf> {
     }
 
     println!("{} Repository initialized!", "OK".green().bold());
+
+    // Post-init guidance
+    println!();
+    if !config.tools.is_empty() {
+        println!(
+            "{} Next step: run {} to generate tool configurations",
+            "=>".blue().bold(),
+            "repo sync".cyan()
+        );
+    } else {
+        println!(
+            "{} Next step: run {} to add a tool, then {} to generate configs",
+            "=>".blue().bold(),
+            "repo add-tool <name>".cyan(),
+            "repo sync".cyan()
+        );
+    }
+    println!(
+        "   Run {} to see available tools",
+        "repo list-tools".cyan()
+    );
+
     Ok(target_path)
 }
 
@@ -476,5 +498,46 @@ mod tests {
             marker.exists(),
             "marker file should still exist - git should not be reinitialized"
         );
+    }
+
+    #[test]
+    fn test_run_init_with_tools_returns_correct_path() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let config = InitConfig {
+            name: "tooled-project".to_string(),
+            mode: "standard".to_string(),
+            tools: vec!["cursor".to_string(), "claude".to_string()],
+            presets: vec![],
+            remote: None,
+        };
+
+        let result = run_init(temp_dir.path(), config);
+        assert!(result.is_ok());
+
+        let project_path = result.unwrap();
+        assert_eq!(project_path.file_name().unwrap(), "tooled-project");
+        assert!(project_path.join(".repository").exists());
+        assert!(project_path.join(".repository/config.toml").exists());
+    }
+
+    #[test]
+    fn test_run_init_without_tools_returns_correct_path() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let config = InitConfig {
+            name: "empty-project".to_string(),
+            mode: "standard".to_string(),
+            tools: vec![],
+            presets: vec![],
+            remote: None,
+        };
+
+        let result = run_init(temp_dir.path(), config);
+        assert!(result.is_ok());
+
+        let project_path = result.unwrap();
+        assert_eq!(project_path.file_name().unwrap(), "empty-project");
+        assert!(project_path.join(".repository").exists());
     }
 }
