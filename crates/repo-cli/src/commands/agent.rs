@@ -386,10 +386,10 @@ fn run_agent_config(show: bool) -> Result<()> {
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|| "not found".red().to_string()));
 
-        if let Some(ref r) = report {
-            if let Some(ref v) = r.python_version {
-                println!("  {:<20} {}", "Python version:".bold(), v);
-            }
+        if let Some(ref r) = report
+            && let Some(ref v) = r.python_version
+        {
+            println!("  {:<20} {}", "Python version:".bold(), v);
         }
 
         println!("  {:<20} {}",  "Vaultspec:".bold(),
@@ -397,10 +397,10 @@ fn run_agent_config(show: bool) -> Result<()> {
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|| "not found".red().to_string()));
 
-        if let Some(ref r) = report {
-            if r.agent_count > 0 {
-                println!("  {:<20} {}", "Agents:".bold(), r.agent_count);
-            }
+        if let Some(ref r) = report
+            && r.agent_count > 0
+        {
+            println!("  {:<20} {}", "Agents:".bold(), r.agent_count);
         }
 
         println!("  {:<20} {}", "Status:".bold(),
