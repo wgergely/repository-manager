@@ -6,22 +6,18 @@ The `.repository` directory serves as the **Single Source of Truth (SSOT)** for 
 
 ## Directory Structure
 
-We adopt a modular, file-based configuration approach using **TOML** for its strong typing and readability.
+We adopt a modular, file-based configuration approach using **TOML** for the manifest and **Markdown** for rule files.
 
 ```text
 .repository/
 ├── config.toml           # The primary manifest (enabled tools, presets, mode)
-├── state.lock            # (Optional) Computed state to track sync status
-├── tools/                # Registry of available tools and their integration logic
-│   ├── claude.toml
-│   ├── rules.toml        # (Alternatively, rules logic can vary)
-│   └── vscode.toml
-├── rules/                # Definitions of prompts/behaviors to enforce
-│   ├── python-style.toml
-│   └── no-api-keys.toml
-└── presets/              # Collections of rules/tools for stacks
-    ├── python-web.toml
-    └── rust-cli.toml
+├── tools/                # Custom tool definitions (TOML); built-in tools are compiled in
+│   └── my-custom-tool.toml
+├── rules/                # Rule files created by `repo add-rule`
+│   ├── python-style.md
+│   └── no-api-keys.md
+└── presets/              # Custom preset definitions (TOML); built-in presets are compiled in
+    └── my-custom-preset.toml
 ```
 
 ## 1. The Manifest (`config.toml`)
@@ -55,70 +51,69 @@ version = "20"
 
 > **Note:** The `tools` and `rules` arrays must appear before any `[section]` headers in the TOML file, since they are top-level keys.
 
-## 2. Tool Registration (`tools/*.toml`)
+## 2. Tool Registration
 
-Each file in `tools/` defines a tool's capabilities and how the manager should interact with it. The 13 built-in tools are compiled into the binary and do not require TOML files. Custom tools placed in `.repository/tools/` extend the built-in set.
+The 13 built-in tools are compiled into the binary via `repo-tools::registry`. They do not require TOML files on disk. Custom tools can be placed in `.repository/tools/` as TOML files and are loaded by the `DefinitionLoader` in `repo-meta`.
 
-> **Implementation note:** The current implementation loads built-in tool definitions from `repo-tools::registry` and dispatches to specialized integration modules. The TOML schema below describes the format for custom tool definitions and matches the `ToolDefinition` struct in `repo-meta`.
+The `ToolDefinition` struct (in `repo-meta::schema`) defines the schema for both built-in and custom tool definitions:
 
-**Example: `tools/claude.toml`**
+**Example: `tools/my-custom-tool.toml`**
 
 ```toml
 [meta]
-name = "Claude Code"
-slug = "claude"
-description = "Anthropic's Claude Code CLI agent"
+name = "My Custom Tool"
+slug = "my-custom-tool"
+description = "A custom tool integration"
 
 [integration]
-config_path = ".claude/config.json"
-type = "json"
+config_path = ".my-tool-config"
+type = "text"
 additional_paths = []
 
 [capabilities]
 supports_custom_instructions = true
-supports_mcp = true
+supports_mcp = false
 supports_rules_directory = false
 
 [schema]
-instruction_key = "global_instructions"
-mcp_key = "mcpServers"
+instruction_key = "instructions"
 ```
 
-**Example: `tools/cursor.toml`**
+### Built-in Tool Examples
 
-```toml
-[meta]
-name = "Cursor"
-slug = "cursor"
-description = "AI-first code editor"
-
-[integration]
-config_path = ".cursorrules"
-type = "text"
-
-[capabilities]
-supports_custom_instructions = true
-supports_mcp = true
-supports_rules_directory = false
-```
+The Claude integration uses `CLAUDE.md` (markdown type) and `.claude/rules/` as its additional path. The Cursor integration uses `.cursorrules` (text type).
 
 ### Supported Config Types
 
 | Type | Extension | Description |
 |------|-----------|-------------|
 | `text` | `.cursorrules`, etc. | Plain text files with managed block markers |
-| `json` | `.json` | Structured JSON merge on manager-owned keys |
+| `json` | `.json` | Structured JSON merge with `__repo_managed__` key |
 | `toml` | `.toml` | TOML configuration files |
 | `yaml` | `.yaml`, `.yml` | YAML configuration files |
 | `markdown` | `.md` | Markdown files (e.g., `CLAUDE.md`) |
 
-## 3. Rule Definitions (`rules/*.toml`)
+## 3. Rule Files (`rules/*.md`)
 
-Rules capture specific behaviors, constraints, or stylistic preferences. They are abstract enough to be unrolled to different tools.
+Rules capture specific behaviors, constraints, or stylistic preferences. The CLI `add-rule` command creates rules as Markdown files in `.repository/rules/`.
 
-> **Implementation note:** The current implementation loads rules via the CLI `add-rule` command, which stores them in `registry.toml`. The TOML schema below describes the design format and matches the `RuleDefinition` struct in `repo-meta`.
+**Example: creating a rule via CLI**
 
-**Example: `rules/code-style-python.toml`**
+```bash
+repo add-rule python-snake-case "All Python variable names must use snake_case." --tag python --tag style
+```
+
+This creates `.repository/rules/python-snake-case.md`:
+
+```markdown
+tags: python, style
+
+All Python variable names must use snake_case.
+```
+
+The `DefinitionLoader` in `repo-meta` also supports loading structured TOML rule definitions from `.repository/rules/*.toml` for advanced use cases. The TOML format matches the `RuleDefinition` struct:
+
+**Example: `rules/python-snake-case.toml`**
 
 ```toml
 [meta]
@@ -142,14 +137,13 @@ files = ["**/*.py"]
 
 ## 4. Presets (`presets/*.toml`)
 
-Presets allow bulk-enabling of rules and tools.
-
-> **Implementation note:** The current implementation provides built-in preset providers in `repo-presets`. The TOML schema below describes the design intent for user-defined presets.
+Presets allow bulk-enabling of rules and tools. Built-in preset providers are compiled into the binary via `repo-presets`. Custom presets can be placed in `.repository/presets/` as TOML files.
 
 **Example: `presets/python-agentic.toml`**
 
 ```toml
 [meta]
+id = "python-agentic"
 description = "Standard setup for Python Agentic development"
 
 [requires]
@@ -165,62 +159,61 @@ include = [
 
 ## 5. The Sync Process ("Unroll")
 
-The `repo sync` command generates config files while preserving user changes through managed strategies.
+The `repo sync` command generates tool config files while preserving user content through managed blocks.
 
-**Text Files (e.g., `.cursorrules`)**:
-We use "Managed Blocks". The CLI only edits content between specific markers.
+Each rule is assigned a UUID (stored in `.repository/rules/registry.toml`). The UUID is used as the managed block marker in tool config files, allowing individual rules to be inserted, updated, or removed independently.
 
-```text
-# .cursorrules
+### Managed Block Formats
 
+**Markdown/Text Files** (e.g., `CLAUDE.md`, `.cursorrules`):
+
+Uses HTML comment markers with UUID-based block identifiers:
+
+```markdown
 # User content can go here...
 Always be concise.
 
-# --- REPO-MANAGER-START: managed-rules --
-# DO NOT EDIT THIS SECTION MANUALLY.
-# Generated from: .repository/rules/
-
-1. (python-snake-case) All Python variable names must use snake_case.
-2. (no-api-keys) Never commit API keys.
-
-# --- REPO-MANAGER-END ---
+<!-- repo:block:550e8400-e29b-41d4-a716-446655440000 -->
+All Python variable names must use snake_case.
+<!-- /repo:block:550e8400-e29b-41d4-a716-446655440000 -->
 ```
 
-**JSON Files (e.g., `.claude/config.json`)**:
-For JSON, we perform structured merges on manager-owned keys, appending or replacing labeled sections.
+**YAML/TOML Files**:
 
-### State Tracking (`state.lock`)
+Uses hash-comment markers:
 
-To robustly handle `remove-rule` operations, we must know what we previously wrote.
-`state.lock` tracks the mapping of `Rule ID` -> `Applied Checksum/Version`.
+```yaml
+# repo:block:550e8400-e29b-41d4-a716-446655440000
+some_key: managed_value
+# /repo:block:550e8400-e29b-41d4-a716-446655440000
+```
 
-```toml
-# .repository/state.lock
-[sync_status]
-last_run = "2026-01-23T12:00:00Z"
+**JSON Files** (e.g., `.vscode/settings.json`):
 
-[installed_files]
-".cursorrules" = "hash_of_managed_block"
-".claude/config.json" = "hash_of_managed_json_keys"
+Uses a reserved `__repo_managed__` key to store managed blocks:
 
-[active_rules]
-python-snake-case = "v1"
+```json
+{
+  "user_setting": true,
+  "__repo_managed__": {
+    "550e8400-e29b-41d4-a716-446655440000": {
+      "content": "managed value"
+    }
+  }
+}
 ```
 
 ## Summary of Workflow
 
-1. **User runs**: `repo add-rule "Use snake_case" --tag python`
-2. **CLI creates**: `.repository/rules/use-snake-case.toml`
+1. **User runs**: `repo add-rule python-style "Use snake_case" --tag python`
+2. **CLI creates**: `.repository/rules/python-style.md`
 3. **User runs**: `repo sync`
 4. **CLI**:
     * Reads `config.toml` -> sees `tools = ["cursor"]`.
-    * Reads `tools/cursor.toml` -> sees `config_path = ".cursorrules"`, `type = "text"`.
-    * Reads `rules/*.toml`.
-    * Generates a text block containing the instructions.
-    * Updates `.cursorrules` (between markers).
-    * Updates `state.lock`.
-
-This schema aligns with the Rust-based modular architecture and supports the requested modularity and unroll capabilities.
+    * Looks up tool integration (built-in or from `tools/*.toml`) -> gets `config_path = ".cursorrules"`, `type = "text"`.
+    * Reads rules from `.repository/rules/`.
+    * Generates managed blocks containing the rule instructions (keyed by UUID).
+    * Updates `.cursorrules` (inserting/updating managed blocks, preserving user content).
 
 ## 6. Rust Data Structures
 
