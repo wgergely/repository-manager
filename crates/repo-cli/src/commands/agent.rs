@@ -5,6 +5,7 @@
 
 use colored::Colorize;
 use repo_agent::discovery::AgentManager;
+use repo_agent::process::{ProcessManager, ProcessStatus};
 use repo_agent::subprocess;
 
 use crate::cli::{AgentAction, RulesSubAction};
@@ -183,42 +184,18 @@ fn run_agent_spawn(name: &str, goal: Option<&str>, worktree: Option<&str>) -> Re
             .unwrap_or_default(),
     );
 
-    // Determine working directory (worktree or current)
-    let work_dir = if let Some(wt) = worktree {
-        let wt_path = manager.root().join(wt);
-        if !wt_path.is_dir() {
-            println!(
-                "{} Worktree '{}' not found at {}",
-                "error:".red().bold(),
-                wt,
-                wt_path.display()
-            );
-            return Ok(());
-        }
-        wt_path
-    } else {
-        manager.root().to_path_buf()
-    };
-
     let python = manager.python_path().unwrap();
     let vaultspec = manager.vaultspec_path().unwrap();
+    let pm = ProcessManager::new(manager.root());
 
-    // Build vaultspec spawn command
-    let mut args = vec!["agent", "run", name];
-    if let Some(g) = goal {
-        args.push("--goal");
-        args.push(g);
-    }
-
-    match subprocess::run_vaultspec(python, vaultspec, &work_dir, &args) {
-        Ok(output) => {
-            if !output.trim().is_empty() {
-                println!("{}", output);
-            }
+    match pm.spawn(python, vaultspec, name, worktree, goal) {
+        Ok(process) => {
             println!(
-                "\n{} Agent '{}' spawned successfully.",
+                "\n{} Agent '{}' spawned (PID: {}, ID: {})",
                 "✓".green().bold(),
-                name.cyan()
+                name.cyan(),
+                process.pid.to_string().yellow(),
+                process.id.dimmed()
             );
         }
         Err(e) => {
@@ -238,46 +215,54 @@ fn run_agent_status(task_id: Option<&str>) -> Result<()> {
         }
     };
 
-    if !manager.is_available() {
-        println!(
-            "{} Agent subsystem not available. Run {} to check prerequisites.",
-            "note:".yellow().bold(),
-            "repo agent check".cyan()
-        );
-        return Ok(());
-    }
+    let pm = ProcessManager::new(manager.root());
 
-    match task_id {
-        Some(id) => {
-            println!(
-                "{} Checking status of task '{}'...",
-                "=>".blue().bold(),
-                id.cyan()
-            );
-        }
-        None => {
-            println!("{} Checking status of all agents...", "=>".blue().bold());
-        }
-    }
-
-    let python = manager.python_path().unwrap();
-    let vaultspec = manager.vaultspec_path().unwrap();
-
-    let mut args = vec!["task", "status"];
-    if let Some(id) = task_id {
-        args.push(id);
-    }
-
-    match subprocess::run_vaultspec(python, vaultspec, manager.root(), &args) {
-        Ok(output) => {
-            if !output.trim().is_empty() {
-                println!("{}", output);
+    match pm.list() {
+        Ok(processes) => {
+            let filtered: Vec<_> = if let Some(id) = task_id {
+                processes.into_iter().filter(|p| p.id.contains(id)).collect()
             } else {
-                println!("{} No active tasks.", "note:".yellow().bold());
+                processes
+            };
+
+            if filtered.is_empty() {
+                println!("{} No tracked agent processes.", "note:".yellow().bold());
+            } else {
+                println!(
+                    "{} {} agent process(es):\n",
+                    "=>".blue().bold(),
+                    filtered.len()
+                );
+                println!(
+                    "  {:<30} {:<12} {:<8} {:<15} {}",
+                    "ID".bold(),
+                    "AGENT".bold(),
+                    "PID".bold(),
+                    "STATUS".bold(),
+                    "WORKTREE".bold()
+                );
+                println!("  {}", "─".repeat(75).dimmed());
+                for p in &filtered {
+                    let status_str = match p.status {
+                        ProcessStatus::Running => "running".green().to_string(),
+                        ProcessStatus::Completed => "completed".blue().to_string(),
+                        ProcessStatus::Stopped => "stopped".yellow().to_string(),
+                        ProcessStatus::Failed => "failed".red().to_string(),
+                        ProcessStatus::Unknown => "unknown".dimmed().to_string(),
+                    };
+                    println!(
+                        "  {:<30} {:<12} {:<8} {:<15} {}",
+                        p.id.dimmed(),
+                        p.agent_name.cyan(),
+                        p.pid,
+                        status_str,
+                        p.worktree.as_deref().unwrap_or("-")
+                    );
+                }
             }
         }
         Err(e) => {
-            println!("{} Failed to get status: {}", "error:".red().bold(), e);
+            println!("{} Failed to list processes: {}", "error:".red().bold(), e);
         }
     }
 
@@ -293,37 +278,25 @@ fn run_agent_stop(task_id: &str) -> Result<()> {
         }
     };
 
-    if !manager.is_available() {
-        println!(
-            "{} Agent subsystem not available. Run {} to check prerequisites.",
-            "note:".yellow().bold(),
-            "repo agent check".cyan()
-        );
-        return Ok(());
-    }
-
     println!(
-        "{} Stopping agent task '{}'...",
+        "{} Stopping agent '{}'...",
         "=>".blue().bold(),
         task_id.cyan()
     );
 
-    let python = manager.python_path().unwrap();
-    let vaultspec = manager.vaultspec_path().unwrap();
+    let pm = ProcessManager::new(manager.root());
 
-    match subprocess::run_vaultspec(python, vaultspec, manager.root(), &["task", "stop", task_id]) {
-        Ok(output) => {
-            if !output.trim().is_empty() {
-                println!("{}", output);
-            }
+    match pm.stop(task_id) {
+        Ok(process) => {
             println!(
-                "{} Task '{}' stopped.",
+                "{} Agent '{}' (PID {}) stopped.",
                 "✓".green().bold(),
-                task_id.cyan()
+                process.agent_name.cyan(),
+                process.pid
             );
         }
         Err(e) => {
-            println!("{} Failed to stop task: {}", "error:".red().bold(), e);
+            println!("{} Failed to stop agent: {}", "error:".red().bold(), e);
         }
     }
 
@@ -386,10 +359,10 @@ fn run_agent_config(show: bool) -> Result<()> {
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|| "not found".red().to_string()));
 
-        if let Some(ref r) = report {
-            if let Some(ref v) = r.python_version {
-                println!("  {:<20} {}", "Python version:".bold(), v);
-            }
+        if let Some(ref r) = report
+            && let Some(ref v) = r.python_version
+        {
+            println!("  {:<20} {}", "Python version:".bold(), v);
         }
 
         println!("  {:<20} {}",  "Vaultspec:".bold(),
@@ -397,10 +370,10 @@ fn run_agent_config(show: bool) -> Result<()> {
                 .map(|p| p.display().to_string())
                 .unwrap_or_else(|| "not found".red().to_string()));
 
-        if let Some(ref r) = report {
-            if r.agent_count > 0 {
-                println!("  {:<20} {}", "Agents:".bold(), r.agent_count);
-            }
+        if let Some(ref r) = report
+            && r.agent_count > 0
+        {
+            println!("  {:<20} {}", "Agents:".bold(), r.agent_count);
         }
 
         println!("  {:<20} {}", "Status:".bold(),
