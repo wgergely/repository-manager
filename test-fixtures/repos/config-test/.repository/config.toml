@@ -1,9 +1,7 @@
 # Repository Manager Configuration
 # This fixture tests config generation across tools
 
+tools = ["cursor", "claude"]
+
 [core]
 mode = "standard"
-
-[active]
-tools = ["cursor", "claude", "aider", "vscode"]
-presets = []

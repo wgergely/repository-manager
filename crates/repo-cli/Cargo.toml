@@ -31,3 +31,4 @@ tokio = { workspace = true, features = ["rt", "macros"] }
 tempfile = { workspace = true }
 assert_cmd = "2"
 predicates = { workspace = true }
+toml.workspace = true

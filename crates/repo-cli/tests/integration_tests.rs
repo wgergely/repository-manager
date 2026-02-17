@@ -6,6 +6,7 @@ use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
 use tempfile::tempdir;
+use toml;
 
 /// Get a Command for the repo binary
 #[allow(deprecated)]
@@ -536,7 +537,7 @@ fn test_check_requires_git_repo() {
 // ============================================================================
 
 #[test]
-fn test_sync_creates_ledger() {
+fn test_sync_creates_ledger_with_valid_content() {
     let dir = tempdir().unwrap();
 
     // Init
@@ -556,8 +557,25 @@ fn test_sync_creates_ledger() {
         .assert()
         .success();
 
-    // Ledger should now exist
-    assert!(dir.path().join(".repository/ledger.toml").exists());
+    // Ledger should now exist with valid TOML content
+    let ledger_path = dir.path().join(".repository/ledger.toml");
+    assert!(ledger_path.exists());
+
+    let ledger_content = fs::read_to_string(&ledger_path).unwrap();
+    // Ledger must be valid TOML
+    let parsed: toml::Value = toml::from_str(&ledger_content)
+        .expect("Ledger should be valid TOML");
+
+    // Must contain version field
+    let version = parsed.get("version").expect("Ledger must have 'version' field");
+    assert_eq!(
+        version.as_str().unwrap(), "1.0",
+        "Ledger version should be 1.0"
+    );
+
+    // Must contain intents array (even if empty)
+    let intents = parsed.get("intents").expect("Ledger must have 'intents' field");
+    assert!(intents.is_array(), "Ledger 'intents' should be an array");
 }
 
 #[test]
@@ -752,7 +770,7 @@ fn test_branch_help() {
 // ============================================================================
 
 #[test]
-fn test_full_workflow_init_add_check_sync() {
+fn test_full_workflow_init_add_check_sync_verifies_content() {
     let dir = tempdir().unwrap();
 
     // 1. Init
@@ -765,7 +783,7 @@ fn test_full_workflow_init_add_check_sync() {
     // 2. Add tool
     let mut cmd = repo_cmd();
     cmd.current_dir(dir.path())
-        .args(["add-tool", "eslint"])
+        .args(["add-tool", "cursor"])
         .assert()
         .success();
 
@@ -790,11 +808,29 @@ fn test_full_workflow_init_add_check_sync() {
         .assert()
         .success();
 
-    // Verify final state
+    // Verify config.toml content
     let config_content = fs::read_to_string(dir.path().join(".repository/config.toml")).unwrap();
-    assert!(config_content.contains("eslint"));
-    assert!(config_content.contains("typescript"));
-    assert!(dir.path().join(".repository/ledger.toml").exists());
+    assert!(config_content.contains("cursor"), "Config should contain cursor tool");
+    assert!(config_content.contains("typescript"), "Config should contain typescript preset");
+    assert!(config_content.contains("[core]"), "Config should have [core] section");
+    assert!(config_content.contains("mode = \"standard\""), "Config should have standard mode");
+
+    // Verify ledger exists AND has valid TOML structure
+    let ledger_path = dir.path().join(".repository/ledger.toml");
+    assert!(ledger_path.exists(), "Ledger file must be created by sync");
+
+    let ledger_content = fs::read_to_string(&ledger_path).unwrap();
+    let ledger: toml::Value = toml::from_str(&ledger_content)
+        .expect("Ledger must be valid TOML");
+    assert_eq!(
+        ledger.get("version").and_then(|v| v.as_str()),
+        Some("1.0"),
+        "Ledger version must be 1.0"
+    );
+    assert!(
+        ledger.get("intents").unwrap().is_array(),
+        "Ledger must have intents array"
+    );
 }
 
 #[test]
@@ -1118,11 +1154,283 @@ fn test_e2e_full_workflow_multiple_tools() {
         .assert()
         .success();
 
-    // 5. Verify ledger created
-    assert!(dir.path().join(".repository/ledger.toml").exists());
+    // 5. Verify ledger has valid structure and tool intents
+    let ledger_path = dir.path().join(".repository/ledger.toml");
+    assert!(ledger_path.exists(), "Ledger must be created by sync");
+    let ledger_content = fs::read_to_string(&ledger_path).unwrap();
+    let ledger: toml::Value = toml::from_str(&ledger_content)
+        .expect("Ledger must be valid TOML");
+    assert_eq!(ledger.get("version").and_then(|v| v.as_str()), Some("1.0"));
+    let _intents = ledger.get("intents").unwrap().as_array().unwrap();
+    // With 3 tools configured, we expect tool intents in the ledger
+    // (exact count depends on which tools have integrations)
+    // At minimum the ledger structure should be parseable
+    assert!(
+        !ledger_content.is_empty(),
+        "Ledger content should not be empty after sync with tools"
+    );
 
-    // 6. Verify rules exist
-    assert!(dir.path().join(".repository/rules/api-design.md").exists());
-    assert!(dir.path().join(".repository/rules/code-style.md").exists());
-    assert!(dir.path().join(".repository/rules/testing.md").exists());
+    // 6. Verify rules exist with correct CONTENT
+    let api_rule = fs::read_to_string(dir.path().join(".repository/rules/api-design.md")).unwrap();
+    assert!(
+        api_rule.contains("Return JSON with data, error, meta fields"),
+        "Rule file should contain the instruction text. Got: {}",
+        api_rule
+    );
+    let code_rule = fs::read_to_string(dir.path().join(".repository/rules/code-style.md")).unwrap();
+    assert!(
+        code_rule.contains("Use consistent naming conventions"),
+        "Rule file should contain the instruction text. Got: {}",
+        code_rule
+    );
+    let test_rule = fs::read_to_string(dir.path().join(".repository/rules/testing.md")).unwrap();
+    assert!(
+        test_rule.contains("Write unit tests for all public functions"),
+        "Rule file should contain the instruction text. Got: {}",
+        test_rule
+    );
+}
+
+// =============================================================================
+// Content verification tests (C9, S5, C4-CLI)
+// =============================================================================
+
+#[test]
+fn test_sync_with_cursor_tool_creates_config_with_content() {
+    // S5: init -> add-tool -> sync -> verify config file CONTENT
+    let dir = tempdir().unwrap();
+
+    // Init with cursor tool
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["init", "--mode", "standard", "--tools", "cursor"])
+        .assert()
+        .success();
+
+    // Sync to generate config files
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .arg("sync")
+        .assert()
+        .success();
+
+    // Verify ledger tracks the tool intent with projections
+    let ledger_content = fs::read_to_string(dir.path().join(".repository/ledger.toml")).unwrap();
+    let ledger: toml::Value = toml::from_str(&ledger_content)
+        .expect("Ledger must be valid TOML");
+
+    let intents = ledger.get("intents").unwrap().as_array().unwrap();
+
+    // Find the cursor tool intent
+    let cursor_intent = intents.iter().find(|i| {
+        i.get("id")
+            .and_then(|id| id.as_str())
+            .map(|id| id.contains("cursor"))
+            .unwrap_or(false)
+    });
+
+    let intent = cursor_intent.expect("Sync should create a cursor tool intent in the ledger");
+
+    // Verify it created projections
+    let projections = intent.get("projections");
+    assert!(
+        projections.is_some(),
+        "Cursor intent should have projections field"
+    );
+
+    // Each projection should have tool, file, and kind fields
+    let projs = projections.unwrap().as_array()
+        .expect("Projections should be an array");
+    assert!(!projs.is_empty(), "Cursor intent must have at least one projection");
+    for proj in projs {
+        assert!(
+            proj.get("tool").is_some(),
+            "Projection must have 'tool' field"
+        );
+        assert!(
+            proj.get("file").is_some(),
+            "Projection must have 'file' field"
+        );
+    }
+}
+
+#[test]
+fn test_sync_json_output_contains_structured_data() {
+    // C4-CLI: Verify JSON output mode produces parseable, structured data
+    let dir = tempdir().unwrap();
+
+    // Init with a tool
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["init", "--mode", "standard", "--tools", "cursor"])
+        .assert()
+        .success();
+
+    // Sync with JSON output
+    let output = repo_cmd()
+        .current_dir(dir.path())
+        .args(["sync", "--json"])
+        .output()
+        .expect("Failed to execute sync --json");
+
+    assert!(output.status.success(), "sync --json should succeed");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    // Must be valid JSON
+    let json: serde_json::Value = serde_json::from_str(&stdout)
+        .unwrap_or_else(|e| panic!("sync --json output must be valid JSON: {}. Got: {}", e, stdout));
+
+    // Must have required fields
+    assert!(json.get("dry_run").is_some(), "JSON output must have 'dry_run' field");
+    assert!(json.get("success").is_some(), "JSON output must have 'success' field");
+    assert!(json.get("has_changes").is_some(), "JSON output must have 'has_changes' field");
+    assert!(json.get("changes").is_some(), "JSON output must have 'changes' field");
+    assert!(json.get("root").is_some(), "JSON output must have 'root' field");
+    assert!(json.get("mode").is_some(), "JSON output must have 'mode' field");
+
+    // dry_run should be false
+    assert_eq!(json["dry_run"], false);
+    // success should be true
+    assert_eq!(json["success"], true);
+    // mode should be "standard"
+    assert_eq!(json["mode"], "standard");
+    // changes should be an array
+    assert!(json["changes"].is_array(), "'changes' should be an array");
+}
+
+#[test]
+fn test_sync_dry_run_json_does_not_modify_filesystem() {
+    let dir = tempdir().unwrap();
+
+    // Init with tool
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["init", "--mode", "standard", "--tools", "cursor"])
+        .assert()
+        .success();
+
+    // Sync with dry-run + JSON
+    let output = repo_cmd()
+        .current_dir(dir.path())
+        .args(["sync", "--dry-run", "--json"])
+        .output()
+        .expect("Failed to execute sync --dry-run --json");
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout)
+        .expect("dry-run JSON output must be valid JSON");
+
+    assert_eq!(json["dry_run"], true, "dry_run flag should be true");
+
+    // In dry-run mode, the ledger should NOT be created
+    // (no files modified on disk)
+    let ledger_path = dir.path().join(".repository/ledger.toml");
+    assert!(
+        !ledger_path.exists(),
+        "Dry-run sync should not create the ledger file"
+    );
+}
+
+#[test]
+fn test_sync_idempotent_ledger_content_unchanged() {
+    let dir = tempdir().unwrap();
+
+    // Init
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["init", "--mode", "standard"])
+        .assert()
+        .success();
+
+    // First sync
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .arg("sync")
+        .assert()
+        .success();
+
+    let ledger_after_first = fs::read_to_string(dir.path().join(".repository/ledger.toml")).unwrap();
+
+    // Second sync
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .arg("sync")
+        .assert()
+        .success();
+
+    let ledger_after_second = fs::read_to_string(dir.path().join(".repository/ledger.toml")).unwrap();
+
+    // Ledger content should be identical after idempotent sync
+    assert_eq!(
+        ledger_after_first, ledger_after_second,
+        "Ledger content should not change on idempotent sync"
+    );
+}
+
+#[test]
+fn test_check_without_init_gives_meaningful_error() {
+    let dir = tempdir().unwrap();
+
+    // Running check without any init should give a clear error message
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .arg("check")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Not in a repository"));
+}
+
+#[test]
+fn test_sync_without_init_gives_meaningful_error() {
+    let dir = tempdir().unwrap();
+
+    // Running sync without any init should give a clear error message
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .arg("sync")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Not in a repository"));
+}
+
+#[test]
+fn test_init_config_toml_is_valid_toml() {
+    // C4-CLI: Verify init produces valid, parseable config - not just string contains
+    let dir = tempdir().unwrap();
+
+    let mut cmd = repo_cmd();
+    cmd.current_dir(dir.path())
+        .args(["init", "--mode", "standard", "--tools", "cursor", "--tools", "claude", "--presets", "typescript"])
+        .assert()
+        .success();
+
+    let config_content = fs::read_to_string(dir.path().join(".repository/config.toml")).unwrap();
+
+    // Must be valid TOML
+    let parsed: toml::Value = toml::from_str(&config_content)
+        .unwrap_or_else(|e| panic!("Config must be valid TOML: {}. Got:\n{}", e, config_content));
+
+    // Verify tools array contains exact tool names
+    let tools = parsed.get("tools").expect("Config must have 'tools' field");
+    let tools_arr = tools.as_array().expect("'tools' should be an array");
+    let tool_names: Vec<&str> = tools_arr.iter().map(|t| t.as_str().unwrap()).collect();
+    assert!(tool_names.contains(&"cursor"), "Tools should contain 'cursor'");
+    assert!(tool_names.contains(&"claude"), "Tools should contain 'claude'");
+
+    // Verify core.mode
+    let core = parsed.get("core").expect("Config must have 'core' section");
+    assert_eq!(
+        core.get("mode").and_then(|m| m.as_str()),
+        Some("standard"),
+        "core.mode should be 'standard'"
+    );
+
+    // Verify presets section exists
+    let presets = parsed.get("presets").expect("Config must have 'presets' section");
+    assert!(
+        presets.get("typescript").is_some(),
+        "Presets should contain 'typescript'"
+    );
 }

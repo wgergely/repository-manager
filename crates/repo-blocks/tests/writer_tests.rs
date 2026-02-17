@@ -184,3 +184,157 @@ old
 
     assert!(result.contains("new line 1\nnew line 2\nnew line 3"));
 }
+
+// =============================================================================
+// Writer edge cases and malformed input tests (C13, H17, H18)
+// =============================================================================
+
+#[test]
+fn insert_multiple_blocks_produces_parseable_output() {
+    // Inserting multiple blocks sequentially should produce content that
+    // round-trips through the parser correctly
+    use repo_blocks::parser::parse_blocks;
+
+    let mut content = String::new();
+    content = insert_block(&content, "block-1", "content one");
+    content = insert_block(&content, "block-2", "content two");
+    content = insert_block(&content, "block-3", "content three");
+
+    let blocks = parse_blocks(&content);
+    assert_eq!(blocks.len(), 3, "All three blocks should be parseable");
+    assert_eq!(blocks[0].uuid, "block-1");
+    assert_eq!(blocks[0].content, "content one");
+    assert_eq!(blocks[1].uuid, "block-2");
+    assert_eq!(blocks[1].content, "content two");
+    assert_eq!(blocks[2].uuid, "block-3");
+    assert_eq!(blocks[2].content, "content three");
+}
+
+#[test]
+fn update_block_with_empty_content() {
+    let content = "<!-- repo:block:test -->\nold content\n<!-- /repo:block:test -->";
+    let result = update_block(content, "test", "").unwrap();
+
+    assert!(result.contains("<!-- repo:block:test -->"));
+    assert!(result.contains("<!-- /repo:block:test -->"));
+    assert!(!result.contains("old content"));
+
+    // The block should still be parseable
+    use repo_blocks::parser::find_block;
+    let block = find_block(&result, "test").unwrap();
+    assert!(
+        block.content.is_empty(),
+        "Updated block should have empty content"
+    );
+}
+
+#[test]
+fn update_block_with_content_containing_marker_like_text() {
+    // Content that looks like block markers but isn't exact format
+    let content = "<!-- repo:block:target -->\noriginal\n<!-- /repo:block:target -->";
+    let tricky_content = "This has <!-- comments --> inside";
+    let result = update_block(content, "target", tricky_content).unwrap();
+
+    assert!(result.contains(tricky_content));
+    // Should still be one parseable block
+    use repo_blocks::parser::parse_blocks;
+    let blocks = parse_blocks(&result);
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].content, tricky_content);
+}
+
+#[test]
+fn remove_block_cleans_up_whitespace() {
+    // After removing a block, there should be no excessive blank lines (H18)
+    let content = r#"Header
+
+<!-- repo:block:middle -->
+to remove
+<!-- /repo:block:middle -->
+
+Footer"#;
+
+    let result = remove_block(content, "middle").unwrap();
+
+    // Should not have triple+ newlines left behind
+    assert!(
+        !result.contains("\n\n\n"),
+        "Remove should not leave triple newlines. Got:\n{:?}",
+        result
+    );
+    // Both header and footer should be preserved
+    assert!(result.contains("Header"));
+    assert!(result.contains("Footer"));
+}
+
+#[test]
+fn remove_only_block_produces_clean_output() {
+    let content = "<!-- repo:block:only -->\nthe content\n<!-- /repo:block:only -->";
+
+    let result = remove_block(content, "only").unwrap();
+
+    // Result should be clean (no leftover markers, minimal whitespace)
+    assert!(!result.contains("repo:block"));
+    assert!(!result.contains("the content"));
+}
+
+#[test]
+fn upsert_then_remove_round_trip() {
+    use repo_blocks::parser::has_block;
+
+    let mut content = "base content".to_string();
+
+    // Insert via upsert
+    content = upsert_block(&content, "temp-block", "temporary").unwrap();
+    assert!(has_block(&content, "temp-block"));
+    assert!(content.contains("temporary"));
+
+    // Update via upsert
+    content = upsert_block(&content, "temp-block", "updated").unwrap();
+    assert!(has_block(&content, "temp-block"));
+    assert!(content.contains("updated"));
+    assert!(!content.contains("temporary"));
+
+    // Remove
+    content = remove_block(&content, "temp-block").unwrap();
+    assert!(!has_block(&content, "temp-block"));
+    assert!(content.contains("base content"));
+}
+
+#[test]
+fn update_specific_block_among_multiple() {
+    // When multiple blocks exist, updating one should not affect others
+    use repo_blocks::parser::parse_blocks;
+
+    let mut content = String::new();
+    content = insert_block(&content, "first", "AAA");
+    content = insert_block(&content, "second", "BBB");
+    content = insert_block(&content, "third", "CCC");
+
+    content = update_block(&content, "second", "UPDATED").unwrap();
+
+    let blocks = parse_blocks(&content);
+    assert_eq!(blocks.len(), 3);
+    assert_eq!(blocks[0].content, "AAA", "First block should be untouched");
+    assert_eq!(blocks[1].content, "UPDATED", "Second block should be updated");
+    assert_eq!(blocks[2].content, "CCC", "Third block should be untouched");
+}
+
+#[test]
+fn insert_block_with_content_containing_newlines_at_boundaries() {
+    // Content with leading/trailing newlines should be preserved exactly
+    let result = insert_block("", "boundary", "\nleading\ntrailing\n");
+
+    use repo_blocks::parser::find_block;
+    let block = find_block(&result, "boundary").unwrap();
+    // The parser strips one leading and one trailing newline from the raw content
+    // between markers, so content starting/ending with \n gets partially stripped
+    assert!(
+        block.content.contains("leading"),
+        "Content should contain 'leading'"
+    );
+    assert!(
+        block.content.contains("trailing"),
+        "Content should contain 'trailing'"
+    );
+}

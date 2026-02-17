@@ -8,4 +8,5 @@ Write clean, idiomatic Rust code following these guidelines:
 3. Document public APIs with doc comments
 4. Write tests for new functionality
 5. Keep functions focused and small (< 50 lines)
+
 <!-- /repo:block:coding-standards -->

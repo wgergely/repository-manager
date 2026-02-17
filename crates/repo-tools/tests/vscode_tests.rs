@@ -22,7 +22,7 @@ fn test_vscode_config_locations() {
 }
 
 #[test]
-fn test_vscode_creates_settings_directory() {
+fn test_vscode_creates_settings_directory_with_valid_json() {
     let temp_dir = TempDir::new().unwrap();
     let root = NormalizedPath::new(temp_dir.path());
     let python_path = NormalizedPath::new("/usr/bin/python3");
@@ -32,9 +32,18 @@ fn test_vscode_creates_settings_directory() {
 
     integration.sync(&context, &[]).unwrap();
 
-    // Verify .vscode directory was created
-    assert!(temp_dir.path().join(".vscode").exists());
+    // Verify .vscode directory and settings.json were created
     assert!(temp_dir.path().join(".vscode").is_dir());
+
+    let content = fs::read_to_string(temp_dir.path().join(".vscode/settings.json")).unwrap();
+    let settings: Value = serde_json::from_str(&content).unwrap();
+
+    // Verify it's a valid JSON object with the python path
+    assert!(settings.is_object());
+    assert_eq!(
+        settings["python.defaultInterpreterPath"],
+        "/usr/bin/python3"
+    );
 }
 
 #[test]
@@ -70,19 +79,30 @@ fn test_vscode_sets_python_path() {
     let integration = VSCodeIntegration::new();
     integration.sync(&context, &[]).unwrap();
 
-    // Verify no python path initially
+    // Verify settings.json is a valid JSON object with no python path
     let content = fs::read_to_string(temp_dir.path().join(".vscode/settings.json")).unwrap();
     let settings: Value = serde_json::from_str(&content).unwrap();
-    assert!(settings["python.defaultInterpreterPath"].is_null());
+    assert!(settings.is_object(), "settings.json must be a JSON object");
+    assert!(
+        settings.get("python.defaultInterpreterPath").is_none()
+            || settings["python.defaultInterpreterPath"].is_null(),
+        "python path should not be set without python context"
+    );
 
     // Now sync with python path
     let python_path = NormalizedPath::new("/updated/python");
     let context = SyncContext::new(root).with_python(python_path);
     integration.sync(&context, &[]).unwrap();
 
-    // Verify python path is set
+    // Verify python path is set as a string value
     let content = fs::read_to_string(temp_dir.path().join(".vscode/settings.json")).unwrap();
     let settings: Value = serde_json::from_str(&content).unwrap();
+    assert!(settings.is_object(), "settings.json must be a JSON object");
+    assert!(
+        settings["python.defaultInterpreterPath"].is_string(),
+        "python path must be a string, got: {:?}",
+        settings["python.defaultInterpreterPath"]
+    );
     assert_eq!(settings["python.defaultInterpreterPath"], "/updated/python");
 }
 

@@ -427,19 +427,97 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn test_tool_syncer_new() {
+    fn sync_tool_writes_config_file_to_disk() {
         let dir = tempdir().unwrap();
         let root = NormalizedPath::new(dir.path());
         let syncer = ToolSyncer::new(root, false);
-        assert!(!syncer.dry_run);
+
+        let mut ledger = Ledger::new();
+        let actions = syncer.sync_tool("cursor", &mut ledger).unwrap();
+
+        // Sync should produce at least one action describing what it did
+        assert!(!actions.is_empty(), "sync_tool should report actions taken");
+
+        // The ledger should now contain an intent for this tool
+        let intents = ledger.find_by_rule("tool:cursor");
+        assert_eq!(
+            intents.len(),
+            1,
+            "Ledger should contain exactly one intent for cursor"
+        );
+
+        // The .cursorrules file should exist on disk
+        let cursorrules = dir.path().join(".cursorrules");
+        assert!(cursorrules.exists(), ".cursorrules should be created on disk");
+
+        let content = std::fs::read_to_string(&cursorrules).unwrap();
+        assert!(!content.is_empty(), ".cursorrules should have content");
     }
 
     #[test]
-    fn test_tool_syncer_dry_run() {
+    fn sync_tool_dry_run_does_not_write_files() {
         let dir = tempdir().unwrap();
         let root = NormalizedPath::new(dir.path());
         let syncer = ToolSyncer::new(root, true);
-        assert!(syncer.dry_run);
+
+        let mut ledger = Ledger::new();
+        let actions = syncer.sync_tool("cursor", &mut ledger).unwrap();
+
+        // Dry run should still report actions
+        assert!(!actions.is_empty(), "dry_run should still report planned actions");
+
+        // But no file should be created on disk
+        let cursorrules = dir.path().join(".cursorrules");
+        assert!(
+            !cursorrules.exists(),
+            "dry_run must NOT create files on disk"
+        );
+    }
+
+    #[test]
+    fn sync_tool_skips_already_synced_tool() {
+        let dir = tempdir().unwrap();
+        let root = NormalizedPath::new(dir.path());
+        let syncer = ToolSyncer::new(root, false);
+
+        let mut ledger = Ledger::new();
+
+        // First sync
+        let actions1 = syncer.sync_tool("cursor", &mut ledger).unwrap();
+        assert!(!actions1.is_empty());
+
+        // Second sync should detect already-synced and skip
+        let actions2 = syncer.sync_tool("cursor", &mut ledger).unwrap();
+        let already_synced = actions2.iter().any(|a| a.contains("already synced"));
+        assert!(
+            already_synced,
+            "Re-syncing should report 'already synced', got: {:?}",
+            actions2
+        );
+    }
+
+    #[test]
+    fn sync_unknown_tool_returns_no_config_files() {
+        let dir = tempdir().unwrap();
+        let root = NormalizedPath::new(dir.path());
+        let syncer = ToolSyncer::new(root, false);
+
+        let mut ledger = Ledger::new();
+        let actions = syncer.sync_tool("nonexistent_tool_xyz", &mut ledger).unwrap();
+
+        // Should indicate no config files
+        let no_config = actions.iter().any(|a| a.contains("No config files"));
+        assert!(
+            no_config,
+            "Unknown tool should report 'No config files', got: {:?}",
+            actions
+        );
+
+        // Ledger should not have an intent for this tool
+        assert!(
+            ledger.find_by_rule("tool:nonexistent_tool_xyz").is_empty(),
+            "Ledger should not contain intent for unknown tool"
+        );
     }
 
     #[test]

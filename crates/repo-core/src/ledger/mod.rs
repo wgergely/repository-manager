@@ -163,7 +163,7 @@ mod tests {
         let path = dir.path().join("ledger.toml");
 
         let mut ledger = Ledger::new();
-        ledger.add_intent(Intent::new("rule:test".to_string(), json!({})));
+        ledger.add_intent(Intent::new("rule:test".to_string(), json!({"key": "value"})));
 
         // Save ledger
         ledger.save(&path).unwrap();
@@ -172,9 +172,16 @@ mod tests {
         let temp_path = path.with_extension("toml.tmp");
         assert!(!temp_path.exists(), "Temporary file should be cleaned up");
 
-        // Verify content is valid
+        // Verify the saved content round-trips correctly with full content checks
         let loaded = Ledger::load(&path).unwrap();
         assert_eq!(loaded.intents().len(), 1);
+        assert_eq!(loaded.intents()[0].id, "rule:test");
+        assert_eq!(loaded.intents()[0].args["key"], "value");
+
+        // Verify the raw file contains expected TOML structure
+        let raw = std::fs::read_to_string(&path).unwrap();
+        assert!(raw.contains("version = \"1.0\""));
+        assert!(raw.contains("rule:test"));
     }
 
     #[test]

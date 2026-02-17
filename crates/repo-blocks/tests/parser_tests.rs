@@ -154,3 +154,206 @@ content
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].uuid, "ABC-123-DEF");
 }
+
+// =============================================================================
+// Malformed input edge cases (C8)
+// =============================================================================
+
+#[test]
+fn unclosed_block_is_silently_skipped() {
+    // An opening marker without a matching closing marker should NOT produce a block
+    let content = r#"before
+<!-- repo:block:unclosed -->
+orphaned content
+after"#;
+
+    let blocks = parse_blocks(content);
+    assert!(
+        blocks.is_empty(),
+        "Unclosed blocks should not be parsed. Got: {:?}",
+        blocks
+    );
+    assert!(!has_block(content, "unclosed"));
+}
+
+#[test]
+fn mismatched_uuid_open_close_not_paired() {
+    // Opening marker with one UUID and closing marker with a different UUID
+    // should not form a block for either UUID
+    let content = r#"<!-- repo:block:alpha -->
+content
+<!-- /repo:block:beta -->"#;
+
+    let blocks = parse_blocks(content);
+    // Neither alpha nor beta should be found as a valid block
+    assert!(
+        blocks.is_empty(),
+        "Mismatched open/close UUIDs should not form a block. Got: {:?}",
+        blocks
+    );
+    assert!(!has_block(content, "alpha"));
+    assert!(!has_block(content, "beta"));
+}
+
+#[test]
+fn closing_marker_without_opening_is_ignored() {
+    // A closing marker with no corresponding opening marker should not produce a block
+    let content = r#"some text
+<!-- /repo:block:orphan-close -->
+more text"#;
+
+    let blocks = parse_blocks(content);
+    assert!(blocks.is_empty());
+}
+
+#[test]
+fn duplicate_uuid_blocks_both_parsed() {
+    // Two separate blocks with the same UUID should both be found
+    let content = r#"<!-- repo:block:dup -->
+first occurrence
+<!-- /repo:block:dup -->
+middle text
+<!-- repo:block:dup -->
+second occurrence
+<!-- /repo:block:dup -->"#;
+
+    let blocks = parse_blocks(content);
+    assert_eq!(
+        blocks.len(),
+        2,
+        "Both blocks with duplicate UUID should be parsed"
+    );
+    assert_eq!(blocks[0].content, "first occurrence");
+    assert_eq!(blocks[1].content, "second occurrence");
+
+    // find_block should return the first match
+    let found = find_block(content, "dup").unwrap();
+    assert_eq!(found.content, "first occurrence");
+}
+
+#[test]
+fn nested_blocks_with_same_uuid_uses_first_close() {
+    // Nested blocks with the same UUID - the parser should match
+    // the first closing marker it finds (greedy first-close behavior)
+    let content = r#"<!-- repo:block:nest -->
+outer start
+<!-- repo:block:nest -->
+inner
+<!-- /repo:block:nest -->
+outer end
+<!-- /repo:block:nest -->"#;
+
+    let blocks = parse_blocks(content);
+    // The parser's regex finds the opening, then searches for the first close.
+    // It should find the inner close first (non-greedy behavior).
+    assert!(
+        !blocks.is_empty(),
+        "Parser should extract at least one block from nested same-UUID markers"
+    );
+
+    // The first block should end at the first closing marker
+    let first = &blocks[0];
+    assert_eq!(first.uuid, "nest");
+    // Content should be everything up to the first close marker
+    assert!(
+        first.content.contains("outer start"),
+        "First block content should contain 'outer start'"
+    );
+}
+
+#[test]
+fn block_with_empty_content() {
+    let content = "<!-- repo:block:empty -->\n<!-- /repo:block:empty -->";
+
+    let blocks = parse_blocks(content);
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].uuid, "empty");
+    assert!(
+        blocks[0].content.is_empty(),
+        "Empty block should have empty content, got: {:?}",
+        blocks[0].content
+    );
+}
+
+#[test]
+fn marker_inside_code_block_still_parsed() {
+    // Block markers inside markdown code fences are still treated as markers
+    // (the parser doesn't understand markdown context)
+    let content = r#"```
+<!-- repo:block:in-code -->
+code content
+<!-- /repo:block:in-code -->
+```"#;
+
+    let blocks = parse_blocks(content);
+    assert_eq!(
+        blocks.len(),
+        1,
+        "Parser does not distinguish code blocks from regular text"
+    );
+}
+
+#[test]
+fn uuid_with_only_underscores_and_hyphens() {
+    let content = r#"<!-- repo:block:__--__ -->
+content
+<!-- /repo:block:__--__ -->"#;
+
+    let blocks = parse_blocks(content);
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].uuid, "__--__");
+}
+
+#[test]
+fn partial_opening_marker_not_matched() {
+    // Incomplete/malformed markers should not be parsed
+    let content = r#"<!-- repo:block -->
+content
+<!-- /repo:block -->"#;
+
+    let blocks = parse_blocks(content);
+    assert!(
+        blocks.is_empty(),
+        "Markers without UUID should not be matched"
+    );
+}
+
+#[test]
+fn uuid_with_dots_or_spaces_not_matched() {
+    // The regex only allows [a-zA-Z0-9_-], so dots and spaces should not match
+    let content = r#"<!-- repo:block:uuid.with.dots -->
+content
+<!-- /repo:block:uuid.with.dots -->"#;
+
+    let blocks = parse_blocks(content);
+    assert!(
+        blocks.is_empty(),
+        "UUIDs with dots should not match the block regex"
+    );
+
+    let content2 = r#"<!-- repo:block:uuid with spaces -->
+content
+<!-- /repo:block:uuid with spaces -->"#;
+
+    let blocks2 = parse_blocks(content2);
+    assert!(
+        blocks2.is_empty(),
+        "UUIDs with spaces should not match the block regex"
+    );
+}
+
+#[test]
+fn very_long_content_between_markers() {
+    // Ensure the parser handles large content gracefully
+    let large_content = "x\n".repeat(10_000);
+    let content = format!(
+        "<!-- repo:block:large -->\n{}<!-- /repo:block:large -->",
+        large_content
+    );
+
+    let blocks = parse_blocks(&content);
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].uuid, "large");
+    // Content should be the large block (minus leading/trailing newline trimming)
+    assert!(blocks[0].content.len() > 9000, "Large content should be preserved");
+}

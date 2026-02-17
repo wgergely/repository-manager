@@ -1,7 +1,7 @@
 //! Tests for Mode abstraction and backends
 
 use repo_core::mode::Mode;
-use repo_core::backend::{BranchInfo, ModeBackend, StandardBackend, WorktreeBackend};
+use repo_core::backend::{ModeBackend, StandardBackend, WorktreeBackend};
 use repo_fs::NormalizedPath;
 use std::fs;
 use tempfile::TempDir;
@@ -214,38 +214,80 @@ fn test_worktree_backend_with_specific_worktree() {
 }
 
 // =============================================================================
-// BranchInfo tests
+// BranchInfo behavioral tests
 // =============================================================================
 
 #[test]
-fn test_branch_info_standard_mode() {
-    // In standard mode, path should be None
-    let info = BranchInfo {
-        name: "main".to_string(),
-        path: None,
-        is_current: true,
-        is_main: true,
-    };
+fn test_standard_backend_accepts_git_dir_without_head() {
+    // StandardBackend only checks that .git exists, not its internal structure.
+    // This documents the current behavior: .git as a directory is sufficient.
+    let temp = TempDir::new().unwrap();
 
-    assert_eq!(info.name, "main");
-    assert!(info.path.is_none());
-    assert!(info.is_current);
-    assert!(info.is_main);
+    // Create .git dir but no HEAD file
+    fs::create_dir(temp.path().join(".git")).unwrap();
+
+    let root = NormalizedPath::new(temp.path());
+    let result = StandardBackend::new(root);
+
+    // Production only checks .git exists, does not validate HEAD
+    assert!(result.is_ok(), "StandardBackend accepts .git dir without HEAD");
+    let backend = result.unwrap();
+    assert_eq!(backend.config_root().as_str(), NormalizedPath::new(temp.path()).join(".repository").as_str());
 }
 
 #[test]
-fn test_branch_info_worktree_mode() {
-    // In worktree mode, path should be Some
-    let path = NormalizedPath::new("/container/main");
-    let info = BranchInfo {
-        name: "main".to_string(),
-        path: Some(path.clone()),
-        is_current: true,
-        is_main: true,
-    };
+fn test_worktree_backend_accepts_missing_main_worktree() {
+    // WorktreeBackend only checks that .gt exists, it does NOT validate main/.
+    // It sets main as the default worktree path but doesn't require it to exist.
+    let temp = TempDir::new().unwrap();
+    fs::create_dir(temp.path().join(".gt")).unwrap();
+    // No main/ directory
 
-    assert_eq!(info.name, "main");
-    assert_eq!(info.path.as_ref().unwrap().as_str(), path.as_str());
-    assert!(info.is_current);
-    assert!(info.is_main);
+    let container = NormalizedPath::new(temp.path());
+    let result = WorktreeBackend::new(container);
+
+    // Production only checks .gt exists, does not validate main/ directory
+    assert!(
+        result.is_ok(),
+        "WorktreeBackend accepts container with .gt even if main/ is missing"
+    );
+    let backend = result.unwrap();
+    // working_dir points to main/ even though it doesn't exist on disk
+    assert!(backend.working_dir().as_str().contains("main"));
+}
+
+#[test]
+fn test_worktree_backend_config_shared_across_worktrees() {
+    // Verify that config_root is at the container level, shared across all worktrees
+    let temp = setup_worktree_container();
+
+    // Create a feature worktree
+    fs::create_dir(temp.path().join("feature-x")).unwrap();
+    fs::write(
+        temp.path().join("feature-x/.git"),
+        format!("gitdir: {}/.gt/worktrees/feature-x", temp.path().display()),
+    )
+    .unwrap();
+
+    let container = NormalizedPath::new(temp.path());
+    let main_backend = WorktreeBackend::new(container.clone()).unwrap();
+    let feature_backend = WorktreeBackend::with_worktree(
+        container,
+        NormalizedPath::new(temp.path().join("feature-x")),
+    )
+    .unwrap();
+
+    // Both backends must share the same config root (container/.repository)
+    assert_eq!(
+        main_backend.config_root().as_str(),
+        feature_backend.config_root().as_str(),
+        "Config root must be shared across all worktrees in the same container"
+    );
+
+    // But working directories must differ
+    assert_ne!(
+        main_backend.working_dir().as_str(),
+        feature_backend.working_dir().as_str(),
+        "Working directories must be different for different worktrees"
+    );
 }

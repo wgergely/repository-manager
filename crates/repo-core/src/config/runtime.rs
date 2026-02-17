@@ -149,27 +149,78 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_runtime_context_default() {
-        let context = RuntimeContext::default();
-        assert!(context.runtime.is_empty());
-        assert!(context.capabilities.is_empty());
+    fn from_resolved_separates_env_from_tool_presets() {
+        // RuntimeContext.from_resolved must route env:* presets to `runtime`
+        // and tool:*/config:* presets to `capabilities`.
+        let mut presets = HashMap::new();
+        presets.insert("env:python".to_string(), serde_json::json!({"version": "3.12"}));
+        presets.insert("env:node".to_string(), serde_json::json!({"version": "20"}));
+        presets.insert("tool:linter".to_string(), serde_json::json!({"enabled": true}));
+        presets.insert("config:editor".to_string(), serde_json::json!({"tabs": 4}));
+
+        let config = ResolvedConfig {
+            mode: "standard".to_string(),
+            presets,
+            tools: vec![],
+            rules: vec![],
+        };
+
+        let ctx = RuntimeContext::from_resolved(&config);
+
+        // env: presets become runtime entries keyed by the name after ":"
+        assert_eq!(ctx.runtime.len(), 2);
+        assert_eq!(ctx.runtime["python"]["version"], "3.12");
+        assert_eq!(ctx.runtime["node"]["version"], "20");
+
+        // tool: and config: presets become capabilities (sorted)
+        assert_eq!(ctx.capabilities, vec!["config:editor", "tool:linter"]);
+
+        // Query methods should reflect the data
+        assert!(ctx.has_runtime());
+        assert!(ctx.has_capabilities());
+        assert_eq!(ctx.get_runtime("python").unwrap()["version"], "3.12");
+        assert!(ctx.has_capability("tool:linter"));
+        assert!(!ctx.has_capability("env:python")); // env presets are NOT capabilities
     }
 
     #[test]
-    fn test_runtime_context_has_methods() {
-        let mut context = RuntimeContext::default();
-        assert!(!context.has_runtime());
-        assert!(!context.has_capabilities());
+    fn from_resolved_with_no_presets_produces_empty_context() {
+        let config = ResolvedConfig {
+            mode: "standard".to_string(),
+            presets: HashMap::new(),
+            tools: vec![],
+            rules: vec![],
+        };
 
-        context.runtime.insert(
-            "python".to_string(),
-            serde_json::json!({"version": "3.12"}),
-        );
-        context.capabilities.push("tool:linter".to_string());
+        let ctx = RuntimeContext::from_resolved(&config);
 
-        assert!(context.has_runtime());
-        assert!(context.has_capabilities());
-        assert!(context.has_capability("tool:linter"));
-        assert!(!context.has_capability("tool:formatter"));
+        assert!(!ctx.has_runtime());
+        assert!(!ctx.has_capabilities());
+        assert!(ctx.runtime.is_empty());
+        assert!(ctx.capabilities.is_empty());
+    }
+
+    #[test]
+    fn to_json_produces_valid_structure() {
+        let mut presets = HashMap::new();
+        presets.insert("env:rust".to_string(), serde_json::json!({"edition": "2021"}));
+        presets.insert("tool:clippy".to_string(), serde_json::json!({}));
+
+        let config = ResolvedConfig {
+            mode: "standard".to_string(),
+            presets,
+            tools: vec![],
+            rules: vec![],
+        };
+
+        let ctx = RuntimeContext::from_resolved(&config);
+        let json = ctx.to_json();
+
+        // JSON must contain both top-level keys with correct values
+        assert_eq!(json["runtime"]["rust"]["edition"], "2021");
+        assert!(json["capabilities"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!("tool:clippy")));
     }
 }

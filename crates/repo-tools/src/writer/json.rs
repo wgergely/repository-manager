@@ -197,7 +197,13 @@ mod tests {
 
         let written = fs::read_to_string(path.as_ref()).unwrap();
         let json: Value = serde_json::from_str(&written).unwrap();
-        assert!(json["mcpServers"]["server1"].is_object());
+        assert!(json.is_object(), "Root must be a JSON object");
+        assert!(json["mcpServers"].is_object(), "mcpServers must be a JSON object");
+        assert!(json["mcpServers"]["server1"].is_object(), "server1 must be a JSON object");
+        assert_eq!(
+            json["mcpServers"]["server1"]["command"], "test",
+            "server1 command must match"
+        );
     }
 
     #[test]
