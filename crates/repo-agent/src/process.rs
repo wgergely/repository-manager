@@ -106,8 +106,8 @@ impl ProcessManager {
             .arg("agent")
             .arg("run")
             .arg(agent_name)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
 
         if let Some(g) = goal {
             cmd.arg("--goal").arg(g);
@@ -143,9 +143,10 @@ impl ProcessManager {
         state.insert(id, process.clone());
         self.save_state(&state)?;
 
-        // We intentionally drop the Child handle here - the process
-        // continues running independently. We track it by PID.
-        std::mem::forget(child);
+        // The Child handle is dropped here. Since stdout/stderr are set to
+        // Stdio::null(), dropping the handle does not affect the child process
+        // which continues running independently. We track it by PID.
+        drop(child);
 
         Ok(process)
     }
