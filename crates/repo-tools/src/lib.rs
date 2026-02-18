@@ -30,7 +30,6 @@ pub mod gemini;
 pub mod generic;
 pub mod integration;
 pub mod jetbrains;
-pub mod logging;
 pub mod registry;
 pub mod roo;
 pub mod syncer;

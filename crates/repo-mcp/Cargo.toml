@@ -19,7 +19,7 @@ repo-meta = { path = "../repo-meta" }
 repo-presets = { path = "../repo-presets" }
 
 # Async runtime
-tokio = { workspace = true, features = ["full"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 
 # Serialization
 serde = { workspace = true }

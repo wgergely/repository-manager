@@ -41,6 +41,7 @@ pub type AntigravityIntegration = GenericToolIntegration;
 ///
 /// # Deprecated
 /// Use `antigravity_integration()` instead.
+#[deprecated(note = "Use antigravity_integration() instead")]
 pub fn new() -> GenericToolIntegration {
     antigravity_integration()
 }

@@ -40,7 +40,7 @@ pub mod writer;
 
 pub use error::{Error, Result};
 pub use formats::{
-    FormatHandler, JsonFormatHandler, ManagedBlock, TomlFormatHandler, YamlFormatHandler,
+    FormatHandler, FormatManagedBlock, JsonFormatHandler, TomlFormatHandler, YamlFormatHandler,
 };
 pub use parser::{Block, find_block, has_block, parse_blocks};
 pub use writer::{insert_block, remove_block, update_block, upsert_block};

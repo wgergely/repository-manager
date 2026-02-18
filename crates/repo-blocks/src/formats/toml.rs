@@ -15,7 +15,7 @@
 //! serde = "1.0"
 //! ```
 
-use super::{FormatHandler, ManagedBlock};
+use super::{FormatHandler, FormatManagedBlock};
 use uuid::Uuid;
 
 /// The reserved table name for managed blocks in TOML files
@@ -33,7 +33,7 @@ impl TomlFormatHandler {
 }
 
 impl FormatHandler for TomlFormatHandler {
-    fn parse_blocks(&self, content: &str) -> Vec<ManagedBlock> {
+    fn parse_blocks(&self, content: &str) -> Vec<FormatManagedBlock> {
         let Ok(table) = content.parse::<toml::Table>() else {
             return Vec::new();
         };
@@ -51,7 +51,7 @@ impl FormatHandler for TomlFormatHandler {
             .filter_map(|(key, value)| {
                 let uuid = Uuid::parse_str(key).ok()?;
                 let content = toml::to_string_pretty(value).ok()?;
-                Some(ManagedBlock {
+                Some(FormatManagedBlock {
                     uuid,
                     content: content.trim().to_string(),
                 })

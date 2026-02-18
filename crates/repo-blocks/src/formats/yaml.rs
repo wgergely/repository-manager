@@ -13,7 +13,7 @@
 //! another_setting: false
 //! ```
 
-use super::{FormatHandler, ManagedBlock};
+use super::{FormatHandler, FormatManagedBlock};
 use regex::Regex;
 use std::sync::LazyLock;
 use uuid::Uuid;
@@ -45,7 +45,7 @@ impl YamlFormatHandler {
 }
 
 impl FormatHandler for YamlFormatHandler {
-    fn parse_blocks(&self, content: &str) -> Vec<ManagedBlock> {
+    fn parse_blocks(&self, content: &str) -> Vec<FormatManagedBlock> {
         let mut blocks = Vec::new();
 
         for caps in OPEN_MARKER.captures_iter(content) {
@@ -73,7 +73,7 @@ impl FormatHandler for YamlFormatHandler {
                     .unwrap_or(raw_content)
                     .to_string();
 
-                blocks.push(ManagedBlock {
+                blocks.push(FormatManagedBlock {
                     uuid,
                     content: trimmed,
                 });

@@ -161,8 +161,7 @@ pub fn diff_configs(root: &Path, manifest: &Manifest) -> Result<Vec<ConfigDrift>
         return Ok(drifts);
     }
 
-    let ledger_content = std::fs::read_to_string(&ledger_path)?;
-    let ledger: Ledger = match toml::from_str(&ledger_content) {
+    let ledger: Ledger = match Ledger::load(&ledger_path) {
         Ok(l) => l,
         Err(e) => {
             tracing::warn!("Ledger is corrupt or unreadable: {}", e);

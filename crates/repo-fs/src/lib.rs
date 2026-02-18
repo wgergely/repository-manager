@@ -2,6 +2,7 @@
 //!
 //! Provides layout-agnostic path resolution and safe I/O operations.
 
+pub mod checksum;
 pub mod config;
 pub mod constants;
 pub mod error;

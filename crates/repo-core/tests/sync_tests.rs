@@ -133,11 +133,8 @@ fn test_check_healthy_when_file_managed_matches() {
     let content = r#"{"key": "value"}"#;
     fs::write(config_dir.join("managed.json"), content).unwrap();
 
-    // Compute the correct checksum
-    use sha2::{Digest, Sha256};
-    let mut hasher = Sha256::new();
-    hasher.update(content.as_bytes());
-    let checksum = format!("{:x}", hasher.finalize());
+    // Compute the correct checksum using canonical format
+    let checksum = repo_fs::checksum::compute_content_checksum(content);
 
     // Create .repository directory and ledger with correct checksum
     let repo_dir = temp.path().join(".repository");

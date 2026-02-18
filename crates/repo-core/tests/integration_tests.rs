@@ -613,11 +613,8 @@ fn test_sync_engine_complete_check_flow() {
     let managed_content = r#"{"managed": true}"#;
     fs::write(temp.path().join("managed.json"), managed_content).unwrap();
 
-    // Compute checksum for managed file
-    use sha2::{Digest, Sha256};
-    let mut hasher = Sha256::new();
-    hasher.update(managed_content.as_bytes());
-    let managed_checksum = format!("{:x}", hasher.finalize());
+    // Compute checksum for managed file using canonical format
+    let managed_checksum = repo_fs::checksum::compute_content_checksum(managed_content);
 
     // Create a file with marker for text block
     let marker = Uuid::new_v4();

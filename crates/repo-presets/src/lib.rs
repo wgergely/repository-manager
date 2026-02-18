@@ -15,6 +15,6 @@ pub use context::Context;
 pub use error::{Error, Result};
 pub use node::NodeProvider;
 pub use plugins::PluginsProvider;
-pub use provider::{ActionType, ApplyReport, CheckReport, PresetProvider, PresetStatus};
+pub use provider::{ActionType, ApplyReport, PresetCheckReport, PresetProvider, PresetStatus};
 pub use python::{UvProvider, VenvProvider};
 pub use rust::RustProvider;

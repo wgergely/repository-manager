@@ -8,6 +8,8 @@
 
 use std::path::Path;
 
+use tracing::warn;
+
 use crate::resources::ResourceContent;
 use crate::{Error, Result};
 
@@ -37,7 +39,8 @@ pub async fn read_resource(root: &Path, uri: &str) -> Result<ResourceContent> {
 /// Read repository configuration from .repository/config.toml
 async fn read_config(root: &Path) -> Result<ResourceContent> {
     let config_path = root.join(".repository/config.toml");
-    let text = std::fs::read_to_string(&config_path).unwrap_or_else(|_| {
+    let text = std::fs::read_to_string(&config_path).unwrap_or_else(|e| {
+        warn!("Failed to read config at {}: {}", config_path.display(), e);
         "# No configuration found\ntools = []\n\n[core]\nmode = \"worktrees\"\n".to_string()
     });
 
@@ -51,8 +54,10 @@ async fn read_config(root: &Path) -> Result<ResourceContent> {
 /// Read repository state from .repository/ledger.toml
 async fn read_state(root: &Path) -> Result<ResourceContent> {
     let ledger_path = root.join(".repository/ledger.toml");
-    let text = std::fs::read_to_string(&ledger_path)
-        .unwrap_or_else(|_| "# No ledger found - run 'repo sync' to create\n".to_string());
+    let text = std::fs::read_to_string(&ledger_path).unwrap_or_else(|e| {
+        warn!("Failed to read ledger at {}: {}", ledger_path.display(), e);
+        "# No ledger found - run 'repo sync' to create\n".to_string()
+    });
 
     Ok(ResourceContent {
         uri: "repo://state".to_string(),
@@ -81,10 +86,19 @@ async fn read_rules(root: &Path) -> Result<ResourceContent> {
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_default();
 
-            if let Ok(rule_content) = std::fs::read_to_string(entry.path()) {
-                content.push_str(&format!("## {}\n\n", rule_name));
-                content.push_str(&rule_content);
-                content.push_str("\n\n---\n\n");
+            match std::fs::read_to_string(entry.path()) {
+                Ok(rule_content) => {
+                    content.push_str(&format!("## {}\n\n", rule_name));
+                    content.push_str(&rule_content);
+                    content.push_str("\n\n---\n\n");
+                }
+                Err(e) => {
+                    warn!(
+                        "Failed to read rule file {}: {}",
+                        entry.path().display(),
+                        e
+                    );
+                }
             }
         }
     }

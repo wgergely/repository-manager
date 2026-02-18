@@ -3,11 +3,11 @@
 use std::collections::HashSet;
 
 /// Registry of known tools for validation
-pub struct ToolRegistry {
+pub struct KnownToolSlugs {
     known: HashSet<&'static str>,
 }
 
-impl ToolRegistry {
+impl KnownToolSlugs {
     pub fn with_builtins() -> Self {
         let known = [
             "claude",
@@ -55,7 +55,7 @@ impl PresetRegistry {
     }
 }
 
-impl Default for ToolRegistry {
+impl Default for KnownToolSlugs {
     fn default() -> Self {
         Self::with_builtins()
     }
@@ -73,7 +73,7 @@ mod tests {
 
     #[test]
     fn test_tool_registry_knows_builtins() {
-        let registry = ToolRegistry::with_builtins();
+        let registry = KnownToolSlugs::with_builtins();
         assert!(registry.is_known("cursor"));
         assert!(registry.is_known("vscode"));
         assert!(registry.is_known("claude"));

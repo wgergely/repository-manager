@@ -2,7 +2,7 @@
 
 use crate::context::Context;
 use crate::error::Result;
-use crate::provider::{ActionType, ApplyReport, CheckReport, PresetProvider, PresetStatus};
+use crate::provider::{ActionType, ApplyReport, PresetCheckReport, PresetProvider, PresetStatus};
 use async_trait::async_trait;
 
 /// Provider for Claude Code plugins.
@@ -78,12 +78,12 @@ impl PresetProvider for PluginsProvider {
         "claude:plugins"
     }
 
-    async fn check(&self, _context: &Context) -> Result<CheckReport> {
+    async fn check(&self, _context: &Context) -> Result<PresetCheckReport> {
         // Check if plugin is installed at the expected location
         let install_dir = match super::paths::plugin_install_dir(&self.version) {
             Some(dir) => dir,
             None => {
-                return Ok(CheckReport::broken("Cannot determine home directory"));
+                return Ok(PresetCheckReport::broken("Cannot determine home directory"));
             }
         };
 
@@ -91,7 +91,7 @@ impl PresetProvider for PluginsProvider {
         let plugin_json = install_dir.join(".claude-plugin").join("plugin.json");
 
         if !plugin_json.exists() {
-            return Ok(CheckReport::missing(format!(
+            return Ok(PresetCheckReport::missing(format!(
                 "Plugin {} not installed at {}",
                 self.version,
                 install_dir.display()
@@ -102,11 +102,11 @@ impl PresetProvider for PluginsProvider {
         match std::fs::read_to_string(&plugin_json) {
             Ok(content) => {
                 if serde_json::from_str::<serde_json::Value>(&content).is_err() {
-                    return Ok(CheckReport::drifted("plugin.json is corrupted"));
+                    return Ok(PresetCheckReport::drifted("plugin.json is corrupted"));
                 }
             }
             Err(e) => {
-                return Ok(CheckReport::drifted(format!(
+                return Ok(PresetCheckReport::drifted(format!(
                     "Cannot read plugin.json: {}",
                     e
                 )));
@@ -116,17 +116,17 @@ impl PresetProvider for PluginsProvider {
         // Check if enabled in Claude settings
         let settings_path = match super::paths::claude_settings_path() {
             Some(path) if path.exists() => path,
-            _ => return Ok(CheckReport::healthy()),
+            _ => return Ok(PresetCheckReport::healthy()),
         };
 
         let content = match std::fs::read_to_string(&settings_path) {
             Ok(c) => c,
-            Err(_) => return Ok(CheckReport::healthy()),
+            Err(_) => return Ok(PresetCheckReport::healthy()),
         };
 
         let settings: serde_json::Value = match serde_json::from_str(&content) {
             Ok(s) => s,
-            Err(_) => return Ok(CheckReport::healthy()),
+            Err(_) => return Ok(PresetCheckReport::healthy()),
         };
 
         let plugin_key = format!(
@@ -141,14 +141,14 @@ impl PresetProvider for PluginsProvider {
             .is_some_and(|enabled| !enabled);
 
         if is_disabled {
-            return Ok(CheckReport {
+            return Ok(PresetCheckReport {
                 status: PresetStatus::Drifted,
                 details: vec!["Plugin is installed but disabled".to_string()],
                 action: ActionType::Repair,
             });
         }
 
-        Ok(CheckReport::healthy())
+        Ok(PresetCheckReport::healthy())
     }
 
     async fn apply(&self, _context: &Context) -> Result<ApplyReport> {

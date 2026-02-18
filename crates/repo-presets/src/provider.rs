@@ -24,13 +24,13 @@ pub enum ActionType {
 
 /// Report from checking a preset
 #[derive(Debug, Clone)]
-pub struct CheckReport {
+pub struct PresetCheckReport {
     pub status: PresetStatus,
     pub details: Vec<String>,
     pub action: ActionType,
 }
 
-impl CheckReport {
+impl PresetCheckReport {
     pub fn healthy() -> Self {
         Self {
             status: PresetStatus::Healthy,
@@ -94,6 +94,6 @@ impl ApplyReport {
 #[async_trait]
 pub trait PresetProvider: Send + Sync {
     fn id(&self) -> &str;
-    async fn check(&self, context: &Context) -> Result<CheckReport>;
+    async fn check(&self, context: &Context) -> Result<PresetCheckReport>;
     async fn apply(&self, context: &Context) -> Result<ApplyReport>;
 }

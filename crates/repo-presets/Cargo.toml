@@ -9,7 +9,7 @@ description = "Preset providers for Repository Manager"
 repo-fs = { path = "../repo-fs" }
 repo-meta = { path = "../repo-meta" }
 async-trait = { workspace = true }
-dirs = "5.0"
+dirs = { workspace = true }
 git2 = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
@@ -20,4 +20,4 @@ toml = { workspace = true }
 tempfile = { workspace = true }
 rstest = { workspace = true }
 pretty_assertions = { workspace = true }
-tokio = { version = "1.42", features = ["rt-multi-thread", "macros"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

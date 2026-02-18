@@ -42,6 +42,7 @@ pub type GeminiIntegration = GenericToolIntegration;
 ///
 /// # Deprecated
 /// Use `gemini_integration()` instead.
+#[deprecated(note = "Use gemini_integration() instead")]
 pub fn new() -> GenericToolIntegration {
     gemini_integration()
 }

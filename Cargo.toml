@@ -22,6 +22,7 @@ toml_edit = "0.23"
 similar = "2.7"
 
 # File operations
+dirs = "5.0"
 fs2 = "0.4"
 tempfile = "3.14"
 dunce = "1.0"
