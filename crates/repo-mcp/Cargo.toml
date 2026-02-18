@@ -14,9 +14,7 @@ path = "src/main.rs"
 repo-agent = { path = "../repo-agent" }
 repo-core = { path = "../repo-core" }
 repo-fs = { path = "../repo-fs" }
-repo-git = { path = "../repo-git" }
 repo-meta = { path = "../repo-meta" }
-repo-tools = { path = "../repo-tools" }
 repo-presets = { path = "../repo-presets" }
 
 # Async runtime
@@ -26,9 +24,6 @@ tokio = { workspace = true, features = ["full"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
-
-# Async traits
-async-trait = { workspace = true }
 
 # Logging
 tracing = { workspace = true }

@@ -74,16 +74,15 @@ fn resolve_editor(slug: &str) -> Result<&'static str> {
 fn auto_detect_editor(config_path: &Path) -> Result<&'static str> {
     // Try to read config to prefer tools listed there
     let config_file = config_path.join(".repository").join("config.toml");
-    if config_file.exists() {
-        if let Ok(content) = std::fs::read_to_string(&config_file) {
-            if let Ok(manifest) = repo_core::Manifest::parse(&content) {
-                // Check configured tools in order
-                for tool_name in &manifest.tools {
-                    for (slug, binary, _) in EDITORS {
-                        if tool_name == *slug && is_on_path(binary) {
-                            return Ok(binary);
-                        }
-                    }
+    if config_file.exists()
+        && let Ok(content) = std::fs::read_to_string(&config_file)
+        && let Ok(manifest) = repo_core::Manifest::parse(&content)
+    {
+        // Check configured tools in order
+        for tool_name in &manifest.tools {
+            for (slug, binary, _) in EDITORS {
+                if tool_name == *slug && is_on_path(binary) {
+                    return Ok(binary);
                 }
             }
         }

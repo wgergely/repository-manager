@@ -1541,12 +1541,10 @@ checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
 name = "repo-agent"
 version = "0.1.0"
 dependencies = [
- "repo-fs",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror 2.0.18",
- "tokio",
 ]
 
 [[package]]
@@ -1677,15 +1675,12 @@ dependencies = [
 name = "repo-mcp"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "clap",
  "repo-agent",
  "repo-core",
  "repo-fs",
- "repo-git",
  "repo-meta",
  "repo-presets",
- "repo-tools",
  "rstest",
  "serde",
  "serde_json",
