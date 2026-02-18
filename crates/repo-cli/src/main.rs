@@ -80,6 +80,10 @@ fn execute_command(cmd: Commands) -> Result<()> {
         } => cmd_add_rule(&id, &instruction, tags),
         Commands::RemoveRule { id } => cmd_remove_rule(&id),
         Commands::ListRules => cmd_list_rules(),
+        Commands::RulesLint { json } => cmd_rules_lint(json),
+        Commands::RulesDiff { json } => cmd_rules_diff(json),
+        Commands::RulesExport { format } => cmd_rules_export(&format),
+        Commands::RulesImport { file } => cmd_rules_import(&file),
         Commands::ListTools { category } => cmd_list_tools(category.as_deref()),
         Commands::ListPresets => cmd_list_presets(),
         Commands::Completions { shell } => cmd_completions(shell),
@@ -189,6 +193,26 @@ fn cmd_remove_rule(id: &str) -> Result<()> {
 fn cmd_list_rules() -> Result<()> {
     let cwd = std::env::current_dir()?;
     commands::run_list_rules(&cwd)
+}
+
+fn cmd_rules_lint(json: bool) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::run_rules_lint(&cwd, json)
+}
+
+fn cmd_rules_diff(json: bool) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::run_rules_diff(&cwd, json)
+}
+
+fn cmd_rules_export(format: &str) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::run_rules_export(&cwd, format)
+}
+
+fn cmd_rules_import(file: &str) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::run_rules_import(&cwd, file)
 }
 
 fn cmd_list_tools(category: Option<&str>) -> Result<()> {

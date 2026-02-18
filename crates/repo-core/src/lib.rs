@@ -37,6 +37,7 @@ pub mod backend;
 pub mod backup;
 pub mod config;
 pub mod error;
+pub mod governance;
 pub mod hooks;
 pub mod ledger;
 pub mod mode;
@@ -52,6 +53,7 @@ pub use hooks::{HookConfig, HookContext, HookEvent, run_hooks};
 pub use ledger::{Intent, Ledger, Projection, ProjectionKind};
 pub use mode::Mode;
 pub use projection::{ProjectionWriter, compute_checksum};
+pub use governance::{ConfigDrift, DriftType, LintWarning, WarnLevel};
 pub use rules::{Rule, RuleRegistry};
 pub use sync::{
     CheckReport, CheckStatus, DriftItem, RuleFile, RuleSyncer, SyncEngine, SyncOptions, SyncReport,

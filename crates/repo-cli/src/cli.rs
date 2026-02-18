@@ -159,6 +159,33 @@ pub enum Commands {
     /// List all active rules
     ListRules,
 
+    /// Lint configuration for consistency issues
+    RulesLint {
+        /// Output as JSON for scripting
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show config drift between expected and actual state
+    RulesDiff {
+        /// Output as JSON for scripting
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Export rules to AGENTS.md format
+    RulesExport {
+        /// Output format (agents)
+        #[arg(long, default_value = "agents")]
+        format: String,
+    },
+
+    /// Import rules from AGENTS.md file
+    RulesImport {
+        /// Path to the file to import
+        file: String,
+    },
+
     /// List available tools
     ///
     /// Shows all tools that can be added to your repository.
