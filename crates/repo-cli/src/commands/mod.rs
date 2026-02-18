@@ -7,6 +7,7 @@ pub mod diff;
 pub mod git;
 pub mod init;
 pub mod list;
+pub mod open;
 pub mod rule;
 pub mod status;
 pub mod plugins;

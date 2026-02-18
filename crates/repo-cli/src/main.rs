@@ -91,6 +91,7 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::ToolInfo { name } => cmd_tool_info(&name),
         Commands::Plugins { action } => cmd_plugins(action),
         Commands::Agent { action } => cmd_agent(action),
+        Commands::Open { worktree, tool } => cmd_open(&worktree, tool.as_deref()),
     }
 }
 
@@ -238,6 +239,11 @@ fn cmd_tool_info(name: &str) -> Result<()> {
 
 fn cmd_agent(action: AgentAction) -> Result<()> {
     commands::agent::run_agent(action)
+}
+
+fn cmd_open(worktree: &str, tool: Option<&str>) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::open::run_open(&cwd, worktree, tool)
 }
 
 fn cmd_plugins(action: PluginsAction) -> Result<()> {
