@@ -1,10 +1,12 @@
 //! Git command implementations (push, pull, merge)
 //!
-//! These commands wrap repo-git's LayoutProvider methods.
+//! These commands use repo-git's free functions for network operations
+//! and LayoutProvider for repo/branch discovery.
 
 use std::path::Path;
 
 use colored::Colorize;
+use git2::Repository;
 
 use repo_fs::NormalizedPath;
 use repo_git::{ClassicLayout, ContainerLayout, LayoutProvider};
@@ -34,6 +36,8 @@ pub fn run_push(path: &Path, remote: Option<&str>, branch: Option<&str>) -> Resu
     let root = NormalizedPath::new(path);
     let mode = detect_mode(&root)?;
     let provider = create_git_provider(&root, mode)?;
+    let repo =
+        Repository::open(provider.main_worktree().to_native()).map_err(repo_git::Error::from)?;
 
     let remote_name = remote.unwrap_or("origin");
     let branch_display = branch.unwrap_or("current branch");
@@ -45,7 +49,8 @@ pub fn run_push(path: &Path, remote: Option<&str>, branch: Option<&str>) -> Resu
         remote_name.yellow()
     );
 
-    provider.push(remote, branch)?;
+    let current_branch_fn = || provider.current_branch();
+    repo_git::push(&repo, remote, branch, current_branch_fn)?;
 
     println!(
         "{} Successfully pushed to {}",
@@ -63,6 +68,8 @@ pub fn run_pull(path: &Path, remote: Option<&str>, branch: Option<&str>) -> Resu
     let root = NormalizedPath::new(path);
     let mode = detect_mode(&root)?;
     let provider = create_git_provider(&root, mode)?;
+    let repo =
+        Repository::open(provider.main_worktree().to_native()).map_err(repo_git::Error::from)?;
 
     let remote_name = remote.unwrap_or("origin");
     let branch_display = branch.unwrap_or("current branch");
@@ -74,7 +81,8 @@ pub fn run_pull(path: &Path, remote: Option<&str>, branch: Option<&str>) -> Resu
         remote_name.yellow()
     );
 
-    provider.pull(remote, branch)?;
+    let current_branch_fn = || provider.current_branch();
+    repo_git::pull(&repo, remote, branch, current_branch_fn, None)?;
 
     println!(
         "{} Successfully pulled from {}",
@@ -92,6 +100,8 @@ pub fn run_merge(path: &Path, source: &str) -> Result<()> {
     let root = NormalizedPath::new(path);
     let mode = detect_mode(&root)?;
     let provider = create_git_provider(&root, mode)?;
+    let repo =
+        Repository::open(provider.main_worktree().to_native()).map_err(repo_git::Error::from)?;
 
     println!(
         "{} Merging {} into current branch...",
@@ -99,7 +109,8 @@ pub fn run_merge(path: &Path, source: &str) -> Result<()> {
         source.cyan()
     );
 
-    provider.merge(source)?;
+    let current_branch_fn = || provider.current_branch();
+    repo_git::merge(&repo, source, current_branch_fn, None)?;
 
     println!(
         "{} Successfully merged {}",

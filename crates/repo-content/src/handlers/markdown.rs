@@ -91,11 +91,99 @@ impl FormatHandler for MarkdownHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::edit::EditKind;
+    use crate::format::FormatHandler;
 
     #[test]
     fn test_multiple_blank_lines_pattern() {
         let source = "a\n\n\n\nb";
         let result = MULTIPLE_BLANK_LINES.replace_all(source, "\n\n");
         assert_eq!(result, "a\n\nb");
+    }
+
+    #[test]
+    fn test_markdown_find_blocks() {
+        let handler = MarkdownHandler::new();
+        let uuid = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+        let source = "# My Document\n\n<!-- repo:block:550e8400-e29b-41d4-a716-446655440000 -->\nManaged content here\n<!-- /repo:block:550e8400-e29b-41d4-a716-446655440000 -->\n\nMore content.\n";
+        let blocks = handler.find_blocks(source);
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].uuid, uuid);
+        assert!(blocks[0].content.contains("Managed content"));
+    }
+
+    #[test]
+    fn test_markdown_insert_block() {
+        let handler = MarkdownHandler::new();
+        let uuid = Uuid::new_v4();
+        let (result, _) = handler
+            .insert_block(
+                "# Title\n\nContent here.\n",
+                uuid,
+                "New managed section",
+                BlockLocation::End,
+            )
+            .unwrap();
+        assert!(result.contains("repo:block:"));
+        assert!(result.contains("New managed section"));
+    }
+
+    #[test]
+    fn test_markdown_normalize() {
+        let handler = MarkdownHandler::new();
+        let norm1 = handler.normalize("# Title\n\n\n\nContent").unwrap();
+        let norm2 = handler.normalize("# Title\n\nContent").unwrap();
+        assert_eq!(norm1, norm2);
+    }
+
+    #[test]
+    fn test_markdown_remove_block() {
+        let handler = MarkdownHandler::new();
+        let uuid = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+        let source = "Before\n\n<!-- repo:block:550e8400-e29b-41d4-a716-446655440000 -->\nContent\n<!-- /repo:block:550e8400-e29b-41d4-a716-446655440000 -->\n\nAfter";
+        let (result, _) = handler.remove_block(source, uuid).unwrap();
+        assert!(!result.contains("repo:block:"));
+        assert!(result.contains("Before"));
+        assert!(result.contains("After"));
+    }
+
+    #[test]
+    fn test_markdown_update_block() {
+        let handler = MarkdownHandler::new();
+        let uuid = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+        let source = "# Title\n\n<!-- repo:block:550e8400-e29b-41d4-a716-446655440000 -->\nOld content\n<!-- /repo:block:550e8400-e29b-41d4-a716-446655440000 -->\n\nFooter\n";
+        let (result, edit) = handler.update_block(source, uuid, "New content").unwrap();
+        assert!(result.contains("New content"));
+        assert!(!result.contains("Old content"));
+        assert_eq!(edit.kind, EditKind::BlockUpdate { uuid });
+    }
+
+    #[test]
+    fn test_markdown_block_not_found() {
+        let handler = MarkdownHandler::new();
+        let uuid = Uuid::new_v4();
+        assert!(
+            handler
+                .update_block("# Title\n\nNo blocks here.\n", uuid, "new content")
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_markdown_format() {
+        let handler = MarkdownHandler::new();
+        assert_eq!(handler.format(), Format::Markdown);
+    }
+
+    #[test]
+    fn test_markdown_multiple_blocks() {
+        let handler = MarkdownHandler::new();
+        let uuid1 = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+        let uuid2 = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap();
+        let source = "# Document\n\n<!-- repo:block:550e8400-e29b-41d4-a716-446655440000 -->\nFirst block\n<!-- /repo:block:550e8400-e29b-41d4-a716-446655440000 -->\n\nMiddle\n\n<!-- repo:block:550e8400-e29b-41d4-a716-446655440001 -->\nSecond block\n<!-- /repo:block:550e8400-e29b-41d4-a716-446655440001 -->\n\nEnd\n";
+        let blocks = handler.find_blocks(source);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].uuid, uuid1);
+        assert_eq!(blocks[1].uuid, uuid2);
     }
 }

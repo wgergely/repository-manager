@@ -41,11 +41,7 @@ pub fn run_rules_lint(path: &Path, json: bool) -> Result<()> {
         return Ok(());
     }
 
-    println!(
-        "{} Found {} issue(s):",
-        "=>".blue().bold(),
-        warnings.len()
-    );
+    println!("{} Found {} issue(s):", "=>".blue().bold(), warnings.len());
     for w in &warnings {
         let prefix = match w.level {
             repo_core::WarnLevel::Info => "info".cyan(),
@@ -91,11 +87,7 @@ pub fn run_rules_diff(path: &Path, json: bool) -> Result<()> {
         return Ok(());
     }
 
-    println!(
-        "{} Found {} drift(s):",
-        "=>".blue().bold(),
-        drifts.len()
-    );
+    println!("{} Found {} drift(s):", "=>".blue().bold(), drifts.len());
     for d in &drifts {
         let prefix = match d.drift_type {
             repo_core::DriftType::Modified => "modified".yellow(),

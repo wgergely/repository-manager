@@ -1001,7 +1001,12 @@ mod tests {
         let cli = Cli::parse_from(["repo", "agent", "spawn", "claude", "--goal", "fix bug"]);
         match cli.command {
             Some(Commands::Agent {
-                action: AgentAction::Spawn { name, goal, worktree },
+                action:
+                    AgentAction::Spawn {
+                        name,
+                        goal,
+                        worktree,
+                    },
             }) => {
                 assert_eq!(name, "claude");
                 assert_eq!(goal, Some("fix bug".to_string()));
@@ -1014,12 +1019,23 @@ mod tests {
     #[test]
     fn parse_agent_spawn_with_worktree() {
         let cli = Cli::parse_from([
-            "repo", "agent", "spawn", "claude",
-            "--goal", "refactor", "--worktree", "feature-x",
+            "repo",
+            "agent",
+            "spawn",
+            "claude",
+            "--goal",
+            "refactor",
+            "--worktree",
+            "feature-x",
         ]);
         match cli.command {
             Some(Commands::Agent {
-                action: AgentAction::Spawn { name, goal, worktree },
+                action:
+                    AgentAction::Spawn {
+                        name,
+                        goal,
+                        worktree,
+                    },
             }) => {
                 assert_eq!(name, "claude");
                 assert_eq!(goal, Some("refactor".to_string()));
@@ -1080,14 +1096,20 @@ mod tests {
     #[test]
     fn parse_agent_rules_add_command() {
         let cli = Cli::parse_from([
-            "repo", "agent", "rules", "add", "no-secrets",
-            "--instruction", "Never expose API keys",
+            "repo",
+            "agent",
+            "rules",
+            "add",
+            "no-secrets",
+            "--instruction",
+            "Never expose API keys",
         ]);
         match cli.command {
             Some(Commands::Agent {
-                action: AgentAction::Rules {
-                    action: RulesSubAction::Add { id, instruction },
-                },
+                action:
+                    AgentAction::Rules {
+                        action: RulesSubAction::Add { id, instruction },
+                    },
             }) => {
                 assert_eq!(id, "no-secrets");
                 assert_eq!(instruction, "Never expose API keys");
@@ -1101,9 +1123,10 @@ mod tests {
         let cli = Cli::parse_from(["repo", "agent", "rules", "remove", "no-secrets"]);
         match cli.command {
             Some(Commands::Agent {
-                action: AgentAction::Rules {
-                    action: RulesSubAction::Remove { id },
-                },
+                action:
+                    AgentAction::Rules {
+                        action: RulesSubAction::Remove { id },
+                    },
             }) => {
                 assert_eq!(id, "no-secrets");
             }
@@ -1124,10 +1147,22 @@ mod tests {
 
     #[test]
     fn parse_hooks_add_command() {
-        let cli = Cli::parse_from(["repo", "hooks", "add", "post-branch-create", "npm", "install"]);
+        let cli = Cli::parse_from([
+            "repo",
+            "hooks",
+            "add",
+            "post-branch-create",
+            "npm",
+            "install",
+        ]);
         match cli.command {
             Some(Commands::Hooks {
-                action: HooksAction::Add { event, command, args },
+                action:
+                    HooksAction::Add {
+                        event,
+                        command,
+                        args,
+                    },
             }) => {
                 assert_eq!(event, "post-branch-create");
                 assert_eq!(command, "npm");

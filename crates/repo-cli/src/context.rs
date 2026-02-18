@@ -101,21 +101,29 @@ pub fn detect_context(cwd: &Path) -> RepoContext {
     RepoContext::NotARepo
 }
 
+/// Minimal struct for parsing mode from config.toml
+#[derive(serde::Deserialize)]
+struct ConfigMode {
+    #[serde(default)]
+    core: CoreMode,
+}
+
+#[derive(serde::Deserialize, Default)]
+struct CoreMode {
+    #[serde(default = "default_standard")]
+    mode: String,
+}
+
+fn default_standard() -> String {
+    "standard".to_string()
+}
+
 /// Parse the mode from config.toml content
 fn parse_mode(content: &str) -> String {
-    // Simple parsing - look for mode = "..."
-    for line in content.lines() {
-        let line = line.trim();
-        if line.starts_with("mode") {
-            // Extract value between quotes
-            if let Some(start) = line.find('"')
-                && let Some(end) = line[start + 1..].find('"')
-            {
-                return line[start + 1..start + 1 + end].to_string();
-            }
-        }
+    match toml::from_str::<ConfigMode>(content) {
+        Ok(config) => config.core.mode,
+        Err(_) => "standard".to_string(),
     }
-    "standard".to_string()
 }
 
 #[cfg(test)]

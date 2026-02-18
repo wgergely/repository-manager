@@ -402,5 +402,8 @@ fn very_long_content_between_markers() {
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].uuid, "large");
     // Content should be the large block (minus leading/trailing newline trimming)
-    assert!(blocks[0].content.len() > 9000, "Large content should be preserved");
+    assert!(
+        blocks[0].content.len() > 9000,
+        "Large content should be preserved"
+    );
 }

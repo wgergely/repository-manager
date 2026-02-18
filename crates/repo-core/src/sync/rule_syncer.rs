@@ -178,10 +178,17 @@ impl RuleSyncer {
     pub fn get_rules_file_for_tool(&self, tool: &str) -> Option<String> {
         match tool {
             "cursor" => Some(".cursorrules".to_string()),
-            // Claude uses CLAUDE.md which we don't manage through rules yet
-            "claude" | "claude-desktop" => None,
-            // VSCode doesn't have a standard rules file
+            "windsurf" => Some(".windsurfrules".to_string()),
+            "claude" | "claude-desktop" => Some("CLAUDE.md".to_string()),
+            "gemini" => Some("GEMINI.md".to_string()),
+            "copilot" => Some(".github/copilot-instructions.md".to_string()),
+            "cline" => Some(".clinerules".to_string()),
+            "roo" => Some(".roorules".to_string()),
+            "antigravity" => Some(".antigravityrules".to_string()),
+            // VSCode uses settings.json, not a rules file
             "vscode" => None,
+            // JetBrains, Zed, Aider, AmazonQ don't have standard rules files
+            "jetbrains" | "zed" | "aider" | "amazonq" => None,
             _ => None,
         }
     }
@@ -331,7 +338,22 @@ mod tests {
             syncer.get_rules_file_for_tool("cursor"),
             Some(".cursorrules".to_string())
         );
-        assert_eq!(syncer.get_rules_file_for_tool("claude"), None);
+        assert_eq!(
+            syncer.get_rules_file_for_tool("windsurf"),
+            Some(".windsurfrules".to_string())
+        );
+        assert_eq!(
+            syncer.get_rules_file_for_tool("claude"),
+            Some("CLAUDE.md".to_string())
+        );
+        assert_eq!(
+            syncer.get_rules_file_for_tool("gemini"),
+            Some("GEMINI.md".to_string())
+        );
+        assert_eq!(
+            syncer.get_rules_file_for_tool("copilot"),
+            Some(".github/copilot-instructions.md".to_string())
+        );
         assert_eq!(syncer.get_rules_file_for_tool("vscode"), None);
         assert_eq!(syncer.get_rules_file_for_tool("unknown"), None);
     }

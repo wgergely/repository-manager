@@ -98,7 +98,7 @@ pub fn update_block(content: &str, uuid: &str, new_content: &str) -> Result<Stri
         regex::escape(uuid),
         regex::escape(uuid)
     );
-    let re = Regex::new(&pattern)?;
+    let re = Regex::new(&pattern).expect("UUID should produce valid regex pattern");
 
     let replacement = format_block(uuid, new_content);
     Ok(re.replace(content, replacement.as_str()).to_string())
@@ -145,7 +145,7 @@ pub fn remove_block(content: &str, uuid: &str) -> Result<String> {
         regex::escape(uuid),
         regex::escape(uuid)
     );
-    let re = Regex::new(&pattern)?;
+    let re = Regex::new(&pattern).expect("UUID should produce valid regex pattern");
 
     let result = re.replace(content, "\n").to_string();
 

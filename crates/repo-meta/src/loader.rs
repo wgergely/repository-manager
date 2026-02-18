@@ -21,6 +21,18 @@ use repo_fs::{ConfigStore, NormalizedPath};
 use std::collections::HashMap;
 use std::fs;
 
+/// Result of loading definitions from a directory.
+///
+/// Contains both the successfully loaded definitions and any warnings
+/// from files that failed to load.
+#[derive(Debug)]
+pub struct LoadResult<T> {
+    /// Successfully loaded definitions, keyed by their ID
+    pub definitions: HashMap<String, T>,
+    /// Warnings for files that failed to load (path and error message)
+    pub warnings: Vec<String>,
+}
+
 /// Loads all definitions from .repository/ directory
 pub struct DefinitionLoader {
     store: ConfigStore,
@@ -42,8 +54,9 @@ impl DefinitionLoader {
     ///
     /// # Returns
     ///
-    /// A map of tool slug to tool definition
-    pub fn load_tools(&self, root: &NormalizedPath) -> Result<HashMap<String, ToolDefinition>> {
+    /// A `LoadResult` containing a map of tool slug to tool definition,
+    /// plus any warnings for files that failed to parse.
+    pub fn load_tools(&self, root: &NormalizedPath) -> Result<LoadResult<ToolDefinition>> {
         let tools_dir = root.join(".repository").join("tools");
         self.load_definitions(&tools_dir)
     }
@@ -56,8 +69,9 @@ impl DefinitionLoader {
     ///
     /// # Returns
     ///
-    /// A map of rule ID to rule definition
-    pub fn load_rules(&self, root: &NormalizedPath) -> Result<HashMap<String, RuleDefinition>> {
+    /// A `LoadResult` containing a map of rule ID to rule definition,
+    /// plus any warnings for files that failed to parse.
+    pub fn load_rules(&self, root: &NormalizedPath) -> Result<LoadResult<RuleDefinition>> {
         let rules_dir = root.join(".repository").join("rules");
         self.load_definitions(&rules_dir)
     }
@@ -70,21 +84,26 @@ impl DefinitionLoader {
     ///
     /// # Returns
     ///
-    /// A map of preset ID to preset definition
-    pub fn load_presets(&self, root: &NormalizedPath) -> Result<HashMap<String, PresetDefinition>> {
+    /// A `LoadResult` containing a map of preset ID to preset definition,
+    /// plus any warnings for files that failed to parse.
+    pub fn load_presets(&self, root: &NormalizedPath) -> Result<LoadResult<PresetDefinition>> {
         let presets_dir = root.join(".repository").join("presets");
         self.load_definitions(&presets_dir)
     }
 
     /// Generic loader for definitions from a directory
-    fn load_definitions<T>(&self, dir: &NormalizedPath) -> Result<HashMap<String, T>>
+    fn load_definitions<T>(&self, dir: &NormalizedPath) -> Result<LoadResult<T>>
     where
         T: serde::de::DeserializeOwned + HasId,
     {
         let mut definitions = HashMap::new();
+        let mut warnings = Vec::new();
 
         if !dir.exists() {
-            return Ok(definitions);
+            return Ok(LoadResult {
+                definitions,
+                warnings,
+            });
         }
 
         let entries = fs::read_dir(dir.to_native())
@@ -99,14 +118,18 @@ impl DefinitionLoader {
                         definitions.insert(def.id().to_string(), def);
                     }
                     Err(e) => {
-                        // Log warning but continue loading other files
-                        tracing::warn!("Failed to load {:?}: {}", path, e);
+                        let warning = format!("Failed to load {}: {}", path.display(), e);
+                        tracing::warn!("{}", warning);
+                        warnings.push(warning);
                     }
                 }
             }
         }
 
-        Ok(definitions)
+        Ok(LoadResult {
+            definitions,
+            warnings,
+        })
     }
 }
 
@@ -148,30 +171,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_loader_can_be_created() {
-        let _loader = DefinitionLoader::new();
-        // Construction should not panic
-    }
-
-    #[test]
-    fn test_loader_default_same_as_new() {
-        let _loader = DefinitionLoader::default();
-        // Default impl should not panic
-    }
-
-    #[test]
     fn test_load_from_nonexistent_dir() {
         let loader = DefinitionLoader::new();
         let root = NormalizedPath::new("/nonexistent/path");
 
         // Should return empty maps, not errors
-        let tools = loader.load_tools(&root).unwrap();
-        assert!(tools.is_empty());
+        let result = loader.load_tools(&root).unwrap();
+        assert!(result.definitions.is_empty());
+        assert!(result.warnings.is_empty());
 
-        let rules = loader.load_rules(&root).unwrap();
-        assert!(rules.is_empty());
+        let result = loader.load_rules(&root).unwrap();
+        assert!(result.definitions.is_empty());
 
-        let presets = loader.load_presets(&root).unwrap();
-        assert!(presets.is_empty());
+        let result = loader.load_presets(&root).unwrap();
+        assert!(result.definitions.is_empty());
     }
 }

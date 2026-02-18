@@ -272,8 +272,14 @@ mod tests {
     #[test]
     fn test_extract_yaml_field() {
         let content = "name: researcher\ntier: specialist\nprovider: claude\n";
-        assert_eq!(extract_yaml_field(content, "tier"), Some("specialist".into()));
-        assert_eq!(extract_yaml_field(content, "provider"), Some("claude".into()));
+        assert_eq!(
+            extract_yaml_field(content, "tier"),
+            Some("specialist".into())
+        );
+        assert_eq!(
+            extract_yaml_field(content, "provider"),
+            Some("claude".into())
+        );
         assert_eq!(extract_yaml_field(content, "missing"), None);
     }
 
@@ -284,7 +290,10 @@ mod tests {
             extract_yaml_field(content, "tier"),
             Some("orchestrator".into())
         );
-        assert_eq!(extract_yaml_field(content, "provider"), Some("gemini".into()));
+        assert_eq!(
+            extract_yaml_field(content, "provider"),
+            Some("gemini".into())
+        );
     }
 
     #[test]

@@ -99,7 +99,11 @@ async fn test_rust_not_confused_by_non_rust_files() {
     // Create files that look like a project but NOT Rust
     fs::write(temp.path().join("package.json"), "{}").unwrap();
     fs::write(temp.path().join("Makefile"), "all:\n\techo hello").unwrap();
-    fs::write(temp.path().join("setup.py"), "from setuptools import setup\nsetup()").unwrap();
+    fs::write(
+        temp.path().join("setup.py"),
+        "from setuptools import setup\nsetup()",
+    )
+    .unwrap();
 
     let context = create_test_context(&temp);
     let provider = RustProvider::new();
@@ -122,7 +126,10 @@ async fn test_rust_apply_is_detection_only() {
     let report = provider.apply(&context).await.unwrap();
     assert!(report.success);
     assert!(
-        report.actions_taken.iter().any(|a| a.contains("detection-only")),
+        report
+            .actions_taken
+            .iter()
+            .any(|a| a.contains("detection-only")),
         "Rust provider should indicate it's detection-only, got: {:?}",
         report.actions_taken
     );
@@ -222,7 +229,10 @@ async fn test_node_package_json_without_node_modules() {
             "Package.json without node_modules should be missing"
         );
         assert!(
-            report.details.iter().any(|d| d.contains("Dependencies") || d.contains("node_modules")),
+            report
+                .details
+                .iter()
+                .any(|d| d.contains("Dependencies") || d.contains("node_modules")),
             "Details should mention missing dependencies, got: {:?}",
             report.details
         );
@@ -241,7 +251,10 @@ async fn test_node_apply_is_detection_only() {
     let report = provider.apply(&context).await.unwrap();
     assert!(report.success);
     assert!(
-        report.actions_taken.iter().any(|a| a.contains("detection-only")),
+        report
+            .actions_taken
+            .iter()
+            .any(|a| a.contains("detection-only")),
         "Node provider should indicate it's detection-only, got: {:?}",
         report.actions_taken
     );

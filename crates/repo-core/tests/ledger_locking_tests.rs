@@ -53,10 +53,7 @@ fn concurrent_ledger_saves_preserve_file_integrity() {
     let final_ledger = Ledger::load(&path).unwrap();
 
     // The seed intent should still be present (both threads loaded it)
-    let has_seed = final_ledger
-        .intents()
-        .iter()
-        .any(|i| i.id == "rule:seed");
+    let has_seed = final_ledger.intents().iter().any(|i| i.id == "rule:seed");
     assert!(has_seed, "Seed intent should survive concurrent writes");
 
     // Due to last-writer-wins, exactly one of the two thread intents will be present,
@@ -124,8 +121,15 @@ fn sequential_ledger_saves_preserve_all_intents() {
         "Sequential saves must preserve all intents"
     );
 
-    let ids: Vec<&str> = final_ledger.intents().iter().map(|i| i.id.as_str()).collect();
-    assert!(ids.contains(&"rule:first"), "First intent must be preserved");
+    let ids: Vec<&str> = final_ledger
+        .intents()
+        .iter()
+        .map(|i| i.id.as_str())
+        .collect();
+    assert!(
+        ids.contains(&"rule:first"),
+        "First intent must be preserved"
+    );
     assert!(
         ids.contains(&"rule:second"),
         "Second intent must be preserved"
@@ -153,7 +157,10 @@ fn ledger_save_cleans_up_temp_file_and_roundtrips() {
 
     // Temp file must not remain
     let temp_path = path.with_extension("toml.tmp");
-    assert!(!temp_path.exists(), "Temporary file should be cleaned up after save");
+    assert!(
+        !temp_path.exists(),
+        "Temporary file should be cleaned up after save"
+    );
 
     // The saved file must be valid TOML that round-trips correctly
     let loaded = Ledger::load(&path).unwrap();
@@ -185,7 +192,11 @@ fn ledger_save_fails_when_parent_directory_missing() {
     // Attempting to save to a path whose parent directory doesn't exist should
     // return an error, not panic or silently succeed.
     let dir = tempdir().unwrap();
-    let path = dir.path().join("nonexistent").join("subdir").join("ledger.toml");
+    let path = dir
+        .path()
+        .join("nonexistent")
+        .join("subdir")
+        .join("ledger.toml");
 
     let ledger = Ledger::new();
     let result = ledger.save(&path);

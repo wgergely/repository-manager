@@ -24,7 +24,10 @@ pub fn run_config_show(path: &Path, json: bool) -> Result<()> {
             "rules": manifest.rules,
             "presets": manifest.presets.keys().collect::<Vec<_>>(),
         });
-        println!("{}", serde_json::to_string_pretty(&output).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&output).unwrap_or_default()
+        );
         return Ok(());
     }
 
@@ -146,11 +149,7 @@ pub fn run_tool_info(path: &Path, name: &str) -> Result<()> {
                     "Active (in current project)".green()
                 );
             } else {
-                println!(
-                    "  {:<16} {}",
-                    "Status:".dimmed(),
-                    "Not active".dimmed()
-                );
+                println!("  {:<16} {}", "Status:".dimmed(), "Not active".dimmed());
             }
         }
         Err(_) => {

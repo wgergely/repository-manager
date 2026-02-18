@@ -12,6 +12,9 @@ use uuid::Uuid;
 
 /// Unified document type wrapping format-specific backends
 pub struct Document {
+    /// Original source as provided to parse/parse_as (for is_modified tracking)
+    original_source: String,
+    /// Current source (may differ from original after edits)
     source: String,
     format: Format,
     handler: Box<dyn FormatHandler>,
@@ -38,6 +41,7 @@ impl Document {
         let _ = handler.parse(source)?;
 
         Ok(Self {
+            original_source: source.to_string(),
             source: source.to_string(),
             format,
             handler,
@@ -148,25 +152,29 @@ impl Document {
         }
     }
 
-    /// Render to string
+    /// Render to string.
+    ///
+    /// For text formats (PlainText, Markdown), returns the source as-is.
+    /// For structured formats (TOML, JSON, YAML), re-parses and re-renders
+    /// to produce canonical output.
     pub fn render(&self) -> String {
-        if let Ok(parsed) = self.handler.parse(&self.source) {
-            self.handler
-                .render(parsed.as_ref())
-                .unwrap_or_else(|_| self.source.clone())
-        } else {
-            self.source.clone()
+        match self.format {
+            Format::PlainText | Format::Markdown => self.source.clone(),
+            _ => {
+                if let Ok(parsed) = self.handler.parse(&self.source) {
+                    self.handler
+                        .render(parsed.as_ref())
+                        .unwrap_or_else(|_| self.source.clone())
+                } else {
+                    self.source.clone()
+                }
+            }
         }
     }
 
     /// Check if document has been modified from its original source.
-    ///
-    /// **Note:** This method is not yet implemented and always returns `false`.
-    /// Full implementation requires tracking original source state.
-    /// See: Phase 5 in the implementation plan.
     pub fn is_modified(&self) -> bool {
-        // TODO: Track original source to enable modification detection
-        false
+        self.source != self.original_source
     }
 
     /// Get normalized representation for semantic comparison
@@ -335,7 +343,7 @@ impl Document {
 /// Convert a serde_json::Value to a toml::Value
 fn json_to_toml(json: &Value) -> Result<toml::Value> {
     match json {
-        Value::Null => Ok(toml::Value::String("null".to_string())),
+        Value::Null => Err(Error::parse("TOML", "TOML does not support null values")),
         Value::Bool(b) => Ok(toml::Value::Boolean(*b)),
         Value::Number(n) => {
             if let Some(i) = n.as_i64() {

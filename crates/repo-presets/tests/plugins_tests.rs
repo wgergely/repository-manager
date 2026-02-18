@@ -4,7 +4,7 @@
 //! Run with: cargo test -p repo-presets --test plugins_tests -- --ignored
 
 use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
-use repo_presets::{Context, PresetProvider, PresetStatus, PluginsProvider};
+use repo_presets::{Context, PluginsProvider, PresetProvider, PresetStatus};
 use std::collections::HashMap;
 use tempfile::TempDir;
 

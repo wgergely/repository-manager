@@ -3,13 +3,19 @@ use repo_git::{NamingStrategy, naming::branch_to_directory};
 #[test]
 fn test_slug_empty_string() {
     let result = branch_to_directory("", NamingStrategy::Slug);
-    assert_eq!(result, "", "Empty branch name should produce empty directory name");
+    assert_eq!(
+        result, "",
+        "Empty branch name should produce empty directory name"
+    );
 }
 
 #[test]
 fn test_hierarchical_empty_string() {
     let result = branch_to_directory("", NamingStrategy::Hierarchical);
-    assert_eq!(result, "", "Empty branch name should produce empty directory name");
+    assert_eq!(
+        result, "",
+        "Empty branch name should produce empty directory name"
+    );
 }
 
 #[test]
@@ -30,13 +36,19 @@ fn test_hierarchical_special_characters() {
 #[test]
 fn test_hierarchical_leading_trailing_slashes() {
     let result = branch_to_directory("/feat/auth/", NamingStrategy::Hierarchical);
-    assert_eq!(result, "feat/auth", "Should strip leading and trailing slashes");
+    assert_eq!(
+        result, "feat/auth",
+        "Should strip leading and trailing slashes"
+    );
 }
 
 #[test]
 fn test_hierarchical_multiple_consecutive_slashes() {
     let result = branch_to_directory("feat//double//slash", NamingStrategy::Hierarchical);
-    assert_eq!(result, "feat/double/slash", "Should collapse consecutive slashes");
+    assert_eq!(
+        result, "feat/double/slash",
+        "Should collapse consecutive slashes"
+    );
 }
 
 #[test]

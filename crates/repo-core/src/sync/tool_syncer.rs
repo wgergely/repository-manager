@@ -98,8 +98,8 @@ impl ToolSyncer {
             return Ok(actions);
         }
 
-        // Get tool config files based on tool type
-        let config_files = self.get_tool_config_files(tool_name);
+        // Ensure tool config files exist (creates them if needed)
+        let config_files = self.ensure_tool_config_files(tool_name);
 
         if config_files.is_empty() {
             actions.push(format!("No config files for tool {}", tool_name));
@@ -144,7 +144,7 @@ impl ToolSyncer {
     ///
     /// This method:
     /// 1. Finds all intents for the specified tool
-    /// 2. Creates a backup of the tool's config files
+    /// 2. Optionally creates a backup of the tool's config files
     /// 3. Deletes the files associated with each projection
     /// 4. Removes the intents from the ledger
     ///
@@ -157,72 +157,7 @@ impl ToolSyncer {
     ///
     /// A list of action descriptions taken during removal.
     pub fn remove_tool(&self, tool_name: &str, ledger: &mut Ledger) -> Result<Vec<String>> {
-        let mut actions = Vec::new();
-        let intent_id = format!("tool:{}", tool_name);
-
-        let intents: Vec<Uuid> = self
-            .get_intents_by_id(ledger, &intent_id)
-            .iter()
-            .map(|i| i.uuid)
-            .collect();
-
-        if intents.is_empty() {
-            actions.push(format!("Tool {} not found in ledger", tool_name));
-            return Ok(actions);
-        }
-
-        // Collect files to backup before deleting
-        let mut files_to_backup = Vec::new();
-        for uuid in &intents {
-            if let Some(intent) = ledger.get_intent(*uuid) {
-                for projection in intent.projections() {
-                    files_to_backup.push(projection.file.clone());
-                }
-            }
-        }
-
-        // Create backup before deleting (unless dry-run)
-        if !self.dry_run && !files_to_backup.is_empty() {
-            match self
-                .backup_manager
-                .create_backup(tool_name, &files_to_backup)
-            {
-                Ok(backup) => {
-                    actions.push(format!(
-                        "Created backup for {} ({} files)",
-                        tool_name,
-                        backup.metadata.files.len()
-                    ));
-                }
-                Err(e) => {
-                    // Log warning but continue with removal
-                    tracing::warn!("Failed to create backup for {}: {}", tool_name, e);
-                }
-            }
-        }
-
-        // Now delete the files
-        for uuid in intents {
-            if let Some(intent) = ledger.get_intent(uuid) {
-                for projection in intent.projections() {
-                    let file_path = self.root.join(projection.file.to_string_lossy().as_ref());
-
-                    if self.dry_run {
-                        actions.push(format!("[dry-run] Would delete {}", file_path));
-                    } else if file_path.exists() {
-                        std::fs::remove_file(file_path.as_ref())?;
-                        actions.push(format!("Deleted {}", file_path));
-                    }
-                }
-            }
-
-            if !self.dry_run {
-                ledger.remove_intent(uuid);
-                actions.push(format!("Removed intent for {}", tool_name));
-            }
-        }
-
-        Ok(actions)
+        self.remove_tool_impl(tool_name, ledger, true)
     }
 
     /// Remove a tool with option to skip backup
@@ -230,6 +165,16 @@ impl ToolSyncer {
         &self,
         tool_name: &str,
         ledger: &mut Ledger,
+    ) -> Result<Vec<String>> {
+        self.remove_tool_impl(tool_name, ledger, false)
+    }
+
+    /// Internal implementation for tool removal with optional backup
+    fn remove_tool_impl(
+        &self,
+        tool_name: &str,
+        ledger: &mut Ledger,
+        backup: bool,
     ) -> Result<Vec<String>> {
         let mut actions = Vec::new();
         let intent_id = format!("tool:{}", tool_name);
@@ -245,6 +190,37 @@ impl ToolSyncer {
             return Ok(actions);
         }
 
+        // Create backup before deleting (if requested and not dry-run)
+        if backup && !self.dry_run {
+            let mut files_to_backup = Vec::new();
+            for uuid in &intents {
+                if let Some(intent) = ledger.get_intent(*uuid) {
+                    for projection in intent.projections() {
+                        files_to_backup.push(projection.file.clone());
+                    }
+                }
+            }
+
+            if !files_to_backup.is_empty() {
+                match self
+                    .backup_manager
+                    .create_backup(tool_name, &files_to_backup)
+                {
+                    Ok(bkp) => {
+                        actions.push(format!(
+                            "Created backup for {} ({} files)",
+                            tool_name,
+                            bkp.metadata.files.len()
+                        ));
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to create backup for {}: {}", tool_name, e);
+                    }
+                }
+            }
+        }
+
+        // Delete the files and remove intents
         for uuid in intents {
             if let Some(intent) = ledger.get_intent(uuid) {
                 for projection in intent.projections() {
@@ -301,14 +277,43 @@ impl ToolSyncer {
         ledger.find_by_rule(intent_id)
     }
 
-    /// Get config files for a tool using repo-tools integrations
+    /// Get config file paths for a tool (read-only, no side effects).
     ///
-    /// Returns a list of (file_path, content) tuples for the tool's configuration files.
-    /// Uses ToolDispatcher to get proper integrations for each tool type.
-    fn get_tool_config_files(&self, tool_name: &str) -> Vec<(String, String)> {
-        // Try to get integration from dispatcher
+    /// Returns a list of (file_path, content) tuples for existing tool config files.
+    /// Does NOT create or write any files.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn get_tool_config_files(&self, tool_name: &str) -> Vec<(String, String)> {
         if let Some(integration) = self.dispatcher.get_integration(tool_name) {
-            // Use the integration to sync with an initial rule
+            integration
+                .config_locations()
+                .into_iter()
+                .filter(|loc| !loc.is_directory)
+                .map(|loc| {
+                    let full_path = self.root.join(&loc.path);
+                    let content = if full_path.exists() {
+                        match std::fs::read_to_string(full_path.as_ref()) {
+                            Ok(c) => c,
+                            Err(e) => {
+                                tracing::warn!("Failed to read {}: {}", loc.path, e);
+                                String::new()
+                            }
+                        }
+                    } else {
+                        String::new()
+                    };
+                    (loc.path, content)
+                })
+                .collect()
+        } else {
+            vec![]
+        }
+    }
+
+    /// Ensure tool config files exist, creating them with initial content if needed.
+    ///
+    /// This is the write-side counterpart to `get_tool_config_files`.
+    fn ensure_tool_config_files(&self, tool_name: &str) -> Vec<(String, String)> {
+        if let Some(integration) = self.dispatcher.get_integration(tool_name) {
             let context = SyncContext::new(self.root.clone());
             let initial_rule = Rule {
                 id: format!("{}-init", tool_name),
@@ -318,7 +323,6 @@ impl ToolSyncer {
                 ),
             };
 
-            // Sync the tool - this creates the config file with managed blocks
             if !self.dry_run
                 && let Err(e) = integration.sync(&context, &[initial_rule])
             {
@@ -326,16 +330,20 @@ impl ToolSyncer {
                 return vec![];
             }
 
-            // Return the config locations for ledger tracking
             integration
                 .config_locations()
                 .into_iter()
                 .filter(|loc| !loc.is_directory)
                 .map(|loc| {
-                    // Read back the content that was written
                     let full_path = self.root.join(&loc.path);
                     let content = if full_path.exists() {
-                        std::fs::read_to_string(full_path.as_ref()).unwrap_or_default()
+                        match std::fs::read_to_string(full_path.as_ref()) {
+                            Ok(c) => c,
+                            Err(e) => {
+                                tracing::warn!("Failed to read {}: {}", loc.path, e);
+                                String::new()
+                            }
+                        }
                     } else {
                         String::new()
                     };
@@ -343,7 +351,6 @@ impl ToolSyncer {
                 })
                 .collect()
         } else {
-            // Unknown tool - return empty (no integration available)
             vec![]
         }
     }
@@ -460,7 +467,10 @@ mod tests {
 
         // The .cursorrules file should exist on disk
         let cursorrules = dir.path().join(".cursorrules");
-        assert!(cursorrules.exists(), ".cursorrules should be created on disk");
+        assert!(
+            cursorrules.exists(),
+            ".cursorrules should be created on disk"
+        );
 
         let content = std::fs::read_to_string(&cursorrules).unwrap();
         assert!(!content.is_empty(), ".cursorrules should have content");
@@ -476,7 +486,10 @@ mod tests {
         let actions = syncer.sync_tool("cursor", &mut ledger).unwrap();
 
         // Dry run should still report actions
-        assert!(!actions.is_empty(), "dry_run should still report planned actions");
+        assert!(
+            !actions.is_empty(),
+            "dry_run should still report planned actions"
+        );
 
         // But no file should be created on disk
         let cursorrules = dir.path().join(".cursorrules");
@@ -515,7 +528,9 @@ mod tests {
         let syncer = ToolSyncer::new(root, false);
 
         let mut ledger = Ledger::new();
-        let actions = syncer.sync_tool("nonexistent_tool_xyz", &mut ledger).unwrap();
+        let actions = syncer
+            .sync_tool("nonexistent_tool_xyz", &mut ledger)
+            .unwrap();
 
         // Should indicate no config files
         let no_config = actions.iter().any(|a| a.contains("No config files"));
@@ -541,8 +556,7 @@ mod tests {
         let files = syncer.get_tool_config_files("cursor");
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].0, ".cursorrules");
-        // Content uses managed blocks from repo-tools
-        assert!(files[0].1.contains("cursor") || files[0].1.contains("repo:block"));
+        // Read-only: content is empty when file doesn't exist on disk
     }
 
     #[test]
@@ -554,8 +568,7 @@ mod tests {
         let files = syncer.get_tool_config_files("vscode");
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].0, ".vscode/settings.json");
-        // Content uses managed blocks from repo-tools
-        assert!(!files[0].1.is_empty());
+        // Read-only: content is empty when file doesn't exist on disk
     }
 
     #[test]
@@ -568,7 +581,7 @@ mod tests {
         assert_eq!(files.len(), 1);
         // Claude integration uses CLAUDE.md
         assert_eq!(files[0].0, "CLAUDE.md");
-        assert!(!files[0].1.is_empty());
+        // Read-only: content is empty when file doesn't exist on disk
     }
 
     #[test]
@@ -590,7 +603,7 @@ mod tests {
 
         let files = syncer.get_tool_config_files("windsurf");
         assert_eq!(files.len(), 1);
-        assert!(!files[0].1.is_empty());
+        // Read-only: only verify path, not content
     }
 
     #[test]
@@ -601,7 +614,7 @@ mod tests {
 
         let files = syncer.get_tool_config_files("antigravity");
         assert_eq!(files.len(), 1);
-        assert!(!files[0].1.is_empty());
+        // Read-only: only verify path, not content
     }
 
     #[test]
@@ -612,7 +625,7 @@ mod tests {
 
         let files = syncer.get_tool_config_files("gemini");
         assert_eq!(files.len(), 1);
-        assert!(!files[0].1.is_empty());
+        // Read-only: only verify path, not content
     }
 
     #[test]

@@ -23,9 +23,9 @@
 //! let loader = DefinitionLoader::new();
 //! let root = NormalizedPath::new("/path/to/repo");
 //!
-//! let tools = loader.load_tools(&root)?;
-//! let rules = loader.load_rules(&root)?;
-//! let presets = loader.load_presets(&root)?;
+//! let tools = loader.load_tools(&root)?.definitions;
+//! let rules = loader.load_rules(&root)?.definitions;
+//! let presets = loader.load_presets(&root)?.definitions;
 //! ```
 
 pub mod config;
@@ -35,15 +35,9 @@ pub mod registry;
 pub mod schema;
 pub mod validation;
 
-// Note: tools.rs was removed - ToolRegistry is now only in validation.rs
-
-#[allow(deprecated)]
-pub use config::{
-    ActiveConfig, CoreConfig, RepositoryConfig, RepositoryMode, SyncConfig, get_preset_config,
-    load_config,
-};
+pub use config::{ActiveConfig, CoreConfig, RepositoryMode, SyncConfig, SyncStrategy};
 pub use error::{Error, Result};
-pub use loader::DefinitionLoader;
+pub use loader::{DefinitionLoader, LoadResult};
 pub use registry::Registry;
 pub use schema::{PresetDefinition, RuleDefinition, ToolDefinition};
 pub use validation::{PresetRegistry, ToolRegistry};

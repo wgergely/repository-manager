@@ -284,7 +284,12 @@ impl ModeBackend for WorktreeBackend {
         // Move the worktree directory
         self.git_command_in_worktree(
             &self.current_worktree,
-            &["worktree", "move", old_worktree_path.as_str(), new_worktree_path.as_str()],
+            &[
+                "worktree",
+                "move",
+                old_worktree_path.as_str(),
+                new_worktree_path.as_str(),
+            ],
         )?;
 
         Ok(())

@@ -97,25 +97,22 @@ mod io_security {
         // Write through the normalized path
         let result = io::write_text(&normalized, "escaped content");
 
-        // The write may succeed (to a safe location) or fail, but it must NOT
-        // create the file at the traversal target (jail_path/escape.txt) via
-        // raw path concatenation. Check the normalized path resolves safely.
-        if result.is_ok() {
-            // The NormalizedPath should have resolved the ".." so the file
-            // lands at a safe location. Verify by reading through the same path.
-            let content = io::read_text(&normalized).unwrap();
-            assert_eq!(content, "escaped content");
-        }
+        // The write should succeed to the normalized (safe) location.
+        assert!(
+            result.is_ok(),
+            "Write through normalized traversal path should succeed: {:?}",
+            result.err()
+        );
 
-        // Key assertion: verify the write went through the normalized path,
-        // not the raw concatenated path. The NormalizedPath::new() call resolves
-        // ".." so the actual write target is deterministic and safe.
+        // Verify the file was written at the normalized location
+        let content = io::read_text(&normalized).unwrap();
+        assert_eq!(content, "escaped content");
+
+        // Verify the write went through the normalized path
         let native = normalized.to_native();
-        if native.exists() {
-            // File was created at the normalized location - verify content
-            let content = std::fs::read_to_string(&native).unwrap();
-            assert_eq!(content, "escaped content");
-        }
+        assert!(native.exists(), "File should exist at the normalized path");
+        let content = std::fs::read_to_string(&native).unwrap();
+        assert_eq!(content, "escaped content");
     }
 
     #[test]

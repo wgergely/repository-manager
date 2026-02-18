@@ -49,11 +49,11 @@ pub use backend::{BranchInfo, ModeBackend, StandardBackend, WorktreeBackend};
 pub use backup::{BackupManager, BackupMetadata, ToolBackup};
 pub use config::{ConfigResolver, Manifest, ResolvedConfig, RuntimeContext, json_to_toml_value};
 pub use error::{Error, Result};
+pub use governance::{ConfigDrift, DriftType, LintWarning, WarnLevel};
 pub use hooks::{HookConfig, HookContext, HookEvent, run_hooks};
 pub use ledger::{Intent, Ledger, Projection, ProjectionKind};
 pub use mode::Mode;
 pub use projection::{ProjectionWriter, compute_checksum};
-pub use governance::{ConfigDrift, DriftType, LintWarning, WarnLevel};
 pub use rules::{Rule, RuleRegistry};
 pub use sync::{
     CheckReport, CheckStatus, DriftItem, RuleFile, RuleSyncer, SyncEngine, SyncOptions, SyncReport,

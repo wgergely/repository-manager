@@ -111,10 +111,13 @@ fn test_get_path_empty_string_key() {
     let source = r#"{"": "empty key value", "normal": "data"}"#;
     let doc = Document::parse(source).unwrap();
 
-    // Empty path should return None or the root, not panic
+    // Empty path should not panic and should return a deterministic result.
+    // Current behavior: returns the entire document root (the whole JSON object).
     let result = doc.get_path("");
-    // The behavior depends on implementation - just ensure no panic
-    let _ = result;
+    assert!(
+        result.is_some(),
+        "Empty path should return Some (the document root), got None",
+    );
 
     assert_eq!(doc.get_path("normal"), Some(json!("data")));
 }
@@ -126,7 +129,10 @@ fn test_get_path_keys_with_special_chars_in_values() {
     let doc = Document::parse(source).unwrap();
 
     assert_eq!(doc.get_path("path"), Some(json!("C:\\Users\\test")));
-    assert_eq!(doc.get_path("url"), Some(json!("https://example.com?a=1&b=2")));
+    assert_eq!(
+        doc.get_path("url"),
+        Some(json!("https://example.com?a=1&b=2"))
+    );
 }
 
 #[test]
@@ -229,6 +235,9 @@ cc = "1.0"
     let doc = Document::parse_as(source, Format::Toml).unwrap();
 
     assert_eq!(doc.get_path("package.name"), Some(json!("test")));
-    assert_eq!(doc.get_path("dependencies.serde.version"), Some(json!("1.0")));
+    assert_eq!(
+        doc.get_path("dependencies.serde.version"),
+        Some(json!("1.0"))
+    );
     assert_eq!(doc.get_path("build-dependencies.cc"), Some(json!("1.0")));
 }

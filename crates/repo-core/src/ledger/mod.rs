@@ -51,7 +51,10 @@ impl Ledger {
         let file = File::open(path)?;
         file.lock_shared()?;
 
-        let content = fs::read_to_string(path)?;
+        // Read through the locked file handle to avoid TOCTOU race
+        let mut content = String::new();
+        use std::io::Read;
+        (&file).read_to_string(&mut content)?;
         let ledger: Ledger = toml::from_str(&content)?;
 
         // Lock released when file is dropped
@@ -163,7 +166,10 @@ mod tests {
         let path = dir.path().join("ledger.toml");
 
         let mut ledger = Ledger::new();
-        ledger.add_intent(Intent::new("rule:test".to_string(), json!({"key": "value"})));
+        ledger.add_intent(Intent::new(
+            "rule:test".to_string(),
+            json!({"key": "value"}),
+        ));
 
         // Save ledger
         ledger.save(&path).unwrap();

@@ -163,7 +163,10 @@ fn test_generic_integration_json_with_schema_keys() {
     );
 
     // Verify pythonPath is a string with the correct value
-    assert!(json["pythonPath"].is_string(), "pythonPath must be a string");
+    assert!(
+        json["pythonPath"].is_string(),
+        "pythonPath must be a string"
+    );
     assert_eq!(json["pythonPath"], "/usr/bin/python3");
 }
 
@@ -220,9 +223,15 @@ fn test_generic_integration_preserves_existing_json() {
 
     // Existing values preserved with correct types
     assert_eq!(json["editor.fontSize"], 14);
-    assert!(json["editor.fontSize"].is_number(), "Preserved number must remain a number");
+    assert!(
+        json["editor.fontSize"].is_number(),
+        "Preserved number must remain a number"
+    );
     assert_eq!(json["existingKey"], "existingValue");
-    assert!(json["existingKey"].is_string(), "Preserved string must remain a string");
+    assert!(
+        json["existingKey"].is_string(),
+        "Preserved string must remain a string"
+    );
 
     // New value added with correct type and content
     assert!(
@@ -341,10 +350,16 @@ fn test_sync_all_with_schema_tools() {
 
     // Verify files contain rule content (not just existence)
     let cursor_content = fs::read_to_string(temp.path().join(".cursorrules")).unwrap();
-    assert!(cursor_content.contains("Test rule content"), "Cursor must contain rule content");
+    assert!(
+        cursor_content.contains("Test rule content"),
+        "Cursor must contain rule content"
+    );
 
     let windsurf_content = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
-    assert!(windsurf_content.contains("Test rule content"), "Windsurf must contain rule content");
+    assert!(
+        windsurf_content.contains("Test rule content"),
+        "Windsurf must contain rule content"
+    );
 }
 
 #[test]

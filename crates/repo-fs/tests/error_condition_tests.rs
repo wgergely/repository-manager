@@ -22,7 +22,10 @@ fn write_text_to_nonexistent_parent_creates_directories() {
     let path = NormalizedPath::new(dir.path().join("a").join("b").join("c").join("file.txt"));
 
     let result = io::write_text(&path, "deep content");
-    assert!(result.is_ok(), "write_text should create parent directories");
+    assert!(
+        result.is_ok(),
+        "write_text should create parent directories"
+    );
 
     let content = io::read_text(&path).unwrap();
     assert_eq!(content, "deep content");
@@ -41,11 +44,7 @@ fn write_atomic_cleans_up_temp_file_on_success() {
     let entries: Vec<_> = std::fs::read_dir(dir.path())
         .unwrap()
         .filter_map(|e| e.ok())
-        .filter(|e| {
-            e.file_name()
-                .to_string_lossy()
-                .ends_with(".tmp")
-        })
+        .filter(|e| e.file_name().to_string_lossy().ends_with(".tmp"))
         .collect();
 
     assert!(
@@ -118,7 +117,10 @@ mod unix_tests {
         // Restore permissions
         let _ = fs::set_permissions(&parent, Permissions::from_mode(0o755));
 
-        assert!(result.is_err(), "Writing when parent is read-only should fail");
+        assert!(
+            result.is_err(),
+            "Writing when parent is read-only should fail"
+        );
 
         // Verify original content is untouched (atomicity guarantee)
         let content = fs::read_to_string(&file_path).unwrap();

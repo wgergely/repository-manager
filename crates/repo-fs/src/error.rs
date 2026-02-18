@@ -22,6 +22,13 @@ pub enum Error {
         message: String,
     },
 
+    #[error("Failed to serialize {format} config for {path}: {message}")]
+    ConfigSerialize {
+        path: PathBuf,
+        format: String,
+        message: String,
+    },
+
     #[error("Unsupported config format: {extension}")]
     UnsupportedFormat { extension: String },
 
@@ -36,9 +43,6 @@ pub enum Error {
         declared: super::LayoutMode,
         detected: super::LayoutMode,
     },
-
-    #[error("Network path detected: {path}. Performance may be degraded.")]
-    NetworkPathWarning { path: PathBuf },
 
     #[error("Lock acquisition failed for {path}")]
     LockFailed { path: PathBuf },

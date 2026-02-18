@@ -232,9 +232,17 @@ fn test_standard_backend_accepts_git_dir_without_head() {
     let result = StandardBackend::new(root);
 
     // Production only checks .git exists, does not validate HEAD
-    assert!(result.is_ok(), "StandardBackend accepts .git dir without HEAD");
+    assert!(
+        result.is_ok(),
+        "StandardBackend accepts .git dir without HEAD"
+    );
     let backend = result.unwrap();
-    assert_eq!(backend.config_root().as_str(), NormalizedPath::new(temp.path()).join(".repository").as_str());
+    assert_eq!(
+        backend.config_root().as_str(),
+        NormalizedPath::new(temp.path())
+            .join(".repository")
+            .as_str()
+    );
 }
 
 #[test]

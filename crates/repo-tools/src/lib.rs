@@ -72,4 +72,4 @@ pub use writer::{
 };
 
 // Syncer
-pub use syncer::ToolSyncer;
+pub use syncer::ToolCapabilitySyncer;

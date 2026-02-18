@@ -121,12 +121,21 @@ impl CommentStyle {
     }
 }
 
-/// Trait for format-specific handlers
+/// Trait for format-specific handlers.
+///
+/// Each format (TOML, JSON, YAML, etc.) implements this trait to provide
+/// parsing, block management, normalization, and rendering.
 pub trait FormatHandler: Send + Sync {
     /// Format identifier
     fn format(&self) -> Format;
 
-    /// Parse source into internal representation
+    /// Parse source into a format-specific internal representation.
+    ///
+    /// Returns `Box<dyn Any>` because each format uses a different parsed type
+    /// (e.g., `toml_edit::DocumentMut` for TOML, `serde_yaml::Value` for YAML).
+    /// Using `Any` allows the trait to be object-safe while supporting heterogeneous
+    /// parsed representations. Callers should use `render()` to convert back to a
+    /// string; only `render()` needs to downcast the `Any` to the concrete type.
     fn parse(&self, source: &str) -> Result<Box<dyn std::any::Any + Send + Sync>>;
 
     /// Find managed blocks in the document

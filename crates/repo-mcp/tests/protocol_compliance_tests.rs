@@ -5,7 +5,7 @@
 //! required field validation, and end-to-end tool execution.
 
 use repo_mcp::RepoMcpServer;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -38,7 +38,8 @@ async fn test_numeric_id_preserved_in_response() {
     let server = setup_server(&temp).await;
 
     let request = r#"{"jsonrpc":"2.0","id":42,"method":"initialize","params":{}}"#;
-    let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     assert_eq!(response["id"], 42, "Numeric ID must be echoed back exactly");
     assert_eq!(response["jsonrpc"], "2.0");
@@ -50,7 +51,8 @@ async fn test_string_id_preserved_in_response() {
     let server = setup_server(&temp).await;
 
     let request = r#"{"jsonrpc":"2.0","id":"req-abc-123","method":"initialize","params":{}}"#;
-    let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     assert_eq!(
         response["id"], "req-abc-123",
@@ -64,13 +66,17 @@ async fn test_id_preserved_in_error_response() {
     let server = setup_server(&temp).await;
 
     let request = r#"{"jsonrpc":"2.0","id":"err-test","method":"nonexistent/method","params":{}}"#;
-    let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     assert_eq!(
         response["id"], "err-test",
         "ID must be preserved even in error responses"
     );
-    assert!(response.get("error").is_some(), "Should be an error response");
+    assert!(
+        response.get("error").is_some(),
+        "Should be an error response"
+    );
 }
 
 #[tokio::test]
@@ -80,7 +86,8 @@ async fn test_large_numeric_id_preserved() {
 
     // Use a large numeric ID to test no truncation
     let request = r#"{"jsonrpc":"2.0","id":999999999,"method":"tools/list","params":{}}"#;
-    let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     assert_eq!(response["id"], 999999999);
 }
@@ -95,7 +102,8 @@ async fn test_method_not_found_returns_32601() {
     let server = setup_server(&temp).await;
 
     let request = r#"{"jsonrpc":"2.0","id":1,"method":"completely/unknown","params":{}}"#;
-    let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     assert_eq!(
         response["error"]["code"], -32601,
@@ -128,7 +136,9 @@ async fn test_missing_method_field_is_parse_error() {
     let server = setup_server(&temp).await;
 
     // Valid JSON but missing required "method" field
-    let result = server.handle_message(r#"{"jsonrpc":"2.0","id":1,"params":{}}"#).await;
+    let result = server
+        .handle_message(r#"{"jsonrpc":"2.0","id":1,"params":{}}"#)
+        .await;
     assert!(
         result.is_err(),
         "Missing 'method' field should fail deserialization"
@@ -157,7 +167,8 @@ async fn test_invalid_params_for_resources_read_returns_error() {
     let server = setup_server(&temp).await;
 
     // resources/read requires params with "uri" field
-    let request = r#"{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"wrong_field":"value"}}"#;
+    let request =
+        r#"{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"wrong_field":"value"}}"#;
     let result = server.handle_message(request).await;
 
     assert!(
@@ -171,9 +182,9 @@ async fn test_unknown_resource_uri_returns_32602() {
     let temp = TempDir::new().unwrap();
     let server = setup_server(&temp).await;
 
-    let request =
-        r#"{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"repo://nonexistent"}}"#;
-    let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
+    let request = r#"{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"repo://nonexistent"}}"#;
+    let response: Value =
+        serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     assert_eq!(
         response["error"]["code"], -32602,
@@ -193,9 +204,9 @@ async fn test_malformed_uri_scheme_returns_error() {
     let server = setup_server(&temp).await;
 
     // URI with wrong scheme
-    let request =
-        r#"{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"http://example.com/config"}}"#;
-    let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
+    let request = r#"{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"http://example.com/config"}}"#;
+    let response: Value =
+        serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     assert!(
         response.get("error").is_some(),
@@ -217,7 +228,8 @@ async fn test_initialize_returns_protocol_version() {
     let server = setup_server(&temp).await;
 
     let request = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}"#;
-    let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     let protocol_version = response["result"]["protocolVersion"].as_str().unwrap();
     assert_eq!(
@@ -232,7 +244,8 @@ async fn test_initialize_returns_server_info() {
     let server = setup_server(&temp).await;
 
     let request = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#;
-    let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     let server_info = &response["result"]["serverInfo"];
     assert_eq!(
@@ -259,7 +272,8 @@ async fn test_initialize_returns_capabilities() {
     let server = setup_server(&temp).await;
 
     let request = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#;
-    let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     let capabilities = &response["result"]["capabilities"];
 
@@ -318,7 +332,8 @@ async fn test_success_response_has_result_not_error() {
     let server = setup_server(&temp).await;
 
     let request = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#;
-    let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     assert!(
         response.get("result").is_some(),
@@ -337,7 +352,8 @@ async fn test_error_response_has_error_not_result() {
     let server = setup_server(&temp).await;
 
     let request = r#"{"jsonrpc":"2.0","id":1,"method":"no/such/method","params":{}}"#;
-    let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     assert!(
         response.get("error").is_some(),
@@ -367,7 +383,8 @@ async fn test_tools_list_returns_all_defined_tools() {
     let server = setup_server(&temp).await;
 
     let request = r#"{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}"#;
-    let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     let tools = response["result"]["tools"].as_array().unwrap();
     assert!(
@@ -410,7 +427,8 @@ async fn test_resources_list_returns_all_defined_resources() {
     let server = setup_server(&temp).await;
 
     let request = r#"{"jsonrpc":"2.0","id":1,"method":"resources/list","params":{}}"#;
-    let response: Value = serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(request).await.unwrap()).unwrap();
 
     let resources = response["result"]["resources"].as_array().unwrap();
     assert_eq!(resources.len(), 3, "Should list all 3 defined resources");
@@ -431,7 +449,10 @@ async fn test_resources_list_returns_all_defined_resources() {
         );
     }
 
-    let uris: Vec<&str> = resources.iter().map(|r| r["uri"].as_str().unwrap()).collect();
+    let uris: Vec<&str> = resources
+        .iter()
+        .map(|r| r["uri"].as_str().unwrap())
+        .collect();
     assert!(uris.contains(&"repo://config"));
     assert!(uris.contains(&"repo://state"));
     assert!(uris.contains(&"repo://rules"));
@@ -463,7 +484,8 @@ async fn test_tool_call_repo_init_creates_repo() {
     }))
     .unwrap();
 
-    let response: Value = serde_json::from_str(&server.handle_message(&request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(&request).await.unwrap()).unwrap();
 
     // Should be a success response (not a JSON-RPC error)
     assert!(
@@ -517,7 +539,8 @@ async fn test_tool_call_unknown_tool_returns_is_error() {
     }))
     .unwrap();
 
-    let response: Value = serde_json::from_str(&server.handle_message(&request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(&request).await.unwrap()).unwrap();
 
     // Per MCP spec, tool errors are returned as successful JSON-RPC responses with is_error=true
     let result = &response["result"];
@@ -556,7 +579,9 @@ async fn test_tool_call_rule_add_then_read_rules_resource() {
 
     let add_response: Value =
         serde_json::from_str(&server.handle_message(&add_request).await.unwrap()).unwrap();
-    let add_text = add_response["result"]["content"][0]["text"].as_str().unwrap();
+    let add_text = add_response["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap();
     let add_inner: Value = serde_json::from_str(add_text).unwrap();
     assert_eq!(add_inner["success"], true, "rule_add should succeed");
 
@@ -607,7 +632,8 @@ async fn test_tool_call_not_implemented_returns_is_error() {
     }))
     .unwrap();
 
-    let response: Value = serde_json::from_str(&server.handle_message(&request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(&request).await.unwrap()).unwrap();
 
     // Not-implemented tools return as tool errors, not JSON-RPC errors
     let result = &response["result"];
@@ -631,7 +657,8 @@ async fn test_resource_read_config_returns_valid_content() {
     }))
     .unwrap();
 
-    let response: Value = serde_json::from_str(&server.handle_message(&request).await.unwrap()).unwrap();
+    let response: Value =
+        serde_json::from_str(&server.handle_message(&request).await.unwrap()).unwrap();
 
     let contents = response["result"]["contents"].as_array().unwrap();
     assert_eq!(contents.len(), 1, "Should return exactly one content entry");
@@ -661,9 +688,18 @@ async fn test_sequential_requests_use_correct_ids() {
 
     // Send multiple requests and verify each gets its own ID back
     let requests = vec![
-        (r#"{"jsonrpc":"2.0","id":100,"method":"initialize","params":{}}"#, 100),
-        (r#"{"jsonrpc":"2.0","id":200,"method":"tools/list","params":{}}"#, 200),
-        (r#"{"jsonrpc":"2.0","id":300,"method":"resources/list","params":{}}"#, 300),
+        (
+            r#"{"jsonrpc":"2.0","id":100,"method":"initialize","params":{}}"#,
+            100,
+        ),
+        (
+            r#"{"jsonrpc":"2.0","id":200,"method":"tools/list","params":{}}"#,
+            200,
+        ),
+        (
+            r#"{"jsonrpc":"2.0","id":300,"method":"resources/list","params":{}}"#,
+            300,
+        ),
     ];
 
     for (request, expected_id) in requests {

@@ -11,16 +11,4 @@ pub enum Error {
 
     #[error("Block not found: {uuid} in {path}")]
     BlockNotFound { uuid: String, path: PathBuf },
-
-    #[error("Malformed block markers in {path}: {message}")]
-    MalformedMarkers { path: PathBuf, message: String },
-
-    #[error("Unclosed block: {uuid} in {path}")]
-    UnclosedBlock { uuid: String, path: PathBuf },
-
-    #[error("Invalid UUID format: {value}")]
-    InvalidUuid { value: String },
-
-    #[error("Regex compilation failed: {0}")]
-    Regex(#[from] regex::Error),
 }

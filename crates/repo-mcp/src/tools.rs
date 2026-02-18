@@ -338,7 +338,8 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
         // Agent Orchestration
         ToolDefinition {
             name: "agent_check".to_string(),
-            description: "Check agent subsystem prerequisites (Python 3.13+, vaultspec)".to_string(),
+            description: "Check agent subsystem prerequisites (Python 3.13+, vaultspec)"
+                .to_string(),
             input_schema: serde_json::json!({
                 "type": "object",
                 "properties": {}

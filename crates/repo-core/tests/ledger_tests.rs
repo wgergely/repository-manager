@@ -368,11 +368,17 @@ fn test_ledger_projections_for_file_returns_correct_pairs() {
     assert_eq!(projections.len(), 2);
 
     // Verify the actual intent-projection pairs, not just count
-    let intent_ids: Vec<&str> = projections.iter().map(|(intent, _)| intent.id.as_str()).collect();
+    let intent_ids: Vec<&str> = projections
+        .iter()
+        .map(|(intent, _)| intent.id.as_str())
+        .collect();
     assert!(intent_ids.contains(&"rule:python/style"));
     assert!(intent_ids.contains(&"rule:rust/naming"));
 
-    let tools: Vec<&str> = projections.iter().map(|(_, proj)| proj.tool.as_str()).collect();
+    let tools: Vec<&str> = projections
+        .iter()
+        .map(|(_, proj)| proj.tool.as_str())
+        .collect();
     assert!(tools.iter().all(|t| *t == "cursor"));
 }
 

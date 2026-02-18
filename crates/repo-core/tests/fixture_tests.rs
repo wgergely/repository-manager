@@ -26,10 +26,14 @@ fn fixtures_dir() -> PathBuf {
 
 /// Read the coding-standards rule from the config-test fixture.
 fn load_coding_standards_rule() -> Rule {
-    let rule_path = fixtures_dir()
-        .join("repos/config-test/.repository/rules/coding-standards.md");
-    let content = fs::read_to_string(&rule_path)
-        .unwrap_or_else(|e| panic!("Failed to read fixture rule at {}: {}", rule_path.display(), e));
+    let rule_path = fixtures_dir().join("repos/config-test/.repository/rules/coding-standards.md");
+    let content = fs::read_to_string(&rule_path).unwrap_or_else(|e| {
+        panic!(
+            "Failed to read fixture rule at {}: {}",
+            rule_path.display(),
+            e
+        )
+    });
     Rule {
         id: "coding-standards".to_string(),
         content,
@@ -38,9 +42,17 @@ fn load_coding_standards_rule() -> Rule {
 
 /// Read the expected output for a tool from test-fixtures/expected/.
 fn load_expected_output(tool_dir: &str, filename: &str) -> String {
-    let path = fixtures_dir().join("expected").join(tool_dir).join(filename);
-    fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("Failed to read expected output at {}: {}", path.display(), e))
+    let path = fixtures_dir()
+        .join("expected")
+        .join(tool_dir)
+        .join(filename);
+    fs::read_to_string(&path).unwrap_or_else(|e| {
+        panic!(
+            "Failed to read expected output at {}: {}",
+            path.display(),
+            e
+        )
+    })
 }
 
 // ==========================================================================
@@ -189,7 +201,10 @@ fn test_config_test_fixture_syncs_all_declared_tools() {
     // Verify that synced tools created files
     // cursor -> .cursorrules
     let cursorrules = temp.path().join(".cursorrules");
-    assert!(cursorrules.exists(), ".cursorrules should exist after cursor sync");
+    assert!(
+        cursorrules.exists(),
+        ".cursorrules should exist after cursor sync"
+    );
     let cursor_content = fs::read_to_string(&cursorrules).unwrap();
     assert!(
         cursor_content.contains("coding-standards"),
@@ -198,7 +213,10 @@ fn test_config_test_fixture_syncs_all_declared_tools() {
 
     // claude -> CLAUDE.md
     let claude_md = temp.path().join("CLAUDE.md");
-    assert!(claude_md.exists(), "CLAUDE.md should exist after claude sync");
+    assert!(
+        claude_md.exists(),
+        "CLAUDE.md should exist after claude sync"
+    );
     let claude_content = fs::read_to_string(&claude_md).unwrap();
     assert!(
         claude_content.contains("coding-standards"),
@@ -301,10 +319,7 @@ fn test_expected_outputs_contain_managed_block_markers() {
 fn test_expected_outputs_have_matching_open_close_markers() {
     let expected_dir = fixtures_dir().join("expected");
 
-    let files = vec![
-        "claude/CLAUDE.md",
-        "cursor/.cursorrules",
-    ];
+    let files = vec!["claude/CLAUDE.md", "cursor/.cursorrules"];
 
     for rel_path in files {
         let path = expected_dir.join(rel_path);

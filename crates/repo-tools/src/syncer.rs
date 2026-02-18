@@ -14,11 +14,11 @@ use repo_meta::schema::{RuleDefinition, ToolDefinition};
 /// 1. Checks tool capabilities via CapabilityTranslator
 /// 2. Translates rules into tool-specific format
 /// 3. Writes using the appropriate ConfigWriter
-pub struct ToolSyncer {
+pub struct ToolCapabilitySyncer {
     writers: WriterRegistry,
 }
 
-impl ToolSyncer {
+impl ToolCapabilitySyncer {
     /// Create a new syncer.
     pub fn new() -> Self {
         Self {
@@ -85,7 +85,7 @@ impl ToolSyncer {
     }
 }
 
-impl Default for ToolSyncer {
+impl Default for ToolCapabilitySyncer {
     fn default() -> Self {
         Self::new()
     }
@@ -141,7 +141,7 @@ mod tests {
     fn test_sync_capable_tool() {
         let temp = TempDir::new().unwrap();
         let root = NormalizedPath::new(temp.path());
-        let syncer = ToolSyncer::new();
+        let syncer = ToolCapabilitySyncer::new();
 
         let tool = make_tool("test", true);
         let rules = vec![make_rule("r1")];
@@ -158,7 +158,7 @@ mod tests {
     fn test_sync_incapable_tool() {
         let temp = TempDir::new().unwrap();
         let root = NormalizedPath::new(temp.path());
-        let syncer = ToolSyncer::new();
+        let syncer = ToolCapabilitySyncer::new();
 
         let tool = make_tool("test", false);
         let rules = vec![make_rule("r1")];
@@ -172,7 +172,7 @@ mod tests {
     fn test_sync_no_rules() {
         let temp = TempDir::new().unwrap();
         let root = NormalizedPath::new(temp.path());
-        let syncer = ToolSyncer::new();
+        let syncer = ToolCapabilitySyncer::new();
 
         let tool = make_tool("test", true);
         let rules: Vec<RuleDefinition> = vec![];
@@ -185,7 +185,7 @@ mod tests {
     fn test_sync_all() {
         let temp = TempDir::new().unwrap();
         let root = NormalizedPath::new(temp.path());
-        let syncer = ToolSyncer::new();
+        let syncer = ToolCapabilitySyncer::new();
 
         let tools = vec![
             make_tool("a", true),

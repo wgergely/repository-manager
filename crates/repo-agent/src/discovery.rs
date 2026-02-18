@@ -78,10 +78,7 @@ impl AgentManager {
             true
         } else {
             let expected = self.root.join(VAULTSPEC_DIR);
-            messages.push(format!(
-                "Vaultspec not found at {}",
-                expected.display()
-            ));
+            messages.push(format!("Vaultspec not found at {}", expected.display()));
             false
         };
 
@@ -100,7 +97,10 @@ impl AgentManager {
             available: python_ok && vaultspec_ok,
             python_path: self.python_path.as_ref().map(|p| p.display().to_string()),
             python_version: self.python_version.clone(),
-            vaultspec_path: self.vaultspec_path.as_ref().map(|p| p.display().to_string()),
+            vaultspec_path: self
+                .vaultspec_path
+                .as_ref()
+                .map(|p| p.display().to_string()),
             agent_count,
             messages,
         })
@@ -163,10 +163,7 @@ fn find_python() -> (Option<PathBuf>, Option<String>) {
 /// Runs `<candidate> --version` and parses the output to check
 /// if it meets the minimum version requirement.
 fn try_python(candidate: &str) -> Option<(PathBuf, String)> {
-    let output = Command::new(candidate)
-        .arg("--version")
-        .output()
-        .ok()?;
+    let output = Command::new(candidate).arg("--version").output().ok()?;
 
     if !output.status.success() {
         return None;

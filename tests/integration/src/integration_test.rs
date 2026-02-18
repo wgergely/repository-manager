@@ -2,8 +2,8 @@
 //!
 //! This test exercises the complete flow: config loading -> preset check -> tool sync.
 
-use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
 use repo_core::Manifest;
+use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
 use repo_meta::Registry;
 use repo_presets::{Context, PresetProvider, PresetStatus, UvProvider};
 use repo_tools::{

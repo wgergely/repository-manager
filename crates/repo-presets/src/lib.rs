@@ -6,10 +6,10 @@
 pub mod context;
 pub mod error;
 pub mod node;
+pub mod plugins;
 pub mod provider;
 pub mod python;
 pub mod rust;
-pub mod plugins;
 
 pub use context::Context;
 pub use error::{Error, Result};

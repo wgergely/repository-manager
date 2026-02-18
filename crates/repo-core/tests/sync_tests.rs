@@ -493,9 +493,10 @@ mode = "standard"
 
     // Verify that the tools were processed by checking action strings directly.
     // At least one action should reference a configured tool name.
-    let mentions_tool = report.actions.iter().any(|action| {
-        action.contains("claude") || action.contains("cursor")
-    });
+    let mentions_tool = report
+        .actions
+        .iter()
+        .any(|action| action.contains("claude") || action.contains("cursor"));
     assert!(
         mentions_tool,
         "At least one action should reference a configured tool. Actions: {:?}",

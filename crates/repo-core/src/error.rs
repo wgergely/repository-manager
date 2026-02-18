@@ -32,6 +32,14 @@ pub enum Error {
     #[error("Sync error: {message}")]
     SyncError { message: String },
 
+    /// Hook execution failure
+    #[error("Hook '{command}' failed for event '{event}': {message}")]
+    HookFailed {
+        event: String,
+        command: String,
+        message: String,
+    },
+
     /// Resource not found
     #[error("Not found: {0}")]
     NotFound(String),

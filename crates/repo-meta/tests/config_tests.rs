@@ -6,7 +6,7 @@
 #![allow(deprecated)]
 
 use repo_fs::NormalizedPath;
-use repo_meta::config::{RepositoryMode, get_preset_config, load_config};
+use repo_meta::config::{RepositoryMode, SyncStrategy, get_preset_config, load_config};
 use std::fs;
 use tempfile::TempDir;
 
@@ -80,7 +80,7 @@ version = "20"
     assert_eq!(config.active.presets, vec!["env:python", "env:node"]);
 
     // Check sync section
-    assert_eq!(config.sync.strategy, "on-commit");
+    assert_eq!(config.sync.strategy, SyncStrategy::OnCommit);
 
     // Check preset configs
     let python_config = get_preset_config(&config, "env:python").unwrap();
@@ -144,7 +144,7 @@ fn test_load_config_with_all_defaults() {
     assert_eq!(config.core.mode, RepositoryMode::Standard);
     assert!(config.active.tools.is_empty());
     assert!(config.active.presets.is_empty());
-    assert_eq!(config.sync.strategy, "auto");
+    assert_eq!(config.sync.strategy, SyncStrategy::Auto);
 }
 
 #[test]

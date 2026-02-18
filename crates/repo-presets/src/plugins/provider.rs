@@ -36,7 +36,11 @@ impl PluginsProvider {
 
         // Disable in Claude settings first
         if let Some(settings_path) = super::paths::claude_settings_path() {
-            let plugin_key = format!("{}@{}", super::paths::PLUGIN_NAME, super::paths::MARKETPLACE_NAME);
+            let plugin_key = format!(
+                "{}@{}",
+                super::paths::PLUGIN_NAME,
+                super::paths::MARKETPLACE_NAME
+            );
 
             if super::settings::is_enabled(&settings_path, &plugin_key) {
                 super::settings::disable_plugin(&settings_path, &plugin_key)?;
@@ -45,10 +49,14 @@ impl PluginsProvider {
         }
 
         // Remove install directory
-        if let Some(install_dir) = super::paths::plugin_install_dir(&self.version).filter(|d| d.exists()) {
+        if let Some(install_dir) =
+            super::paths::plugin_install_dir(&self.version).filter(|d| d.exists())
+        {
             std::fs::remove_dir_all(&install_dir).map_err(|e| {
                 crate::error::Error::ClaudeSettings(format!(
-                    "Failed to remove {}: {}", install_dir.display(), e
+                    "Failed to remove {}: {}",
+                    install_dir.display(),
+                    e
                 ))
             })?;
             actions.push(format!("Removed {}", install_dir.display()));

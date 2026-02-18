@@ -1,17 +1,15 @@
+use git2::Repository;
 use repo_fs::NormalizedPath;
 use repo_git::classic::ClassicLayout;
 use repo_git::provider::LayoutProvider;
-use std::fs;
 use tempfile::TempDir;
 
 fn setup_classic_repo() -> (TempDir, ClassicLayout) {
     let temp = TempDir::new().unwrap();
     let root = temp.path();
 
-    // Initialize a basic git repo structure
-    fs::create_dir(root.join(".git")).unwrap();
-    fs::write(root.join(".git/HEAD"), "ref: refs/heads/main").unwrap();
-    fs::create_dir_all(root.join(".git/refs/heads")).unwrap();
+    // Initialize a real git repo using git2
+    Repository::init(root).unwrap();
 
     let layout = ClassicLayout::new(NormalizedPath::new(root)).unwrap();
     (temp, layout)

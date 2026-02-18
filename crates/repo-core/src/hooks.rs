@@ -159,11 +159,10 @@ pub fn run_hooks(
         results.push(result);
 
         if failed {
-            return Err(Error::SyncError {
-                message: format!(
-                    "Hook '{}' for event '{}' failed",
-                    hook.command, event
-                ),
+            return Err(Error::HookFailed {
+                event: event.to_string(),
+                command: hook.command.clone(),
+                message: "Hook exited with non-zero status".to_string(),
             });
         }
     }
@@ -287,10 +286,7 @@ mod tests {
             substitute_vars("branch: ${NAME} at ${PATH}", &vars),
             "branch: feature-x at /repo"
         );
-        assert_eq!(
-            substitute_vars("no vars here", &vars),
-            "no vars here"
-        );
+        assert_eq!(substitute_vars("no vars here", &vars), "no vars here");
     }
 
     #[test]
@@ -327,8 +323,7 @@ mod tests {
 
         let ctx = HookContext::default();
         let temp = tempfile::TempDir::new().unwrap();
-        let results =
-            run_hooks(&hooks, HookEvent::PostBranchCreate, &ctx, temp.path()).unwrap();
+        let results = run_hooks(&hooks, HookEvent::PostBranchCreate, &ctx, temp.path()).unwrap();
         assert_eq!(results.len(), 1);
         assert!(results[0].success);
         assert!(results[0].stdout.trim().contains("hello"));

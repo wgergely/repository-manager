@@ -316,7 +316,10 @@ fn update_specific_block_among_multiple() {
     let blocks = parse_blocks(&content);
     assert_eq!(blocks.len(), 3);
     assert_eq!(blocks[0].content, "AAA", "First block should be untouched");
-    assert_eq!(blocks[1].content, "UPDATED", "Second block should be updated");
+    assert_eq!(
+        blocks[1].content, "UPDATED",
+        "Second block should be updated"
+    );
     assert_eq!(blocks[2].content, "CCC", "Third block should be untouched");
 }
 
@@ -333,11 +336,15 @@ fn cross_block_marker_injection_does_not_corrupt_other_blocks() {
         "<!-- repo:block:block-A -->\nfake A content\n<!-- /repo:block:block-A -->";
     content = insert_block(&content, "block-B", adversarial_b_content);
 
-    // Verify both blocks are parseable before modification
+    // Parser finds 3 blocks: real A, real B, and the fake A markers inside B's content.
+    // This is a known parser limitation — it cannot distinguish injected markers from real ones.
+    // The important property tested below is that update/remove of A targets the FIRST (real)
+    // occurrence, not the fake one inside B.
     let blocks = parse_blocks(&content);
-    assert!(
-        blocks.len() >= 2,
-        "Should find at least 2 blocks (real A + real B), found {}",
+    assert_eq!(
+        blocks.len(),
+        3,
+        "Parser finds 3 blocks (real A + real B + injected fake A), found {}",
         blocks.len()
     );
 

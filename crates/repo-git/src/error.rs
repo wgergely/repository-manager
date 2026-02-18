@@ -30,9 +30,6 @@ pub enum Error {
         hint: String,
     },
 
-    #[error("Invalid branch name: {name}")]
-    InvalidBranchName { name: String },
-
     #[error("Remote '{name}' not found")]
     RemoteNotFound { name: String },
 

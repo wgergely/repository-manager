@@ -33,10 +33,7 @@ pub fn run_hooks_list(path: &Path) -> Result<()> {
             "hint:".cyan().bold(),
             "repo hooks add <event> <command> [args...]".cyan()
         );
-        println!(
-            "  Events: {}",
-            HookEvent::all_names().join(", ").dimmed()
-        );
+        println!("  Events: {}", HookEvent::all_names().join(", ").dimmed());
         return Ok(());
     }
 
@@ -233,13 +230,7 @@ mod tests {
         setup_repo(temp.path());
 
         // Add a hook
-        run_hooks_add(
-            temp.path(),
-            "pre-sync",
-            "cargo",
-            vec!["check".to_string()],
-        )
-        .unwrap();
+        run_hooks_add(temp.path(), "pre-sync", "cargo", vec!["check".to_string()]).unwrap();
 
         // Remove it
         let result = run_hooks_remove(temp.path(), "pre-sync");
@@ -273,13 +264,7 @@ mod tests {
             vec!["install".to_string()],
         )
         .unwrap();
-        run_hooks_add(
-            temp.path(),
-            "pre-sync",
-            "cargo",
-            vec!["check".to_string()],
-        )
-        .unwrap();
+        run_hooks_add(temp.path(), "pre-sync", "cargo", vec!["check".to_string()]).unwrap();
 
         // Read and verify
         let content = fs::read_to_string(temp.path().join(".repository/config.toml")).unwrap();

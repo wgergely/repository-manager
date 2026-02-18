@@ -50,7 +50,10 @@ fn test_claude_creates_claude_md_with_correct_content() {
     let content_pos = content.find("This is a test project.").unwrap();
     let close_pos = content.find("<!-- /repo:block:project-info -->").unwrap();
     assert!(open_pos < content_pos, "Open marker should precede content");
-    assert!(content_pos < close_pos, "Content should precede close marker");
+    assert!(
+        content_pos < close_pos,
+        "Content should precede close marker"
+    );
 }
 
 #[test]

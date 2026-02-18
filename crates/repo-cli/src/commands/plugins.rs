@@ -3,7 +3,7 @@
 use crate::cli::PluginsAction;
 use crate::error::{CliError, Result};
 use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
-use repo_presets::{Context, PresetProvider, PresetStatus, PluginsProvider};
+use repo_presets::{Context, PluginsProvider, PresetProvider, PresetStatus};
 use std::collections::HashMap;
 
 pub async fn handle_plugins(action: PluginsAction) -> Result<()> {

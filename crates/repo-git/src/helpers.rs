@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use git2::{BranchType, Repository, WorktreeAddOptions, WorktreePruneOptions};
+use git2::{BranchType, MergeOptions, Repository, WorktreeAddOptions, WorktreePruneOptions};
 
 use crate::{Error, Result};
 
@@ -93,15 +93,204 @@ pub fn remove_worktree_and_branch(repo: &Repository, name: &str) -> Result<()> {
 
 /// Get the current branch name from a repository.
 ///
-/// Returns the branch name if HEAD points to a branch, or "HEAD" if detached.
-pub fn get_current_branch(repo: &Repository) -> Result<String> {
+/// Returns the branch name if HEAD points to a branch, or `None` if HEAD is detached.
+pub fn get_current_branch(repo: &Repository) -> Result<Option<String>> {
     let head = repo.head()?;
 
     if head.is_branch() {
-        Ok(head.shorthand().unwrap_or("HEAD").to_string())
+        Ok(Some(head.shorthand().unwrap_or("HEAD").to_string()))
     } else {
-        Ok("HEAD".to_string())
+        Ok(None)
     }
+}
+
+/// Push a branch to a remote repository.
+///
+/// # Arguments
+/// * `repo` - The repository to push from
+/// * `remote` - Remote name (defaults to "origin" if None)
+/// * `branch` - Branch to push (defaults to current branch if None)
+/// * `current_branch_fn` - Function to get the current branch name
+pub fn push(
+    repo: &Repository,
+    remote: Option<&str>,
+    branch: Option<&str>,
+    current_branch_fn: impl FnOnce() -> Result<String>,
+) -> Result<()> {
+    let remote_name = remote.unwrap_or("origin");
+    let branch_name = match branch {
+        Some(b) => b.to_string(),
+        None => current_branch_fn()?,
+    };
+
+    let mut remote = repo
+        .find_remote(remote_name)
+        .map_err(|_| Error::RemoteNotFound {
+            name: remote_name.to_string(),
+        })?;
+
+    let refspec = format!("refs/heads/{}:refs/heads/{}", branch_name, branch_name);
+
+    remote
+        .push(&[&refspec], None)
+        .map_err(|e| Error::PushFailed {
+            message: e.message().to_string(),
+        })?;
+
+    Ok(())
+}
+
+/// Pull changes from a remote repository using fetch + fast-forward.
+///
+/// # Arguments
+/// * `repo` - The repository to pull into
+/// * `remote` - Remote name (defaults to "origin" if None)
+/// * `branch` - Branch to pull (defaults to current branch if None)
+/// * `current_branch_fn` - Function to get the current branch name
+/// * `checkout_repo` - Optional different repo for checking out HEAD (e.g., main worktree)
+pub fn pull(
+    repo: &Repository,
+    remote: Option<&str>,
+    branch: Option<&str>,
+    current_branch_fn: impl FnOnce() -> Result<String>,
+    checkout_repo: Option<&Repository>,
+) -> Result<()> {
+    let remote_name = remote.unwrap_or("origin");
+    let branch_name = match branch {
+        Some(b) => b.to_string(),
+        None => current_branch_fn()?,
+    };
+
+    let mut remote = repo
+        .find_remote(remote_name)
+        .map_err(|_| Error::RemoteNotFound {
+            name: remote_name.to_string(),
+        })?;
+
+    remote
+        .fetch(&[&branch_name], None, None)
+        .map_err(|e| Error::PullFailed {
+            message: format!("Fetch failed: {}", e.message()),
+        })?;
+
+    let fetch_head = repo
+        .find_reference("FETCH_HEAD")
+        .map_err(|e| Error::PullFailed {
+            message: format!("Could not find FETCH_HEAD: {}", e.message()),
+        })?;
+
+    let fetch_commit = fetch_head.peel_to_commit().map_err(|e| Error::PullFailed {
+        message: format!("Could not resolve FETCH_HEAD: {}", e.message()),
+    })?;
+
+    let head = repo.head()?;
+    let head_commit = head.peel_to_commit()?;
+
+    let (merge_analysis, _) =
+        repo.merge_analysis(&[&repo.find_annotated_commit(fetch_commit.id())?])?;
+
+    if merge_analysis.is_up_to_date() {
+        return Ok(());
+    }
+
+    if merge_analysis.is_fast_forward() {
+        let refname = format!("refs/heads/{}", branch_name);
+        let mut reference = repo.find_reference(&refname)?;
+        reference.set_target(
+            fetch_commit.id(),
+            &format!("pull: fast-forward to {}", fetch_commit.id()),
+        )?;
+
+        let co_repo = checkout_repo.unwrap_or(repo);
+        co_repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
+        return Ok(());
+    }
+
+    Err(Error::CannotFastForward {
+        message: format!(
+            "Cannot fast-forward {} from {} to {}. Manual merge required.",
+            branch_name,
+            head_commit.id(),
+            fetch_commit.id()
+        ),
+    })
+}
+
+/// Merge a source branch into the current branch.
+///
+/// # Arguments
+/// * `repo` - The repository (used for branch lookup and merge analysis)
+/// * `source` - The branch name to merge from
+/// * `current_branch_fn` - Function to get the current branch name
+/// * `merge_repo` - Optional different repo for performing the merge (e.g., main worktree)
+pub fn merge(
+    repo: &Repository,
+    source: &str,
+    current_branch_fn: impl FnOnce() -> Result<String>,
+    merge_repo: Option<&Repository>,
+) -> Result<()> {
+    let source_branch =
+        repo.find_branch(source, BranchType::Local)
+            .map_err(|_| Error::BranchNotFound {
+                name: source.to_string(),
+            })?;
+
+    let source_commit = source_branch.get().peel_to_commit()?;
+    let annotated_commit = repo.find_annotated_commit(source_commit.id())?;
+
+    let (merge_analysis, _) = repo.merge_analysis(&[&annotated_commit])?;
+
+    if merge_analysis.is_up_to_date() {
+        return Ok(());
+    }
+
+    if merge_analysis.is_fast_forward() {
+        let current_branch = current_branch_fn()?;
+        let refname = format!("refs/heads/{}", current_branch);
+        let mut reference = repo.find_reference(&refname)?;
+        reference.set_target(
+            source_commit.id(),
+            &format!("merge {}: fast-forward", source),
+        )?;
+
+        let co_repo = merge_repo.unwrap_or(repo);
+        co_repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
+        return Ok(());
+    }
+
+    // Normal merge
+    let mr = merge_repo.unwrap_or(repo);
+    let mut merge_opts = MergeOptions::new();
+    let annotated_for_merge = mr.find_annotated_commit(source_commit.id())?;
+    mr.merge(&[&annotated_for_merge], Some(&mut merge_opts), None)?;
+
+    let mut index = mr.index()?;
+    if index.has_conflicts() {
+        mr.cleanup_state()?;
+        return Err(Error::MergeConflict {
+            message: format!("Merge of '{}' resulted in conflicts", source),
+        });
+    }
+
+    let signature = mr.signature()?;
+    let tree_id = index.write_tree()?;
+    let tree = mr.find_tree(tree_id)?;
+    let head_commit = mr.head()?.peel_to_commit()?;
+    let source_commit_in_mr = mr.find_commit(source_commit.id())?;
+
+    let message = format!("Merge branch '{}'", source);
+    mr.commit(
+        Some("HEAD"),
+        &signature,
+        &signature,
+        &message,
+        &tree,
+        &[&head_commit, &source_commit_in_mr],
+    )?;
+
+    mr.cleanup_state()?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -123,6 +312,6 @@ mod tests {
 
         let branch = get_current_branch(&repo).unwrap();
         // Default branch is either "main" or "master" depending on git config
-        assert!(branch == "main" || branch == "master");
+        assert!(branch == Some("main".to_string()) || branch == Some("master".to_string()));
     }
 }

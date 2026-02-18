@@ -7,9 +7,13 @@ use std::collections::HashMap;
 
 /// Registry mapping preset IDs to provider names.
 ///
-/// The registry tracks which provider implements each preset,
+/// This is the **preset provider registry** (not to be confused with
+/// `ToolRegistry` or `PresetRegistry` in the `validation` module, which
+/// validate tool/preset definitions against schemas).
+///
+/// This registry tracks which runtime provider implements each preset,
 /// allowing the system to look up the correct provider when
-/// a preset needs to be applied.
+/// a preset needs to be applied (e.g., `"env:python"` -> `"uv"`).
 ///
 /// # Example
 ///

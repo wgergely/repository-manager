@@ -112,68 +112,19 @@ impl Manifest {
 
     /// Serialize this manifest to a clean TOML string
     ///
-    /// Produces a readable TOML representation with tools and rules before
-    /// the `[core]` section (required for correct parsing as top-level keys).
+    /// Uses serde serialization with proper escaping for all values.
     pub fn to_toml(&self) -> String {
-        let mut content = String::new();
-
-        // tools array - must be BEFORE [core] section to be top-level
-        if !self.tools.is_empty() {
-            content.push_str("tools = [");
-            let tools_str: Vec<String> = self.tools.iter().map(|t| format!("\"{}\"", t)).collect();
-            content.push_str(&tools_str.join(", "));
-            content.push_str("]\n");
-        }
-
-        // rules array - must be BEFORE [core] section to be top-level
-        if !self.rules.is_empty() {
-            content.push_str("rules = [");
-            let rules_str: Vec<String> = self.rules.iter().map(|r| format!("\"{}\"", r)).collect();
-            content.push_str(&rules_str.join(", "));
-            content.push_str("]\n");
-        }
-
-        // Add blank line before [core] if we had top-level keys
-        if !self.tools.is_empty() || !self.rules.is_empty() {
-            content.push('\n');
-        }
-
-        // [core] section
-        content.push_str("[core]\n");
-        content.push_str(&format!("mode = \"{}\"\n", self.core.mode));
-
-        // [presets] section
-        if !self.presets.is_empty() {
-            content.push('\n');
-            content.push_str("[presets]\n");
-            for (name, value) in &self.presets {
-                if value.is_object()
-                    && value.as_object().is_some_and(|o| o.is_empty())
-                {
-                    content.push_str(&format!("\"{}\" = {{}}\n", name));
-                } else {
-                    let toml_value = json_to_toml_value(value);
-                    content.push_str(&format!("\"{}\" = {}\n", name, toml_value));
-                }
+        match toml::to_string_pretty(self) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!("Failed to serialize manifest to TOML: {}", e);
+                // Fallback: serialize what we can
+                format!(
+                    "tools = {:?}\nrules = {:?}\n\n[core]\nmode = {:?}\n",
+                    self.tools, self.rules, self.core.mode
+                )
             }
         }
-
-        // [[hooks]] array of tables
-        for hook in &self.hooks {
-            content.push_str("\n[[hooks]]\n");
-            content.push_str(&format!("event = \"{}\"\n", hook.event));
-            content.push_str(&format!("command = \"{}\"\n", hook.command));
-            if !hook.args.is_empty() {
-                let args_str: Vec<String> =
-                    hook.args.iter().map(|a| format!("\"{}\"", a)).collect();
-                content.push_str(&format!("args = [{}]\n", args_str.join(", ")));
-            }
-            if let Some(ref dir) = hook.working_dir {
-                content.push_str(&format!("working_dir = \"{}\"\n", dir.display()));
-            }
-        }
-
-        content
     }
 
     /// Merge another manifest into this one
@@ -188,10 +139,9 @@ impl Manifest {
     ///
     /// * `other` - The manifest to merge into this one (takes precedence)
     pub fn merge(&mut self, other: &Manifest) {
-        // Core mode: other takes precedence if not default
-        if other.core.mode != default_mode() {
-            self.core.mode = other.core.mode.clone();
-        }
+        // Core mode: other always takes precedence
+        // (even if set to the default value, it may be an explicit choice)
+        self.core.mode = other.core.mode.clone();
 
         // Presets: deep merge
         for (key, other_value) in &other.presets {

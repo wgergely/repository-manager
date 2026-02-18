@@ -174,31 +174,18 @@ pub fn run_open(root: &Path, worktree: &str, tool: Option<&str>) -> Result<()> {
             Ok(()) => {}
             Err(e) => {
                 // Don't fail the open if sync fails - just warn
-                println!(
-                    "{} Sync warning: {}",
-                    "WARN".yellow().bold(),
-                    e
-                );
+                println!("{} Sync warning: {}", "WARN".yellow().bold(), e);
             }
         }
     }
 
     // Launch the editor
-    println!(
-        "{} Launching {} ...",
-        "=>".blue().bold(),
-        editor_name
-    );
+    println!("{} Launching {} ...", "=>".blue().bold(), editor_name);
 
     Command::new(editor_binary)
         .arg(&worktree_path)
         .spawn()
-        .map_err(|e| {
-            CliError::user(format!(
-                "Failed to launch '{}': {}",
-                editor_binary, e
-            ))
-        })?;
+        .map_err(|e| CliError::user(format!("Failed to launch '{}': {}", editor_binary, e)))?;
 
     println!("{} Opened in {}.", "OK".green().bold(), editor_name);
     Ok(())

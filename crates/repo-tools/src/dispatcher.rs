@@ -65,7 +65,7 @@ impl ToolDispatcher {
     pub fn get_integration(&self, tool_name: &str) -> Option<Box<dyn ToolIntegration>> {
         // Check built-in tools in registry
         if self.registry.contains(tool_name) {
-            return Some(Self::create_builtin_integration(tool_name));
+            return Self::create_builtin_integration(tool_name);
         }
 
         // Fall back to schema-defined generic integration
@@ -75,8 +75,10 @@ impl ToolDispatcher {
     }
 
     /// Create a built-in integration by name.
-    fn create_builtin_integration(name: &str) -> Box<dyn ToolIntegration> {
-        match name {
+    ///
+    /// Returns `None` if the tool name is not recognized.
+    fn create_builtin_integration(name: &str) -> Option<Box<dyn ToolIntegration>> {
+        let integration: Box<dyn ToolIntegration> = match name {
             "vscode" => Box::new(VSCodeIntegration::new()),
             "cursor" => Box::new(cursor_integration()),
             "claude" => Box::new(claude_integration()),
@@ -90,15 +92,19 @@ impl ToolDispatcher {
             "zed" => Box::new(zed_integration()),
             "aider" => Box::new(aider_integration()),
             "amazonq" => Box::new(amazonq_integration()),
-            // Fallback - shouldn't happen if registry is consistent
-            _ => Box::new(GenericToolIntegration::new(
-                crate::registry::builtin_registrations()
+            _ => {
+                // Try to find in builtin registrations as fallback
+                match crate::registry::builtin_registrations()
                     .into_iter()
                     .find(|r| r.slug == name)
                     .map(|r| r.definition)
-                    .unwrap_or_else(|| panic!("Unknown built-in tool: {}", name)),
-            )),
-        }
+                {
+                    Some(def) => Box::new(GenericToolIntegration::new(def)),
+                    None => return None,
+                }
+            }
+        };
+        Some(integration)
     }
 
     /// Check if a tool is available (built-in or schema-defined).

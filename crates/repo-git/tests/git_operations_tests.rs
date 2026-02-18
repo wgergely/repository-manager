@@ -57,9 +57,9 @@ fn setup_classic_repo_with_git() -> (TempDir, ClassicLayout) {
 #[test]
 fn test_classic_push_no_remote_returns_error() {
     let (_temp, layout) = setup_classic_repo_with_git();
+    let repo = layout.open_repo().unwrap();
 
-    // Push should fail when no remote is configured
-    let result = layout.push(None, None);
+    let result = repo_git::push(&repo, None, None, || layout.current_branch());
     assert!(result.is_err());
 
     let err = result.unwrap_err();
@@ -74,8 +74,9 @@ fn test_classic_push_no_remote_returns_error() {
 #[test]
 fn test_classic_push_named_remote_not_found() {
     let (_temp, layout) = setup_classic_repo_with_git();
+    let repo = layout.open_repo().unwrap();
 
-    let result = layout.push(Some("upstream"), None);
+    let result = repo_git::push(&repo, Some("upstream"), None, || layout.current_branch());
     assert!(result.is_err());
 
     let err = result.unwrap_err();
@@ -86,8 +87,9 @@ fn test_classic_push_named_remote_not_found() {
 #[test]
 fn test_classic_pull_no_remote_returns_error() {
     let (_temp, layout) = setup_classic_repo_with_git();
+    let repo = layout.open_repo().unwrap();
 
-    let result = layout.pull(None, None);
+    let result = repo_git::pull(&repo, None, None, || layout.current_branch(), None);
     assert!(result.is_err());
 
     let err = result.unwrap_err();
@@ -102,8 +104,14 @@ fn test_classic_pull_no_remote_returns_error() {
 #[test]
 fn test_classic_merge_branch_not_found() {
     let (_temp, layout) = setup_classic_repo_with_git();
+    let repo = layout.open_repo().unwrap();
 
-    let result = layout.merge("nonexistent-branch");
+    let result = repo_git::merge(
+        &repo,
+        "nonexistent-branch",
+        || layout.current_branch(),
+        None,
+    );
     assert!(result.is_err());
 
     let err = result.unwrap_err();
@@ -148,7 +156,8 @@ fn test_classic_merge_fast_forward() {
         .unwrap();
 
     // Merge feature branch (should fast-forward)
-    let result = layout.merge("feature");
+    let repo = layout.open_repo().unwrap();
+    let result = repo_git::merge(&repo, "feature", || layout.current_branch(), None);
     assert!(result.is_ok(), "Merge failed: {:?}", result);
 
     // Verify the file exists after merge
@@ -168,7 +177,8 @@ fn test_classic_merge_already_up_to_date() {
         .unwrap();
 
     // Merge should succeed (already up to date)
-    let result = layout.merge("feature");
+    let repo = layout.open_repo().unwrap();
+    let result = repo_git::merge(&repo, "feature", || layout.current_branch(), None);
     assert!(result.is_ok(), "Merge failed: {:?}", result);
 }
 
@@ -232,8 +242,9 @@ fn setup_container_repo_with_git() -> (TempDir, ContainerLayout) {
 #[test]
 fn test_container_push_no_remote_returns_error() {
     let (_temp, layout) = setup_container_repo_with_git();
+    let repo = layout.open_repo().unwrap();
 
-    let result = layout.push(None, None);
+    let result = repo_git::push(repo, None, None, || layout.current_branch());
     assert!(result.is_err());
 
     let err = result.unwrap_err();
@@ -248,8 +259,9 @@ fn test_container_push_no_remote_returns_error() {
 #[test]
 fn test_container_pull_no_remote_returns_error() {
     let (_temp, layout) = setup_container_repo_with_git();
+    let repo = layout.open_repo().unwrap();
 
-    let result = layout.pull(None, None);
+    let result = repo_git::pull(repo, None, None, || layout.current_branch(), None);
     assert!(result.is_err());
 
     let err = result.unwrap_err();
@@ -264,8 +276,9 @@ fn test_container_pull_no_remote_returns_error() {
 #[test]
 fn test_container_merge_branch_not_found() {
     let (_temp, layout) = setup_container_repo_with_git();
+    let repo = layout.open_repo().unwrap();
 
-    let result = layout.merge("nonexistent-branch");
+    let result = repo_git::merge(repo, "nonexistent-branch", || layout.current_branch(), None);
     assert!(result.is_err());
 
     let err = result.unwrap_err();
@@ -299,8 +312,17 @@ fn test_container_merge_fast_forward() {
         .output()
         .unwrap();
 
-    // Merge feature branch into main
-    let result = layout.merge("feature");
+    // Merge feature branch into main.
+    // The container's open_repo() returns the bare .gt repo, which cannot checkout.
+    // We must open the main worktree as a separate repo for the checkout step.
+    let repo = layout.open_repo().unwrap();
+    let main_repo = git2::Repository::open(&main_dir).unwrap();
+    let result = repo_git::merge(
+        repo,
+        "feature",
+        || layout.current_branch(),
+        Some(&main_repo),
+    );
     assert!(result.is_ok(), "Merge failed: {:?}", result);
 
     // Verify the file exists in main after merge
@@ -359,8 +381,9 @@ fn setup_in_repo_worktrees_with_git() -> (TempDir, InRepoWorktreesLayout) {
 #[test]
 fn test_in_repo_push_no_remote_returns_error() {
     let (_temp, layout) = setup_in_repo_worktrees_with_git();
+    let repo = layout.open_repo().unwrap();
 
-    let result = layout.push(None, None);
+    let result = repo_git::push(repo, None, None, || layout.current_branch());
     assert!(result.is_err());
 
     let err = result.unwrap_err();
@@ -375,8 +398,9 @@ fn test_in_repo_push_no_remote_returns_error() {
 #[test]
 fn test_in_repo_pull_no_remote_returns_error() {
     let (_temp, layout) = setup_in_repo_worktrees_with_git();
+    let repo = layout.open_repo().unwrap();
 
-    let result = layout.pull(None, None);
+    let result = repo_git::pull(repo, None, None, || layout.current_branch(), None);
     assert!(result.is_err());
 
     let err = result.unwrap_err();
@@ -391,8 +415,9 @@ fn test_in_repo_pull_no_remote_returns_error() {
 #[test]
 fn test_in_repo_merge_branch_not_found() {
     let (_temp, layout) = setup_in_repo_worktrees_with_git();
+    let repo = layout.open_repo().unwrap();
 
-    let result = layout.merge("nonexistent-branch");
+    let result = repo_git::merge(repo, "nonexistent-branch", || layout.current_branch(), None);
     assert!(result.is_err());
 
     let err = result.unwrap_err();
@@ -434,7 +459,8 @@ fn test_in_repo_merge_fast_forward() {
         .unwrap();
 
     // Merge feature branch
-    let result = layout.merge("feature");
+    let repo = layout.open_repo().unwrap();
+    let result = repo_git::merge(repo, "feature", || layout.current_branch(), None);
     assert!(result.is_ok(), "Merge failed: {:?}", result);
 
     // Verify the file exists in root after merge

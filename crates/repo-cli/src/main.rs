@@ -262,7 +262,6 @@ fn cmd_tool_info(name: &str) -> Result<()> {
     commands::config::run_tool_info(&cwd, name)
 }
 
-
 fn cmd_agent(action: AgentAction) -> Result<()> {
     commands::agent::run_agent(action)
 }
@@ -318,6 +317,14 @@ mod tests {
 
         let result = commands::run_add_tool(temp_dir.path(), "eslint", false);
         assert!(result.is_ok());
+
+        // Verify the tool was added to config.toml
+        let config_path = temp_dir.path().join(".repository/config.toml");
+        let config_content = fs::read_to_string(&config_path).unwrap();
+        assert!(
+            config_content.contains("eslint"),
+            "Config should contain the added tool 'eslint'"
+        );
     }
 
     #[test]
@@ -330,6 +337,14 @@ mod tests {
         // Then remove it
         let result = commands::run_remove_tool(temp_dir.path(), "eslint", false);
         assert!(result.is_ok());
+
+        // Verify the tool was removed from config.toml
+        let config_path = temp_dir.path().join(".repository/config.toml");
+        let config_content = fs::read_to_string(&config_path).unwrap();
+        assert!(
+            !config_content.contains("eslint"),
+            "Config should no longer contain the removed tool 'eslint'"
+        );
     }
 
     #[test]
@@ -366,9 +381,14 @@ mod tests {
         );
         assert!(result.is_ok());
 
-        // Verify rule file was created
+        // Verify rule file was created with correct content
         let rule_path = temp_dir.path().join(".repository/rules/python-style.md");
         assert!(rule_path.exists());
+        let content = fs::read_to_string(&rule_path).unwrap();
+        assert!(
+            content.contains("snake_case"),
+            "Rule file should contain the instruction text"
+        );
     }
 
     #[test]

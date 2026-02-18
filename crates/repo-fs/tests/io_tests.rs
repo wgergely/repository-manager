@@ -40,7 +40,12 @@ fn test_write_atomic_replaces_content_completely() {
     // Overwrite with shorter content
     let path = NormalizedPath::new(&file_path);
     let short_content = "short";
-    io::write_atomic(&path, short_content.as_bytes(), io::RobustnessConfig::default()).unwrap();
+    io::write_atomic(
+        &path,
+        short_content.as_bytes(),
+        io::RobustnessConfig::default(),
+    )
+    .unwrap();
 
     let content = fs::read_to_string(&file_path).unwrap();
     assert_eq!(
@@ -92,7 +97,12 @@ fn test_write_atomic_concurrent_reader_sees_complete_content() {
     let writer = thread::spawn(move || {
         b2.wait();
         let path = NormalizedPath::new(&writer_path);
-        io::write_atomic(&path, new_content.as_bytes(), io::RobustnessConfig::default()).unwrap();
+        io::write_atomic(
+            &path,
+            new_content.as_bytes(),
+            io::RobustnessConfig::default(),
+        )
+        .unwrap();
     });
 
     writer.join().unwrap();
@@ -100,7 +110,10 @@ fn test_write_atomic_concurrent_reader_sees_complete_content() {
 
     // Guard against vacuous truth: if all reads failed, the for-all assertion
     // below would pass trivially over an empty iterator.
-    assert!(!observed.is_empty(), "Reader must observe at least one successful read");
+    assert!(
+        !observed.is_empty(),
+        "Reader must observe at least one successful read"
+    );
 
     // Every observed content must be one of the two complete versions
     for content in &observed {

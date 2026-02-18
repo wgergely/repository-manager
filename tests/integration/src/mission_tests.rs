@@ -14,7 +14,7 @@ use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
 use repo_git::{
     ClassicLayout, ContainerLayout, LayoutProvider, NamingStrategy, naming::branch_to_directory,
 };
-use repo_presets::{Context, PresetProvider, PresetStatus, PluginsProvider, UvProvider};
+use repo_presets::{Context, PluginsProvider, PresetProvider, PresetStatus, UvProvider};
 use repo_tools::{
     Rule, SyncContext, ToolIntegration, VSCodeIntegration, antigravity_integration,
     claude_integration, cursor_integration, gemini_integration, windsurf_integration,
@@ -56,9 +56,7 @@ impl TestRepo {
 
     /// Initialize as a git repository
     pub fn init_git(&self) {
-        fs::create_dir(self.root().join(".git")).unwrap();
-        fs::write(self.root().join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
-        fs::create_dir_all(self.root().join(".git/refs/heads")).unwrap();
+        git2::Repository::init(self.root()).expect("Failed to init git repository");
     }
 
     /// Initialize with repository manager config
@@ -208,26 +206,12 @@ mod m2_branch {
         let repo = TestRepo::new();
         repo.init_git();
 
-        match ClassicLayout::new(NormalizedPath::new(repo.root())) {
-            Ok(layout) => {
-                // This may fail if git2 requires a real repo - document the result
-                let result = layout.current_branch();
+        let layout = ClassicLayout::new(NormalizedPath::new(repo.root()))
+            .expect("ClassicLayout::new() should succeed on a real git repo");
 
-                // We expect this to either work or fail gracefully
-                // If it fails, it documents that ClassicLayout needs a real git repo
-                match result {
-                    Ok(branch) => assert!(!branch.is_empty()),
-                    Err(e) => {
-                        // Document the error - this reveals implementation behavior
-                        println!("ClassicLayout.current_branch() error: {:?}", e);
-                    }
-                }
-            }
-            Err(e) => {
-                // Document that ClassicLayout creation failed
-                println!("ClassicLayout::new() error: {:?}", e);
-            }
-        }
+        // current_branch may return an error on a fresh repo with no commits (unborn HEAD),
+        // which is acceptable behavior
+        let _result = layout.current_branch();
     }
 
     /// M2.2: Feature worktree path computation (Worktrees Mode)
@@ -237,26 +221,20 @@ mod m2_branch {
         fs::create_dir(repo.root().join(".git")).unwrap();
         fs::create_dir(repo.root().join("main")).unwrap();
 
-        match ContainerLayout::new(NormalizedPath::new(repo.root()), NamingStrategy::Slug) {
-            Ok(layout) => {
-                let path = layout.feature_worktree("feature-x");
+        let layout = ContainerLayout::new(NormalizedPath::new(repo.root()), NamingStrategy::Slug)
+            .expect("ContainerLayout::new() should succeed");
 
-                // Verify path is at container level, not inside main
-                let path_str = path.as_str();
-                assert!(
-                    path_str.ends_with("feature-x"),
-                    "Expected path to end with 'feature-x', got: {}",
-                    path_str
-                );
-                assert!(
-                    !path_str.contains("main/feature-x"),
-                    "Feature worktree should not be inside main/"
-                );
-            }
-            Err(e) => {
-                println!("ContainerLayout::new() error: {:?}", e);
-            }
-        }
+        let path = layout.feature_worktree("feature-x");
+        let path_str = path.as_str();
+        assert!(
+            path_str.ends_with("feature-x"),
+            "Expected path to end with 'feature-x', got: {}",
+            path_str
+        );
+        assert!(
+            !path_str.contains("main/feature-x"),
+            "Feature worktree should not be inside main/"
+        );
     }
 
     /// M2.3: Branch name sanitization (slashes to dashes)
@@ -279,20 +257,15 @@ mod m2_branch {
         fs::create_dir(repo.root().join(".gt")).unwrap(); // ContainerLayout uses .gt
         fs::create_dir(repo.root().join("main")).unwrap();
 
-        match ContainerLayout::new(NormalizedPath::new(repo.root()), NamingStrategy::Slug) {
-            Ok(layout) => {
-                let git_db = layout.git_database();
-                // ContainerLayout uses .gt for the git database
-                assert!(
-                    git_db.as_str().ends_with(".gt"),
-                    "Expected .gt, got: {}",
-                    git_db.as_str()
-                );
-            }
-            Err(e) => {
-                println!("ContainerLayout::new() error: {:?}", e);
-            }
-        }
+        let layout = ContainerLayout::new(NormalizedPath::new(repo.root()), NamingStrategy::Slug)
+            .expect("ContainerLayout::new() should succeed with .gt");
+
+        let git_db = layout.git_database();
+        assert!(
+            git_db.as_str().ends_with(".gt"),
+            "Expected .gt, got: {}",
+            git_db.as_str()
+        );
     }
 
     /// M2.5: Main worktree path
@@ -302,15 +275,11 @@ mod m2_branch {
         fs::create_dir(repo.root().join(".git")).unwrap();
         fs::create_dir(repo.root().join("main")).unwrap();
 
-        match ContainerLayout::new(NormalizedPath::new(repo.root()), NamingStrategy::Slug) {
-            Ok(layout) => {
-                let main_wt = layout.main_worktree();
-                assert!(main_wt.as_str().ends_with("main"));
-            }
-            Err(e) => {
-                println!("ContainerLayout::new() error: {:?}", e);
-            }
-        }
+        let layout = ContainerLayout::new(NormalizedPath::new(repo.root()), NamingStrategy::Slug)
+            .expect("ContainerLayout::new() should succeed");
+
+        let main_wt = layout.main_worktree();
+        assert!(main_wt.as_str().ends_with("main"));
     }
 }
 
@@ -656,18 +625,22 @@ mod m5_presets {
 // =============================================================================
 
 mod m6_git_ops {
-    #[allow(unused_imports)]
-    use super::*;
-    #[allow(deprecated)]
     use assert_cmd::Command;
     use predicates::prelude::*;
+
+    // cargo_bin! macro requires CARGO_BIN_EXE_* env vars which are only set when
+    // the binary is in the same package as the test. Since this is a separate
+    // integration-tests crate, we must use the runtime-discovery Command::cargo_bin.
+    #[allow(deprecated)]
+    fn repo_cmd() -> Command {
+        Command::cargo_bin("repo").unwrap()
+    }
 
     /// M6.1: repo push command
     /// GAP-001: Now implemented - verify CLI command exists
     #[test]
-    #[allow(deprecated)]
     fn m6_1_push_command() {
-        let mut cmd = Command::cargo_bin("repo").unwrap();
+        let mut cmd = repo_cmd();
         cmd.arg("push").arg("--help");
         cmd.assert()
             .success()
@@ -677,9 +650,8 @@ mod m6_git_ops {
     /// M6.2: repo pull command
     /// GAP-002: Now implemented - verify CLI command exists
     #[test]
-    #[allow(deprecated)]
     fn m6_2_pull_command() {
-        let mut cmd = Command::cargo_bin("repo").unwrap();
+        let mut cmd = repo_cmd();
         cmd.arg("pull").arg("--help");
         cmd.assert()
             .success()
@@ -689,9 +661,8 @@ mod m6_git_ops {
     /// M6.3: repo merge command
     /// GAP-003: Now implemented - verify CLI command exists
     #[test]
-    #[allow(deprecated)]
     fn m6_3_merge_command() {
-        let mut cmd = Command::cargo_bin("repo").unwrap();
+        let mut cmd = repo_cmd();
         cmd.arg("merge").arg("--help");
         cmd.assert()
             .success()
@@ -700,10 +671,10 @@ mod m6_git_ops {
 }
 
 // =============================================================================
-// Gap Documentation Tests
+// Sync & Tool Integration Tests
 // =============================================================================
 
-mod gaps {
+mod sync_integration {
     #[allow(unused_imports)]
     use super::*;
 
@@ -722,9 +693,7 @@ mod gaps {
             .collect::<Vec<_>>()
             .join(", ");
 
-        let config = format!(
-            "tools = [{tools_str}]\n\n[core]\nmode = \"{mode}\"\n"
-        );
+        let config = format!("tools = [{tools_str}]\n\n[core]\nmode = \"{mode}\"\n");
 
         fs::write(repo_dir.join("config.toml"), config).unwrap();
     }
@@ -763,12 +732,17 @@ mod gaps {
         );
 
         // Verify files have content
-        let vscode_content =
-            fs::read_to_string(repo.root().join(".vscode/settings.json")).unwrap();
-        assert!(!vscode_content.is_empty(), "VSCode settings should have content");
+        let vscode_content = fs::read_to_string(repo.root().join(".vscode/settings.json")).unwrap();
+        assert!(
+            !vscode_content.is_empty(),
+            "VSCode settings should have content"
+        );
 
         let cursor_content = fs::read_to_string(repo.root().join(".cursorrules")).unwrap();
-        assert!(!cursor_content.is_empty(), "Cursor rules should have content");
+        assert!(
+            !cursor_content.is_empty(),
+            "Cursor rules should have content"
+        );
 
         let claude_content = fs::read_to_string(repo.root().join("CLAUDE.md")).unwrap();
         assert!(!claude_content.is_empty(), "CLAUDE.md should have content");
@@ -813,11 +787,7 @@ mod gaps {
         let registry_path = rules_dir.join("registry.toml");
         let mut registry = RuleRegistry::new(registry_path);
         registry
-            .add_rule(
-                "test-rule",
-                "Always use descriptive variable names",
-                vec![],
-            )
+            .add_rule("test-rule", "Always use descriptive variable names", vec![])
             .unwrap();
 
         let root = NormalizedPath::new(repo.root());

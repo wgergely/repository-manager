@@ -209,10 +209,7 @@ impl SyncEngine {
                         }
                     }
 
-                    ProjectionKind::TextBlock {
-                        marker,
-                        checksum,
-                    } => {
+                    ProjectionKind::TextBlock { marker, checksum } => {
                         if !file_path.exists() {
                             missing.push(DriftItem {
                                 intent_id: intent.id.clone(),
@@ -236,8 +233,11 @@ impl SyncEngine {
                                             ),
                                         });
                                     } else {
-                                        // Verify the block checksum matches
-                                        let actual_checksum = compute_content_checksum(&content);
+                                        // Extract only the managed block for checksum, not the full file
+                                        let block_content =
+                                            extract_managed_block(&content, &marker_str);
+                                        let actual_checksum =
+                                            compute_content_checksum(&block_content);
                                         if actual_checksum != *checksum {
                                             drifted.push(DriftItem {
                                                 intent_id: intent.id.clone(),
@@ -380,37 +380,42 @@ impl SyncEngine {
 
         // Read config and sync tools using typed Manifest parsing
         let config_content = std::fs::read_to_string(config_path.as_ref())?;
-        if let Ok(manifest) = Manifest::parse(&config_content) {
-            let tool_syncer = ToolSyncer::new(self.root.clone(), options.dry_run);
-            let tool_names = &manifest.tools;
-
-            // Sync tool configurations
-            for tool_name in tool_names {
-                match tool_syncer.sync_tool(tool_name, &mut ledger) {
-                    Ok(actions) => {
-                        for action in actions {
-                            report = report.with_action(action);
-                        }
-                    }
-                    Err(e) => {
-                        report
-                            .errors
-                            .push(format!("Failed to sync {}: {}", tool_name, e));
-                    }
-                }
+        let manifest = match Manifest::parse(&config_content) {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::warn!("Failed to parse config.toml: {}", e);
+                return Ok(report.with_action(format!("Failed to parse config.toml: {}", e)));
             }
+        };
+        let tool_syncer = ToolSyncer::new(self.root.clone(), options.dry_run);
+        let tool_names = &manifest.tools;
 
-            // Sync rules to tool configurations
-            let rule_syncer = RuleSyncer::new(self.root.clone(), options.dry_run);
-            match rule_syncer.sync_rules(tool_names, &mut ledger) {
+        // Sync tool configurations
+        for tool_name in tool_names {
+            match tool_syncer.sync_tool(tool_name, &mut ledger) {
                 Ok(actions) => {
                     for action in actions {
                         report = report.with_action(action);
                     }
                 }
                 Err(e) => {
-                    report.errors.push(format!("Failed to sync rules: {}", e));
+                    report
+                        .errors
+                        .push(format!("Failed to sync {}: {}", tool_name, e));
                 }
+            }
+        }
+
+        // Sync rules to tool configurations
+        let rule_syncer = RuleSyncer::new(self.root.clone(), options.dry_run);
+        match rule_syncer.sync_rules(tool_names, &mut ledger) {
+            Ok(actions) => {
+                for action in actions {
+                    report = report.with_action(action);
+                }
+            }
+            Err(e) => {
+                report.errors.push(format!("Failed to sync rules: {}", e));
             }
         }
 
@@ -525,6 +530,27 @@ pub fn compute_file_checksum(path: &Path) -> Result<String> {
     let mut hasher = Sha256::new();
     hasher.update(&content);
     Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Extract managed block content from a file by marker UUID
+///
+/// Looks for content between `<!-- repo:block:MARKER -->` and `<!-- /repo:block:MARKER -->`
+/// markers. Returns the block content if found, or the full content if markers are not found.
+fn extract_managed_block(content: &str, marker: &str) -> String {
+    let start_tag = format!("<!-- repo:block:{} -->", marker);
+    let end_tag = format!("<!-- /repo:block:{} -->", marker);
+
+    if let Some(start_pos) = content.find(&start_tag)
+        && let Some(end_pos) = content.find(&end_tag)
+    {
+        let block_start = start_pos + start_tag.len();
+        if block_start <= end_pos {
+            return content[start_pos..end_pos + end_tag.len()].to_string();
+        }
+    }
+
+    // Fallback to full content if markers not found
+    content.to_string()
 }
 
 /// Get a value from a JSON object using a dot-separated path

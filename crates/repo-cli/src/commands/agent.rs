@@ -32,8 +32,7 @@ pub fn run_agent(action: AgentAction) -> Result<()> {
 /// Discover the agent manager for the current directory
 fn discover_manager() -> Result<AgentManager> {
     let cwd = std::env::current_dir()?;
-    AgentManager::discover(&cwd)
-        .map_err(|e| CliError::user(format!("Agent discovery failed: {e}")))
+    AgentManager::discover(&cwd).map_err(|e| CliError::user(format!("Agent discovery failed: {e}")))
 }
 
 /// Require the agent subsystem to be available, returning an error if not.
@@ -89,10 +88,7 @@ fn run_agent_check() -> Result<()> {
             "=>".blue().bold(),
             "not available".yellow().bold()
         );
-        println!(
-            "\n{} Install prerequisites:",
-            "hint:".cyan().bold()
-        );
+        println!("\n{} Install prerequisites:", "hint:".cyan().bold());
         if report.python_path.is_none() {
             println!("  - Python 3.13+: https://python.org/downloads/");
         }
@@ -108,7 +104,8 @@ fn run_agent_list() -> Result<()> {
     let manager = discover_manager()?;
     require_available(&manager)?;
 
-    let vaultspec_path = manager.vaultspec_path()
+    let vaultspec_path = manager
+        .vaultspec_path()
         .ok_or_else(|| CliError::user("Vaultspec directory not found"))?
         .to_path_buf();
 
@@ -122,11 +119,7 @@ fn run_agent_list() -> Result<()> {
             vaultspec_path.display()
         );
     } else {
-        println!(
-            "{} {} agent(s) found:\n",
-            "=>".blue().bold(),
-            agents.len()
-        );
+        println!("{} {} agent(s) found:\n", "=>".blue().bold(), agents.len());
         println!(
             "  {:<20} {:<15} {}",
             "NAME".bold(),
@@ -166,7 +159,8 @@ fn run_agent_spawn(name: &str, goal: Option<&str>, worktree: Option<&str>) -> Re
     let vaultspec = manager.vaultspec_path().unwrap();
     let pm = ProcessManager::new(manager.root());
 
-    let process = pm.spawn(python, vaultspec, name, worktree, goal)
+    let process = pm
+        .spawn(python, vaultspec, name, worktree, goal)
         .map_err(|e| CliError::user(format!("Failed to spawn agent: {e}")))?;
 
     println!(
@@ -184,11 +178,15 @@ fn run_agent_status(task_id: Option<&str>) -> Result<()> {
     let manager = discover_manager()?;
     let pm = ProcessManager::new(manager.root());
 
-    let processes = pm.list()
+    let processes = pm
+        .list()
         .map_err(|e| CliError::user(format!("Failed to list processes: {e}")))?;
 
     let filtered: Vec<_> = if let Some(id) = task_id {
-        processes.into_iter().filter(|p| p.id.contains(id)).collect()
+        processes
+            .into_iter()
+            .filter(|p| p.id.contains(id))
+            .collect()
     } else {
         processes
     };
@@ -243,7 +241,8 @@ fn run_agent_stop(task_id: &str) -> Result<()> {
 
     let pm = ProcessManager::new(manager.root());
 
-    let process = pm.stop(task_id)
+    let process = pm
+        .stop(task_id)
         .map_err(|e| CliError::user(format!("Failed to stop agent: {e}")))?;
 
     println!(
@@ -290,34 +289,45 @@ fn run_agent_config(show: bool) -> Result<()> {
         println!("{} Agent configuration:\n", "=>".blue().bold());
 
         let report = manager.health_check().ok();
-        println!("  {:<20} {}", "Python:".bold(),
-            manager.python_path()
+        println!(
+            "  {:<20} {}",
+            "Python:".bold(),
+            manager
+                .python_path()
                 .map(|p| p.display().to_string())
-                .unwrap_or_else(|| "not found".red().to_string()));
+                .unwrap_or_else(|| "not found".red().to_string())
+        );
 
-        if let Some(ref r) = report {
-            if let Some(ref v) = r.python_version {
-                println!("  {:<20} {}", "Python version:".bold(), v);
-            }
+        if let Some(ref r) = report
+            && let Some(ref v) = r.python_version
+        {
+            println!("  {:<20} {}", "Python version:".bold(), v);
         }
 
-        println!("  {:<20} {}",  "Vaultspec:".bold(),
-            manager.vaultspec_path()
+        println!(
+            "  {:<20} {}",
+            "Vaultspec:".bold(),
+            manager
+                .vaultspec_path()
                 .map(|p| p.display().to_string())
-                .unwrap_or_else(|| "not found".red().to_string()));
+                .unwrap_or_else(|| "not found".red().to_string())
+        );
 
-        if let Some(ref r) = report {
-            if r.agent_count > 0 {
-                println!("  {:<20} {}", "Agents:".bold(), r.agent_count);
-            }
+        if let Some(ref r) = report
+            && r.agent_count > 0
+        {
+            println!("  {:<20} {}", "Agents:".bold(), r.agent_count);
         }
 
-        println!("  {:<20} {}", "Status:".bold(),
+        println!(
+            "  {:<20} {}",
+            "Status:".bold(),
             if manager.is_available() {
                 "ready".green().to_string()
             } else {
                 "not available".yellow().to_string()
-            });
+            }
+        );
     } else {
         println!(
             "{} Use {} to display agent configuration.",
@@ -339,8 +349,9 @@ fn run_agent_rules(action: RulesSubAction) -> Result<()> {
     match action {
         RulesSubAction::List => {
             println!("{} Agent rules:\n", "=>".blue().bold());
-            let output = subprocess::run_vaultspec(python, vaultspec, manager.root(), &["rules", "list"])
-                .map_err(|e| CliError::user(format!("Failed to list rules: {e}")))?;
+            let output =
+                subprocess::run_vaultspec(python, vaultspec, manager.root(), &["rules", "list"])
+                    .map_err(|e| CliError::user(format!("Failed to list rules: {e}")))?;
             if output.trim().is_empty() {
                 println!("  No rules defined.");
             } else {
@@ -348,11 +359,7 @@ fn run_agent_rules(action: RulesSubAction) -> Result<()> {
             }
         }
         RulesSubAction::Add { id, instruction } => {
-            println!(
-                "{} Adding rule '{}'...",
-                "=>".blue().bold(),
-                id.cyan()
-            );
+            println!("{} Adding rule '{}'...", "=>".blue().bold(), id.cyan());
             subprocess::run_vaultspec(
                 python,
                 vaultspec,
@@ -363,18 +370,9 @@ fn run_agent_rules(action: RulesSubAction) -> Result<()> {
             println!("{} Rule '{}' added.", "OK".green().bold(), id.cyan());
         }
         RulesSubAction::Remove { id } => {
-            println!(
-                "{} Removing rule '{}'...",
-                "=>".blue().bold(),
-                id.cyan()
-            );
-            subprocess::run_vaultspec(
-                python,
-                vaultspec,
-                manager.root(),
-                &["rules", "remove", &id],
-            )
-            .map_err(|e| CliError::user(format!("Failed to remove rule: {e}")))?;
+            println!("{} Removing rule '{}'...", "=>".blue().bold(), id.cyan());
+            subprocess::run_vaultspec(python, vaultspec, manager.root(), &["rules", "remove", &id])
+                .map_err(|e| CliError::user(format!("Failed to remove rule: {e}")))?;
             println!("{} Rule '{}' removed.", "OK".green().bold(), id.cyan());
         }
     }

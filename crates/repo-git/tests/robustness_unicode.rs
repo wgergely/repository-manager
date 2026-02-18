@@ -62,14 +62,6 @@ fn test_unicode_and_emoji_support() {
     // 3. List and Verify
     let worktrees = layout.list_worktrees().expect("Should list worktrees");
 
-    println!("Found Worktrees:");
-    for wt in &worktrees {
-        println!(
-            " - Name: '{}', Branch: '{}', Path: '{}'",
-            wt.name, wt.branch, wt.path
-        );
-    }
-
     // NamingStrategy::Slug converts "feature/..." to "feature-..."
     // We expect the Unicode characters to be preserved.
     let expected_jp_slug = "feature-ユーザー認証";

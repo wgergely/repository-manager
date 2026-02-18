@@ -153,9 +153,15 @@ mod tests {
         // RuntimeContext.from_resolved must route env:* presets to `runtime`
         // and tool:*/config:* presets to `capabilities`.
         let mut presets = HashMap::new();
-        presets.insert("env:python".to_string(), serde_json::json!({"version": "3.12"}));
+        presets.insert(
+            "env:python".to_string(),
+            serde_json::json!({"version": "3.12"}),
+        );
         presets.insert("env:node".to_string(), serde_json::json!({"version": "20"}));
-        presets.insert("tool:linter".to_string(), serde_json::json!({"enabled": true}));
+        presets.insert(
+            "tool:linter".to_string(),
+            serde_json::json!({"enabled": true}),
+        );
         presets.insert("config:editor".to_string(), serde_json::json!({"tabs": 4}));
 
         let config = ResolvedConfig {
@@ -203,7 +209,10 @@ mod tests {
     #[test]
     fn to_json_produces_valid_structure() {
         let mut presets = HashMap::new();
-        presets.insert("env:rust".to_string(), serde_json::json!({"edition": "2021"}));
+        presets.insert(
+            "env:rust".to_string(),
+            serde_json::json!({"edition": "2021"}),
+        );
         presets.insert("tool:clippy".to_string(), serde_json::json!({}));
 
         let config = ResolvedConfig {
@@ -218,9 +227,11 @@ mod tests {
 
         // JSON must contain both top-level keys with correct values
         assert_eq!(json["runtime"]["rust"]["edition"], "2021");
-        assert!(json["capabilities"]
-            .as_array()
-            .unwrap()
-            .contains(&serde_json::json!("tool:clippy")));
+        assert!(
+            json["capabilities"]
+                .as_array()
+                .unwrap()
+                .contains(&serde_json::json!("tool:clippy"))
+        );
     }
 }

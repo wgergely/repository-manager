@@ -164,14 +164,15 @@ pub fn diff_configs(root: &Path, manifest: &Manifest) -> Result<Vec<ConfigDrift>
     let ledger_content = std::fs::read_to_string(&ledger_path)?;
     let ledger: Ledger = match toml::from_str(&ledger_content) {
         Ok(l) => l,
-        Err(_) => {
-            // Ledger is corrupt - report all tools as drifted
+        Err(e) => {
+            tracing::warn!("Ledger is corrupt or unreadable: {}", e);
+            // Report corruption explicitly rather than silently treating as all-drifted
             for tool in &manifest.tools {
                 drifts.push(ConfigDrift {
                     tool: tool.clone(),
                     config_path: PathBuf::from("ledger.toml"),
                     drift_type: DriftType::Modified,
-                    details: "Ledger is corrupt or unreadable.".to_string(),
+                    details: format!("Ledger is corrupt or unreadable: {}", e),
                 });
             }
             return Ok(drifts);
@@ -254,11 +255,7 @@ pub fn export_agents_md(root: &Path) -> Result<String> {
 
     let mut entries: Vec<_> = std::fs::read_dir(&rules_dir)?
         .flatten()
-        .filter(|e| {
-            e.path()
-                .extension()
-                .is_some_and(|ext| ext == "md")
-        })
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
         .collect();
     entries.sort_by_key(|e| e.file_name());
 
@@ -338,14 +335,22 @@ mod tests {
     fn test_lint_empty_config() {
         let manifest = make_manifest(&[], &[]);
         let warnings = lint_rules(&manifest, &[]);
-        assert!(warnings.iter().any(|w| w.message.contains("No tools configured")));
+        assert!(
+            warnings
+                .iter()
+                .any(|w| w.message.contains("No tools configured"))
+        );
     }
 
     #[test]
     fn test_lint_duplicate_tools() {
         let manifest = make_manifest(&["claude", "cursor", "claude"], &[]);
         let warnings = lint_rules(&manifest, &[]);
-        assert!(warnings.iter().any(|w| w.message.contains("Duplicate tool")));
+        assert!(
+            warnings
+                .iter()
+                .any(|w| w.message.contains("Duplicate tool"))
+        );
     }
 
     #[test]
@@ -353,16 +358,22 @@ mod tests {
         let available = vec!["claude".to_string(), "cursor".to_string()];
         let manifest = make_manifest(&["claude", "nonexistent"], &[]);
         let warnings = lint_rules(&manifest, &available);
-        assert!(warnings
-            .iter()
-            .any(|w| w.message.contains("not a recognized tool")));
+        assert!(
+            warnings
+                .iter()
+                .any(|w| w.message.contains("not a recognized tool"))
+        );
     }
 
     #[test]
     fn test_lint_no_rules_info() {
         let manifest = make_manifest(&["claude"], &[]);
         let warnings = lint_rules(&manifest, &[]);
-        assert!(warnings.iter().any(|w| w.message.contains("No rules configured")));
+        assert!(
+            warnings
+                .iter()
+                .any(|w| w.message.contains("No rules configured"))
+        );
     }
 
     #[test]
@@ -411,8 +422,16 @@ mod tests {
         let rules_dir = temp.path().join(".repository/rules");
         std::fs::create_dir_all(&rules_dir).unwrap();
 
-        std::fs::write(rules_dir.join("code-style.md"), "Use consistent formatting.").unwrap();
-        std::fs::write(rules_dir.join("naming.md"), "tags: python\n\nUse snake_case.").unwrap();
+        std::fs::write(
+            rules_dir.join("code-style.md"),
+            "Use consistent formatting.",
+        )
+        .unwrap();
+        std::fs::write(
+            rules_dir.join("naming.md"),
+            "tags: python\n\nUse snake_case.",
+        )
+        .unwrap();
 
         let output = export_agents_md(temp.path()).unwrap();
         assert!(output.contains("## code-style"));

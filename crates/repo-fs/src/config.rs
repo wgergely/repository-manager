@@ -7,10 +7,6 @@ use serde::{Serialize, de::DeserializeOwned};
 ///
 /// Automatically detects format from file extension and handles
 /// serialization/deserialization transparently.
-/// Format-agnostic configuration store.
-///
-/// Automatically detects format from file extension and handles
-/// serialization/deserialization transparently.
 #[derive(Debug, Default)]
 pub struct ConfigStore {
     robustness: io::RobustnessConfig,
@@ -67,17 +63,17 @@ impl ConfigStore {
         let extension = path.extension().unwrap_or("");
 
         let content = match extension.to_lowercase().as_str() {
-            "toml" => toml::to_string_pretty(value).map_err(|e| Error::ConfigParse {
+            "toml" => toml::to_string_pretty(value).map_err(|e| Error::ConfigSerialize {
                 path: path.to_native(),
                 format: "TOML".into(),
                 message: e.to_string(),
             })?,
-            "json" => serde_json::to_string_pretty(value).map_err(|e| Error::ConfigParse {
+            "json" => serde_json::to_string_pretty(value).map_err(|e| Error::ConfigSerialize {
                 path: path.to_native(),
                 format: "JSON".into(),
                 message: e.to_string(),
             })?,
-            "yaml" | "yml" => serde_yaml::to_string(value).map_err(|e| Error::ConfigParse {
+            "yaml" | "yml" => serde_yaml::to_string(value).map_err(|e| Error::ConfigSerialize {
                 path: path.to_native(),
                 format: "YAML".into(),
                 message: e.to_string(),

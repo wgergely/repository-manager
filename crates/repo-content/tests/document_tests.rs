@@ -19,6 +19,21 @@ fn test_document_parse_auto_detect() {
     let plain = "Hello world";
     let doc = Document::parse(plain).unwrap();
     assert_eq!(doc.format(), Format::PlainText);
+
+    // YAML detection: key: value on first line
+    let yaml = "host: localhost\nport: 8080\n";
+    let doc = Document::parse(yaml).unwrap();
+    assert_eq!(doc.format(), Format::Yaml);
+
+    // Markdown detection: starts with heading
+    let markdown = "# My Document\n\nSome content here.\n";
+    let doc = Document::parse(markdown).unwrap();
+    assert_eq!(doc.format(), Format::Markdown);
+
+    // Markdown detection: starts with list
+    let markdown_list = "- item one\n- item two\n";
+    let doc = Document::parse(markdown_list).unwrap();
+    assert_eq!(doc.format(), Format::Markdown);
 }
 
 #[test]
@@ -109,4 +124,19 @@ fn test_document_diff() {
     let doc3 = Document::parse(r#"{"a": 2}"#).unwrap();
     let diff = doc1.diff(&doc3);
     assert!(!diff.is_equivalent);
+}
+
+#[test]
+fn test_document_is_modified() {
+    let source = "# Config file\n";
+    let mut doc = Document::parse_as(source, Format::PlainText).unwrap();
+
+    // Freshly parsed document should not be modified
+    assert!(!doc.is_modified());
+
+    // After inserting a block, it should be modified
+    let uuid = Uuid::new_v4();
+    doc.insert_block(uuid, "managed content", BlockLocation::End)
+        .unwrap();
+    assert!(doc.is_modified());
 }

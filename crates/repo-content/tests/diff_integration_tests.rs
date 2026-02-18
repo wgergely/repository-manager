@@ -75,12 +75,18 @@ fn test_diff_similarity_ratio_with_known_overlap() {
     );
 
     // Verify the specific changes detected
-    assert!(diff.changes.iter().any(|c| matches!(c,
-        SemanticChange::Removed { path, .. } if path == "d"
-    )), "Key 'd' should be reported as removed");
-    assert!(diff.changes.iter().any(|c| matches!(c,
-        SemanticChange::Added { path, .. } if path == "e"
-    )), "Key 'e' should be reported as added");
+    assert!(
+        diff.changes.iter().any(|c| matches!(c,
+            SemanticChange::Removed { path, .. } if path == "d"
+        )),
+        "Key 'd' should be reported as removed"
+    );
+    assert!(
+        diff.changes.iter().any(|c| matches!(c,
+            SemanticChange::Added { path, .. } if path == "e"
+        )),
+        "Key 'e' should be reported as added"
+    );
 }
 
 #[test]
@@ -89,7 +95,10 @@ fn test_diff_similarity_identical_documents_is_1() {
     let doc2 = Document::parse(r#"{"x": 1}"#).unwrap();
 
     let diff = doc1.diff(&doc2);
-    assert_eq!(diff.similarity, 1.0, "Identical documents should have similarity 1.0");
+    assert_eq!(
+        diff.similarity, 1.0,
+        "Identical documents should have similarity 1.0"
+    );
     assert!(diff.is_equivalent);
 }
 
@@ -109,7 +118,10 @@ fn test_diff_similarity_completely_different_is_not_one() {
     );
     assert!(!diff.is_equivalent);
     // Verify specific changes: all keys should be reported as added/removed
-    assert!(!diff.changes.is_empty(), "Different documents must have changes");
+    assert!(
+        !diff.changes.is_empty(),
+        "Different documents must have changes"
+    );
 }
 
 #[test]

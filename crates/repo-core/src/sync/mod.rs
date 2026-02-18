@@ -13,6 +13,9 @@ mod rule_syncer;
 mod tool_syncer;
 
 pub use check::{CheckReport, CheckStatus, DriftItem};
-pub use engine::{SyncEngine, SyncOptions, SyncReport, compute_content_checksum, compute_file_checksum, get_json_path};
+pub use engine::{
+    SyncEngine, SyncOptions, SyncReport, compute_content_checksum, compute_file_checksum,
+    get_json_path,
+};
 pub use rule_syncer::{RuleFile, RuleSyncer};
 pub use tool_syncer::ToolSyncer;

@@ -57,16 +57,25 @@ pub struct ActiveConfig {
     pub presets: Vec<String>,
 }
 
+/// Sync strategy for configuration synchronization
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SyncStrategy {
+    /// Automatically sync on relevant operations
+    #[default]
+    Auto,
+    /// Only sync when explicitly requested
+    Manual,
+    /// Sync on every commit
+    OnCommit,
+}
+
 /// Synchronization configuration
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct SyncConfig {
-    /// Sync strategy (e.g., "auto", "manual", "on-commit")
-    #[serde(default = "default_strategy")]
-    pub strategy: String,
-}
-
-fn default_strategy() -> String {
-    "auto".to_string()
+    /// Sync strategy
+    #[serde(default)]
+    pub strategy: SyncStrategy,
 }
 
 /// Complete repository configuration

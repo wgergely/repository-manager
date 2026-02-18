@@ -107,4 +107,87 @@ key = "value"
         assert!(def.config.contains_key("string_value"));
         assert!(def.config.contains_key("nested"));
     }
+
+    #[test]
+    fn test_parse_preset_definition_minimal() {
+        let toml = r#"
+[meta]
+id = "basic"
+"#;
+
+        let def: PresetDefinition = toml::from_str(toml).unwrap();
+        assert_eq!(def.meta.id, "basic");
+        assert!(def.meta.description.is_none());
+        assert!(def.requires.tools.is_empty());
+        assert!(def.requires.presets.is_empty());
+        assert!(def.rules.include.is_empty());
+        assert!(def.config.is_empty());
+    }
+
+    #[test]
+    fn test_parse_preset_definition_full() {
+        let toml = r#"
+[meta]
+id = "python-agentic"
+description = "Python development with agentic AI tools"
+
+[requires]
+tools = ["cursor", "claude"]
+presets = ["env:python"]
+
+[rules]
+include = ["python-snake-case", "no-api-keys", "prefer-type-hints"]
+
+[config]
+python_version = "3.11"
+use_strict_typing = true
+max_line_length = 100
+"#;
+
+        let def: PresetDefinition = toml::from_str(toml).unwrap();
+        assert_eq!(def.meta.id, "python-agentic");
+        assert_eq!(
+            def.meta.description,
+            Some("Python development with agentic AI tools".to_string())
+        );
+        assert_eq!(def.requires.tools, vec!["cursor", "claude"]);
+        assert_eq!(def.requires.presets, vec!["env:python"]);
+        assert_eq!(
+            def.rules.include,
+            vec!["python-snake-case", "no-api-keys", "prefer-type-hints"]
+        );
+
+        assert_eq!(
+            def.config.get("python_version").unwrap().as_str(),
+            Some("3.11")
+        );
+        assert_eq!(
+            def.config.get("use_strict_typing").unwrap().as_bool(),
+            Some(true)
+        );
+        assert_eq!(
+            def.config.get("max_line_length").unwrap().as_integer(),
+            Some(100)
+        );
+    }
+
+    #[test]
+    fn test_parse_preset_with_nested_config() {
+        let toml = r#"
+[meta]
+id = "custom"
+
+[config.linting]
+enabled = true
+rules = ["E501", "E302"]
+
+[config.formatting]
+style = "black"
+line_length = 88
+"#;
+
+        let def: PresetDefinition = toml::from_str(toml).unwrap();
+        assert!(def.config.contains_key("linting"));
+        assert!(def.config.contains_key("formatting"));
+    }
 }

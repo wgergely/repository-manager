@@ -116,12 +116,7 @@ impl ProcessManager {
         let child: Child = cmd.spawn().map_err(AgentError::Io)?;
         let pid = child.id();
 
-        let id = format!(
-            "{}-{}-{}",
-            agent_name,
-            worktree.unwrap_or("root"),
-            pid
-        );
+        let id = format!("{}-{}-{}", agent_name, worktree.unwrap_or("root"), pid);
 
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -157,9 +152,7 @@ impl ProcessManager {
         let mut changed = false;
 
         for process in state.values_mut() {
-            if process.status == ProcessStatus::Running
-                && !is_process_alive(process.pid)
-            {
+            if process.status == ProcessStatus::Running && !is_process_alive(process.pid) {
                 process.status = ProcessStatus::Unknown;
                 changed = true;
             }
@@ -186,9 +179,7 @@ impl ProcessManager {
                 .iter()
                 .find(|(_, p)| p.pid == pid)
                 .map(|(k, _)| k.clone())
-                .ok_or_else(|| {
-                    AgentError::ParseError(format!("No agent found with PID {}", pid))
-                })?
+                .ok_or_else(|| AgentError::ParseError(format!("No agent found with PID {}", pid)))?
         } else {
             return Err(AgentError::ParseError(format!(
                 "No agent found with ID '{}'",

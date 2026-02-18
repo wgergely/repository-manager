@@ -132,8 +132,14 @@ mod cursor_tests {
         integration.sync(&context, &rules).unwrap();
 
         let content = fs::read_to_string(temp.path().join(".cursorrules")).unwrap();
-        assert!(content.contains("Test content"), "Factory function integration must produce correct content");
-        assert!(content.contains("<!-- repo:block:test -->"), "Factory function integration must use managed blocks");
+        assert!(
+            content.contains("Test content"),
+            "Factory function integration must produce correct content"
+        );
+        assert!(
+            content.contains("<!-- repo:block:test -->"),
+            "Factory function integration must use managed blocks"
+        );
     }
 }
 
@@ -157,9 +163,18 @@ mod claude_tests {
         integration.sync(&context, &rules).unwrap();
 
         let content = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
-        assert!(content.contains("Use clear, concise code."), "Rule content must be written");
-        assert!(content.contains("<!-- repo:block:style -->"), "Must have block start marker");
-        assert!(content.contains("<!-- /repo:block:style -->"), "Must have block end marker");
+        assert!(
+            content.contains("Use clear, concise code."),
+            "Rule content must be written"
+        );
+        assert!(
+            content.contains("<!-- repo:block:style -->"),
+            "Must have block start marker"
+        );
+        assert!(
+            content.contains("<!-- /repo:block:style -->"),
+            "Must have block end marker"
+        );
     }
 
     #[test]
@@ -234,8 +249,14 @@ This is my custom documentation that should be preserved.
         integration.sync(&context, &rules).unwrap();
 
         let content = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
-        assert!(content.contains("Test content"), "Factory function integration must produce correct content");
-        assert!(content.contains("<!-- repo:block:test -->"), "Factory function integration must use managed blocks");
+        assert!(
+            content.contains("Test content"),
+            "Factory function integration must produce correct content"
+        );
+        assert!(
+            content.contains("<!-- repo:block:test -->"),
+            "Factory function integration must use managed blocks"
+        );
     }
 }
 
@@ -261,10 +282,8 @@ mod copilot_tests {
 
         integration.sync(&context, &rules).unwrap();
 
-        let content = fs::read_to_string(
-            temp.path().join(".github/copilot-instructions.md"),
-        )
-        .unwrap();
+        let content =
+            fs::read_to_string(temp.path().join(".github/copilot-instructions.md")).unwrap();
         assert!(
             content.contains("Follow conventions."),
             "Rule content must be written to copilot instructions"
@@ -290,17 +309,24 @@ mod copilot_tests {
 
         integration.sync(&context, &rules).unwrap();
 
-        let content = fs::read_to_string(
-            temp.path().join(".github/copilot-instructions.md"),
-        )
-        .unwrap();
+        let content =
+            fs::read_to_string(temp.path().join(".github/copilot-instructions.md")).unwrap();
 
         // Copilot uses non-raw mode so content includes headers
-        assert!(content.contains("Use TypeScript strict mode."), "Rule content must be present");
+        assert!(
+            content.contains("Use TypeScript strict mode."),
+            "Rule content must be present"
+        );
         assert!(content.contains("coding"), "Rule id must appear in content");
         // Copilot uses managed blocks (markdown type uses same as text)
-        assert!(content.contains("<!-- repo:block:coding -->"), "Must have block start marker");
-        assert!(content.contains("<!-- /repo:block:coding -->"), "Must have block end marker");
+        assert!(
+            content.contains("<!-- repo:block:coding -->"),
+            "Must have block start marker"
+        );
+        assert!(
+            content.contains("<!-- /repo:block:coding -->"),
+            "Must have block end marker"
+        );
     }
 
     #[test]
@@ -316,12 +342,16 @@ mod copilot_tests {
 
         integration.sync(&context, &rules).unwrap();
 
-        let content = fs::read_to_string(
-            temp.path().join(".github/copilot-instructions.md"),
-        )
-        .unwrap();
-        assert!(content.contains("Test content"), "Factory function integration must produce correct content");
-        assert!(content.contains("<!-- repo:block:test -->"), "Factory function integration must use managed blocks");
+        let content =
+            fs::read_to_string(temp.path().join(".github/copilot-instructions.md")).unwrap();
+        assert!(
+            content.contains("Test content"),
+            "Factory function integration must produce correct content"
+        );
+        assert!(
+            content.contains("<!-- repo:block:test -->"),
+            "Factory function integration must use managed blocks"
+        );
     }
 }
 
@@ -347,7 +377,10 @@ mod vscode_tests {
         // Verify valid JSON object is created
         let content = fs::read_to_string(temp.path().join(".vscode/settings.json")).unwrap();
         let settings: serde_json::Value = serde_json::from_str(&content).unwrap();
-        assert!(settings.is_object(), "settings.json must be a valid JSON object");
+        assert!(
+            settings.is_object(),
+            "settings.json must be a valid JSON object"
+        );
     }
 
     #[test]
@@ -391,7 +424,10 @@ mod vscode_tests {
 
         let content = fs::read_to_string(temp.path().join(".vscode/settings.json")).unwrap();
         let settings: serde_json::Value = serde_json::from_str(&content).unwrap();
-        assert!(settings.is_object(), "settings.json must be a valid JSON object");
+        assert!(
+            settings.is_object(),
+            "settings.json must be a valid JSON object"
+        );
         assert_eq!(settings["python.defaultInterpreterPath"], "/test/python");
     }
 }
@@ -416,9 +452,18 @@ mod windsurf_tests {
         integration.sync(&context, &rules).unwrap();
 
         let content = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
-        assert!(content.contains("Be concise."), "Rule content must be written");
-        assert!(content.contains("<!-- repo:block:style -->"), "Must have block start marker");
-        assert!(content.contains("<!-- /repo:block:style -->"), "Must have block end marker");
+        assert!(
+            content.contains("Be concise."),
+            "Rule content must be written"
+        );
+        assert!(
+            content.contains("<!-- repo:block:style -->"),
+            "Must have block start marker"
+        );
+        assert!(
+            content.contains("<!-- /repo:block:style -->"),
+            "Must have block end marker"
+        );
     }
 
     #[test]
@@ -478,8 +523,14 @@ mod windsurf_tests {
         integration.sync(&context, &rules).unwrap();
 
         let content = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
-        assert!(content.contains("Test content"), "Factory function integration must produce correct content");
-        assert!(content.contains("<!-- repo:block:test -->"), "Factory function integration must use managed blocks");
+        assert!(
+            content.contains("Test content"),
+            "Factory function integration must produce correct content"
+        );
+        assert!(
+            content.contains("<!-- repo:block:test -->"),
+            "Factory function integration must use managed blocks"
+        );
     }
 }
 
@@ -591,13 +642,22 @@ mod dispatcher_tests {
 
         // Verify files contain the shared rule content
         let cursor_content = fs::read_to_string(temp.path().join(".cursorrules")).unwrap();
-        assert!(cursor_content.contains("Shared rule content"), "Cursor must have shared rule");
+        assert!(
+            cursor_content.contains("Shared rule content"),
+            "Cursor must have shared rule"
+        );
 
         let claude_content = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
-        assert!(claude_content.contains("Shared rule content"), "Claude must have shared rule");
+        assert!(
+            claude_content.contains("Shared rule content"),
+            "Claude must have shared rule"
+        );
 
         let windsurf_content = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
-        assert!(windsurf_content.contains("Shared rule content"), "Windsurf must have shared rule");
+        assert!(
+            windsurf_content.contains("Shared rule content"),
+            "Windsurf must have shared rule"
+        );
     }
 
     #[test]
@@ -776,9 +836,18 @@ mod cross_tool_tests {
         let claude_2 = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
         let windsurf_2 = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
 
-        assert_eq!(cursor_1, cursor_2, "Cursor must be idempotent across sync_all");
-        assert_eq!(claude_1, claude_2, "Claude must be idempotent across sync_all");
-        assert_eq!(windsurf_1, windsurf_2, "Windsurf must be idempotent across sync_all");
+        assert_eq!(
+            cursor_1, cursor_2,
+            "Cursor must be idempotent across sync_all"
+        );
+        assert_eq!(
+            claude_1, claude_2,
+            "Claude must be idempotent across sync_all"
+        );
+        assert_eq!(
+            windsurf_1, windsurf_2,
+            "Windsurf must be idempotent across sync_all"
+        );
     }
 
     #[test]

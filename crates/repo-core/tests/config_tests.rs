@@ -195,12 +195,22 @@ rules = ["shared-rule", "new-rule"]
 
         // "cargo" appears in both - should only appear once after merge
         let cargo_count = base.tools.iter().filter(|t| t.as_str() == "cargo").count();
-        assert_eq!(cargo_count, 1, "Duplicate tool 'cargo' should be deduplicated");
+        assert_eq!(
+            cargo_count, 1,
+            "Duplicate tool 'cargo' should be deduplicated"
+        );
         assert_eq!(base.tools.len(), 3, "Should have cargo, rustfmt, clippy");
 
         // "shared-rule" appears in both - should only appear once
-        let rule_count = base.rules.iter().filter(|r| r.as_str() == "shared-rule").count();
-        assert_eq!(rule_count, 1, "Duplicate rule 'shared-rule' should be deduplicated");
+        let rule_count = base
+            .rules
+            .iter()
+            .filter(|r| r.as_str() == "shared-rule")
+            .count();
+        assert_eq!(
+            rule_count, 1,
+            "Duplicate rule 'shared-rule' should be deduplicated"
+        );
         assert_eq!(base.rules.len(), 2, "Should have shared-rule, new-rule");
     }
 }

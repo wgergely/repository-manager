@@ -96,11 +96,13 @@ impl ConfigResolver {
     pub fn resolve(&self) -> Result<ResolvedConfig> {
         let mut manifest = Manifest::empty();
 
-        // TODO: Layer 1 - Global defaults (~/.config/repo-manager/config.toml)
-        // This would load user-global settings
+        // Layer 1 - Global defaults (~/.config/repo-manager/config.toml)
+        // Not yet implemented - will load user-global settings
+        tracing::debug!("Config layer 1 (global defaults) not yet implemented");
 
-        // TODO: Layer 2 - Organization config
-        // This would load organization-level settings
+        // Layer 2 - Organization config
+        // Not yet implemented - will load organization-level settings
+        tracing::debug!("Config layer 2 (organization config) not yet implemented");
 
         // Layer 3 - Repository config (.repository/config.toml)
         let repo_config_path = self.root.join(".repository/config.toml");

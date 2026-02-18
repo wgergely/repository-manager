@@ -10,13 +10,15 @@ pub mod hooks;
 pub mod init;
 pub mod list;
 pub mod open;
+pub mod plugins;
 pub mod rule;
 pub mod status;
-pub mod plugins;
 pub mod sync;
 pub mod tool;
 
-pub use branch::{run_branch_add, run_branch_checkout, run_branch_list, run_branch_remove, run_branch_rename};
+pub use branch::{
+    run_branch_add, run_branch_checkout, run_branch_list, run_branch_remove, run_branch_rename,
+};
 pub use diff::run_diff;
 pub use git::{run_merge, run_pull, run_push};
 pub use governance::{run_rules_diff, run_rules_export, run_rules_import, run_rules_lint};

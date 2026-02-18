@@ -81,10 +81,7 @@ pub fn run_init(cwd: &Path, config: InitConfig) -> Result<PathBuf> {
             "repo sync".cyan()
         );
     }
-    println!(
-        "   Run {} to see available tools",
-        "repo list-tools".cyan()
-    );
+    println!("   Run {} to see available tools", "repo list-tools".cyan());
 
     Ok(target_path)
 }
@@ -277,7 +274,6 @@ mod tests {
             tools: vec![],
             presets: vec![],
             remote: None,
-
         };
 
         let result = run_init(temp_dir.path(), config);
@@ -299,7 +295,6 @@ mod tests {
             tools: vec![],
             presets: vec![],
             remote: None,
-
         };
 
         let result = run_init(temp_dir.path(), config);
@@ -321,7 +316,6 @@ mod tests {
             tools: vec![],
             presets: vec![],
             remote: None,
-
         };
 
         let result = run_init(temp_dir.path(), config);
