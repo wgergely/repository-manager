@@ -48,7 +48,7 @@ pub fn detect_mode(root: &NormalizedPath) -> Result<Mode> {
     let mode: Mode = config
         .mode
         .parse()
-        .map_err(|e: repo_core::Error| CliError::user(format!("Invalid mode in config: {}", e)))?;
+        .map_err(|e: repo_meta::Error| CliError::user(format!("Invalid mode in config: {}", e)))?;
 
     Ok(mode)
 }

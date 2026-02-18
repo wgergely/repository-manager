@@ -42,6 +42,7 @@ pub type WindsurfIntegration = GenericToolIntegration;
 ///
 /// # Deprecated
 /// Use `windsurf_integration()` instead.
+#[deprecated(note = "Use windsurf_integration() instead")]
 pub fn new() -> GenericToolIntegration {
     windsurf_integration()
 }

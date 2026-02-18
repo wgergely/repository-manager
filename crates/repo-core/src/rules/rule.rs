@@ -5,7 +5,6 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 /// A rule in the registry
@@ -73,10 +72,7 @@ impl Rule {
 
     /// Compute SHA-256 hash for content
     fn compute_hash_for(content: &str) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(content.as_bytes());
-        let result = hasher.finalize();
-        format!("sha256:{:x}", result)
+        repo_fs::checksum::compute_content_checksum(content)
     }
 
     /// Update the content and recompute hash

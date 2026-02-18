@@ -9,7 +9,7 @@ use serde_json;
 
 use repo_core::{Manifest, SyncEngine};
 use repo_fs::NormalizedPath;
-use repo_meta::{Registry, ToolRegistry};
+use repo_meta::{KnownToolSlugs, Registry};
 
 use crate::commands::sync::detect_mode;
 use crate::error::{CliError, Result};
@@ -31,7 +31,7 @@ pub fn run_add_tool(path: &Path, name: &str, dry_run: bool) -> Result<()> {
     );
 
     // Validate tool name
-    let tool_registry = ToolRegistry::with_builtins();
+    let tool_registry = KnownToolSlugs::with_builtins();
     if !tool_registry.is_known(name) {
         eprintln!(
             "{} Unknown tool '{}'. Known tools: {}",

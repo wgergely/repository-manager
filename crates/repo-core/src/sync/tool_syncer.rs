@@ -666,10 +666,10 @@ mod tests {
         let content = "hello world";
         let checksum = compute_checksum(content);
 
-        // Known SHA-256 of "hello world"
+        // Known SHA-256 of "hello world" with canonical prefix
         assert_eq!(
             checksum,
-            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+            "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
         );
     }
 

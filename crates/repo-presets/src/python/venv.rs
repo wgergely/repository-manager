@@ -2,7 +2,7 @@
 
 use crate::context::Context;
 use crate::error::{Error, Result};
-use crate::provider::{ApplyReport, CheckReport, PresetProvider};
+use crate::provider::{ApplyReport, PresetCheckReport, PresetProvider};
 use async_trait::async_trait;
 use repo_fs::NormalizedPath;
 use std::path::Path;
@@ -151,20 +151,20 @@ impl PresetProvider for VenvProvider {
         "env:python-venv"
     }
 
-    async fn check(&self, context: &Context) -> Result<CheckReport> {
+    async fn check(&self, context: &Context) -> Result<PresetCheckReport> {
         // First check if python is available
         if !self.check_python_available().await {
-            return Ok(CheckReport::broken(
+            return Ok(PresetCheckReport::broken(
                 "Python not found. Install Python 3.3+ to use venv.",
             ));
         }
 
         // Check if venv exists
         if !self.check_venv_exists(context) {
-            return Ok(CheckReport::missing("Virtual environment not found"));
+            return Ok(PresetCheckReport::missing("Virtual environment not found"));
         }
 
-        Ok(CheckReport::healthy())
+        Ok(PresetCheckReport::healthy())
     }
 
     async fn apply(&self, context: &Context) -> Result<ApplyReport> {

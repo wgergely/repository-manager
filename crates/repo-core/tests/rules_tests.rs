@@ -124,7 +124,7 @@ fn test_registry_remove_rule() {
 
     assert_eq!(registry.all_rules().len(), 1);
 
-    let removed = registry.remove_rule(uuid);
+    let removed = registry.remove_rule(uuid).unwrap();
     assert!(removed.is_some());
     assert_eq!(removed.unwrap().id, "to-remove");
     assert_eq!(registry.all_rules().len(), 0);

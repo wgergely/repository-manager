@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 /// A parsed managed block from a file
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ManagedBlock {
+pub struct FormatManagedBlock {
     /// The rule UUID this block belongs to
     pub uuid: Uuid,
     /// The content inside the block
@@ -21,7 +21,7 @@ pub struct ManagedBlock {
 /// Handler for format-specific managed block operations
 pub trait FormatHandler: Send + Sync {
     /// Parse all managed blocks from file content
-    fn parse_blocks(&self, content: &str) -> Vec<ManagedBlock>;
+    fn parse_blocks(&self, content: &str) -> Vec<FormatManagedBlock>;
 
     /// Write or update a managed block in the content
     /// Returns the new file content with the block added/updated

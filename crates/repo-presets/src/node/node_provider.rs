@@ -2,7 +2,7 @@
 
 use crate::context::Context;
 use crate::error::Result;
-use crate::provider::{ActionType, ApplyReport, CheckReport, PresetProvider, PresetStatus};
+use crate::provider::{ActionType, ApplyReport, PresetCheckReport, PresetProvider, PresetStatus};
 use async_trait::async_trait;
 use std::process::Stdio;
 use tokio::process::Command;
@@ -70,7 +70,7 @@ impl PresetProvider for NodeProvider {
         "env:node"
     }
 
-    async fn check(&self, context: &Context) -> Result<CheckReport> {
+    async fn check(&self, context: &Context) -> Result<PresetCheckReport> {
         let mut details = Vec::new();
 
         // Check if package.json exists
@@ -94,7 +94,7 @@ impl PresetProvider for NodeProvider {
         // Determine status based on what's present
         if !has_package_json {
             // Not a Node.js project
-            return Ok(CheckReport {
+            return Ok(PresetCheckReport {
                 status: PresetStatus::Missing,
                 details,
                 action: ActionType::None,
@@ -103,12 +103,12 @@ impl PresetProvider for NodeProvider {
 
         if !node_available {
             // Node.js project but node not installed
-            return Ok(CheckReport::broken(details.join("; ")));
+            return Ok(PresetCheckReport::broken(details.join("; ")));
         }
 
         if !has_node_modules {
             // Node.js project with node, but dependencies not installed
-            return Ok(CheckReport {
+            return Ok(PresetCheckReport {
                 status: PresetStatus::Missing,
                 details: vec![
                     "Dependencies not installed. Run npm install or yarn install.".to_string(),
@@ -118,7 +118,7 @@ impl PresetProvider for NodeProvider {
         }
 
         // Everything is present
-        Ok(CheckReport::healthy())
+        Ok(PresetCheckReport::healthy())
     }
 
     async fn apply(&self, _context: &Context) -> Result<ApplyReport> {

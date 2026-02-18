@@ -8,7 +8,6 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 
 use crate::Result;
 use crate::backend::{ModeBackend, StandardBackend, WorktreeBackend};
@@ -503,33 +502,18 @@ impl SyncEngine {
 
 /// Compute the SHA-256 checksum of a string content
 ///
-/// # Arguments
-///
-/// * `content` - The string content to hash
-///
-/// # Returns
-///
-/// The hex-encoded SHA-256 checksum of the content.
+/// Delegates to [`repo_fs::checksum::compute_content_checksum`] for the
+/// canonical `"sha256:<hex>"` format.
 pub fn compute_content_checksum(content: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(content.as_bytes());
-    format!("{:x}", hasher.finalize())
+    repo_fs::checksum::compute_content_checksum(content)
 }
 
 /// Compute the SHA-256 checksum of a file
 ///
-/// # Arguments
-///
-/// * `path` - Path to the file
-///
-/// # Returns
-///
-/// The hex-encoded SHA-256 checksum of the file contents.
+/// Delegates to [`repo_fs::checksum::compute_file_checksum`] for the
+/// canonical `"sha256:<hex>"` format.
 pub fn compute_file_checksum(path: &Path) -> Result<String> {
-    let content = fs::read(path)?;
-    let mut hasher = Sha256::new();
-    hasher.update(&content);
-    Ok(format!("{:x}", hasher.finalize()))
+    Ok(repo_fs::checksum::compute_file_checksum(path)?)
 }
 
 /// Extract managed block content from a file by marker UUID
@@ -598,10 +582,10 @@ mod tests {
 
         let checksum = compute_file_checksum(&file_path).unwrap();
 
-        // Known SHA-256 of "hello world"
+        // Known SHA-256 of "hello world" with canonical prefix
         assert_eq!(
             checksum,
-            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+            "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
         );
     }
 

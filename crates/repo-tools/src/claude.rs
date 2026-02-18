@@ -42,6 +42,7 @@ pub type ClaudeIntegration = GenericToolIntegration;
 ///
 /// # Deprecated
 /// Use `claude_integration()` instead.
+#[deprecated(note = "Use claude_integration() instead")]
 pub fn new() -> GenericToolIntegration {
     claude_integration()
 }

@@ -1,7 +1,6 @@
 //! Managed block types and operations
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::ops::Range;
 use uuid::Uuid;
 
@@ -52,10 +51,7 @@ impl ManagedBlock {
     }
 
     fn compute_checksum(content: &str) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(content.as_bytes());
-        let result = hasher.finalize();
-        format!("{:x}", result)
+        repo_fs::checksum::compute_content_checksum(content)
     }
 }
 
@@ -76,19 +72,15 @@ pub enum BlockLocation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sha2::{Digest, Sha256};
-
     #[test]
-    fn checksum_matches_independently_computed_sha256() {
+    fn checksum_matches_canonical_format() {
         let uuid = Uuid::new_v4();
         let content = "test content for checksum verification";
         let block = ManagedBlock::new(uuid, content, 0..40);
 
-        let mut hasher = Sha256::new();
-        hasher.update(content.as_bytes());
-        let expected = format!("{:x}", hasher.finalize());
-
+        let expected = repo_fs::checksum::compute_content_checksum(content);
         assert_eq!(block.checksum(), expected);
+        assert!(block.checksum().starts_with("sha256:"));
     }
 
     #[test]
@@ -140,9 +132,7 @@ mod tests {
         assert_eq!(block.content, "updated");
         assert!(!block.has_drifted());
 
-        let mut hasher = Sha256::new();
-        hasher.update(b"updated");
-        let expected = format!("{:x}", hasher.finalize());
+        let expected = repo_fs::checksum::compute_content_checksum("updated");
         assert_eq!(block.checksum(), expected);
     }
 }

@@ -42,6 +42,7 @@ pub type CursorIntegration = GenericToolIntegration;
 ///
 /// # Deprecated
 /// Use `cursor_integration()` instead.
+#[deprecated(note = "Use cursor_integration() instead")]
 pub fn new() -> GenericToolIntegration {
     cursor_integration()
 }

@@ -12,10 +12,6 @@ pub enum Error {
     #[error("Configuration not found at {path}")]
     ConfigNotFound { path: PathBuf },
 
-    /// Invalid repository mode specified
-    #[error("Invalid mode: {mode}")]
-    InvalidMode { mode: String },
-
     /// Error in ledger operations
     #[error("Ledger error: {message}")]
     LedgerError { message: String },

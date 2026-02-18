@@ -2,7 +2,7 @@
 
 use crate::context::Context;
 use crate::error::Result;
-use crate::provider::{ActionType, ApplyReport, CheckReport, PresetProvider, PresetStatus};
+use crate::provider::{ActionType, ApplyReport, PresetCheckReport, PresetProvider, PresetStatus};
 use async_trait::async_trait;
 use std::process::Stdio;
 use tokio::process::Command;
@@ -61,10 +61,10 @@ impl PresetProvider for RustProvider {
         "env:rust"
     }
 
-    async fn check(&self, context: &Context) -> Result<CheckReport> {
+    async fn check(&self, context: &Context) -> Result<PresetCheckReport> {
         // Check if Cargo.toml exists
         if !self.check_cargo_toml_exists(context) {
-            return Ok(CheckReport {
+            return Ok(PresetCheckReport {
                 status: PresetStatus::Missing,
                 details: vec!["Cargo.toml not found. This may not be a Rust project.".to_string()],
                 action: ActionType::None,
@@ -73,12 +73,12 @@ impl PresetProvider for RustProvider {
 
         // Check if rustc is available
         if !self.check_rustc_available().await {
-            return Ok(CheckReport::broken(
+            return Ok(PresetCheckReport::broken(
                 "Cargo.toml found but rustc not available on PATH. Install Rust via https://rustup.rs to use this project.",
             ));
         }
 
-        Ok(CheckReport::healthy())
+        Ok(PresetCheckReport::healthy())
     }
 
     async fn apply(&self, _context: &Context) -> Result<ApplyReport> {

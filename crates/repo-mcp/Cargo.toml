@@ -17,7 +17,7 @@ repo-fs = { path = "../repo-fs" }
 repo-meta = { path = "../repo-meta" }
 
 # Async runtime
-tokio = { workspace = true, features = ["full"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 
 # Serialization
 serde = { workspace = true }

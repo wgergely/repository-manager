@@ -6,6 +6,7 @@ license.workspace = true
 description = "Content parsing, editing, and diffing for Repository Manager"
 
 [dependencies]
+repo-fs = { path = "../repo-fs" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
@@ -13,7 +14,6 @@ toml = { workspace = true }
 toml_edit = { workspace = true }
 similar = { workspace = true }
 uuid = { workspace = true }
-sha2 = { workspace = true }
 regex = { workspace = true }
 thiserror = { workspace = true }
 

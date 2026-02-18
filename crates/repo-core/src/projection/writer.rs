@@ -5,7 +5,6 @@
 use crate::ledger::{Projection, ProjectionKind};
 use crate::{Error, Result};
 use repo_fs::NormalizedPath;
-use sha2::{Digest, Sha256};
 use std::fs;
 use uuid::Uuid;
 
@@ -287,10 +286,11 @@ fn remove_json_path(json: &mut serde_json::Value, path: &str) {
 }
 
 /// Compute checksum of content
+///
+/// Delegates to [`repo_fs::checksum::compute_content_checksum`] for the
+/// canonical `"sha256:<hex>"` format.
 pub fn compute_checksum(content: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(content.as_bytes());
-    format!("{:x}", hasher.finalize())
+    repo_fs::checksum::compute_content_checksum(content)
 }
 
 #[cfg(test)]
@@ -302,7 +302,7 @@ mod tests {
         let checksum = compute_checksum("hello world");
         assert_eq!(
             checksum,
-            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+            "sha256:b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
         );
     }
 

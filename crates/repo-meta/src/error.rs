@@ -29,4 +29,7 @@ pub enum Error {
 
     #[error("Provider not registered for preset: {preset_id}")]
     ProviderNotRegistered { preset_id: String },
+
+    #[error("Invalid mode: {mode}")]
+    InvalidMode { mode: String },
 }

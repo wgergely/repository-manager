@@ -15,7 +15,7 @@
 //! }
 //! ```
 
-use super::{FormatHandler, ManagedBlock};
+use super::{FormatHandler, FormatManagedBlock};
 use serde_json::{Map, Value};
 use uuid::Uuid;
 
@@ -34,7 +34,7 @@ impl JsonFormatHandler {
 }
 
 impl FormatHandler for JsonFormatHandler {
-    fn parse_blocks(&self, content: &str) -> Vec<ManagedBlock> {
+    fn parse_blocks(&self, content: &str) -> Vec<FormatManagedBlock> {
         let Ok(json) = serde_json::from_str::<Value>(content) else {
             return Vec::new();
         };
@@ -52,7 +52,7 @@ impl FormatHandler for JsonFormatHandler {
             .filter_map(|(key, value)| {
                 let uuid = Uuid::parse_str(key).ok()?;
                 let content = serde_json::to_string_pretty(value).ok()?;
-                Some(ManagedBlock { uuid, content })
+                Some(FormatManagedBlock { uuid, content })
             })
             .collect()
     }

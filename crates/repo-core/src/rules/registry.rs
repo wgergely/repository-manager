@@ -120,12 +120,16 @@ impl RuleRegistry {
 
     /// Remove a rule by UUID
     ///
-    /// Returns the removed rule if found.
-    pub fn remove_rule(&mut self, uuid: Uuid) -> Option<Rule> {
-        let pos = self.rules.iter().position(|r| r.uuid == uuid)?;
+    /// Returns the removed rule if found, or `Ok(None)` if no rule with that UUID exists.
+    /// Returns `Err` if the rule was found and removed from memory but persistence failed,
+    /// in which case the in-memory state and on-disk file will have diverged.
+    pub fn remove_rule(&mut self, uuid: Uuid) -> Result<Option<Rule>> {
+        let Some(pos) = self.rules.iter().position(|r| r.uuid == uuid) else {
+            return Ok(None);
+        };
         let rule = self.rules.remove(pos);
-        self.save().ok()?;
-        Some(rule)
+        self.save()?;
+        Ok(Some(rule))
     }
 
     /// Get all rules
