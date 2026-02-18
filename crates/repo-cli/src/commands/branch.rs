@@ -6,6 +6,8 @@ use std::path::Path;
 
 use colored::Colorize;
 
+use repo_core::config::Manifest;
+use repo_core::hooks::{HookContext, HookEvent, run_hooks};
 use repo_core::{Mode, ModeBackend, StandardBackend, WorktreeBackend};
 use repo_fs::NormalizedPath;
 
@@ -28,6 +30,22 @@ pub fn create_backend(root: &NormalizedPath, mode: Mode) -> Result<Box<dyn ModeB
     }
 }
 
+/// Load hooks from config.toml if it exists
+fn load_hooks(path: &Path) -> Vec<repo_core::hooks::HookConfig> {
+    let config_path = path.join(".repository").join("config.toml");
+    if !config_path.exists() {
+        return Vec::new();
+    }
+    let content = match std::fs::read_to_string(&config_path) {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+    match Manifest::parse(&content) {
+        Ok(m) => m.hooks,
+        Err(_) => Vec::new(),
+    }
+}
+
 /// Run the branch add command.
 ///
 /// Creates a new branch. In Standard mode, creates a git branch.
@@ -36,6 +54,7 @@ pub fn run_branch_add(path: &Path, name: &str, base: Option<&str>) -> Result<()>
     let root = NormalizedPath::new(path);
     let mode = detect_mode(&root)?;
     let backend = create_backend(&root, mode)?;
+    let hooks = load_hooks(path);
 
     let base_display = base.unwrap_or("HEAD");
     println!(
@@ -45,16 +64,32 @@ pub fn run_branch_add(path: &Path, name: &str, base: Option<&str>) -> Result<()>
         base_display.yellow()
     );
 
+    // Pre-create hooks
+    let ctx = HookContext::for_branch(name, None);
+    if let Err(e) = run_hooks(&hooks, HookEvent::PreBranchCreate, &ctx, path) {
+        println!("{} Pre-create hook failed: {}", "warn:".yellow().bold(), e);
+    }
+
     backend.create_branch(name, base)?;
+
+    // Post-create hooks
+    let worktree_path = match mode {
+        Mode::Worktrees => Some(root.join(name)),
+        Mode::Standard => None,
+    };
+    let ctx = HookContext::for_branch(name, worktree_path.as_ref().map(|p| p.as_ref()));
+    if let Err(e) = run_hooks(&hooks, HookEvent::PostBranchCreate, &ctx, path) {
+        println!("{} Post-create hook failed: {}", "warn:".yellow().bold(), e);
+    }
 
     match mode {
         Mode::Worktrees => {
-            let worktree_path = root.join(name);
+            let wt_path = root.join(name);
             println!(
                 "{} Branch {} created at {}",
                 "OK".green().bold(),
                 name.cyan(),
-                worktree_path.as_str().yellow()
+                wt_path.as_str().yellow()
             );
         }
         Mode::Standard => {
@@ -73,10 +108,23 @@ pub fn run_branch_remove(path: &Path, name: &str) -> Result<()> {
     let root = NormalizedPath::new(path);
     let mode = detect_mode(&root)?;
     let backend = create_backend(&root, mode)?;
+    let hooks = load_hooks(path);
 
     println!("{} Removing branch {}...", "=>".blue().bold(), name.cyan());
 
+    // Pre-delete hooks
+    let ctx = HookContext::for_branch(name, None);
+    if let Err(e) = run_hooks(&hooks, HookEvent::PreBranchDelete, &ctx, path) {
+        println!("{} Pre-delete hook failed: {}", "warn:".yellow().bold(), e);
+    }
+
     backend.delete_branch(name)?;
+
+    // Post-delete hooks
+    let ctx = HookContext::for_branch(name, None);
+    if let Err(e) = run_hooks(&hooks, HookEvent::PostBranchDelete, &ctx, path) {
+        println!("{} Post-delete hook failed: {}", "warn:".yellow().bold(), e);
+    }
 
     match mode {
         Mode::Worktrees => {

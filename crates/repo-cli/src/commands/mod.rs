@@ -5,6 +5,7 @@ pub mod branch;
 pub mod config;
 pub mod diff;
 pub mod git;
+pub mod hooks;
 pub mod init;
 pub mod list;
 pub mod rule;

@@ -252,6 +252,20 @@ pub enum Commands {
         #[command(subcommand)]
         action: AgentAction,
     },
+
+    /// Manage lifecycle hooks
+    ///
+    /// Configure hooks that run before/after branch creation, deletion,
+    /// agent completion, and sync operations.
+    ///
+    /// Examples:
+    ///   repo hooks list
+    ///   repo hooks add post-branch-create npm -- install
+    ///   repo hooks remove post-branch-create
+    Hooks {
+        #[command(subcommand)]
+        action: HooksAction,
+    },
 }
 
 /// Branch management actions
@@ -300,6 +314,34 @@ pub enum ConfigAction {
         /// Output as JSON
         #[arg(long)]
         json: bool,
+    },
+}
+
+/// Hook management actions
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum HooksAction {
+    /// List all configured hooks
+    List,
+
+    /// Add a new hook
+    ///
+    /// The event must be one of: pre-branch-create, post-branch-create,
+    /// pre-branch-delete, post-branch-delete, pre-agent-complete,
+    /// post-agent-complete, pre-sync, post-sync
+    Add {
+        /// Event that triggers the hook
+        event: String,
+        /// Command to execute
+        command: String,
+        /// Arguments to pass to the command
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
+
+    /// Remove all hooks for an event
+    Remove {
+        /// Event to remove hooks for
+        event: String,
     },
 }
 
@@ -1021,6 +1063,45 @@ mod tests {
                 assert_eq!(id, "no-secrets");
             }
             _ => panic!("Expected Agent Rules Remove command"),
+        }
+    }
+
+    #[test]
+    fn parse_hooks_list_command() {
+        let cli = Cli::parse_from(["repo", "hooks", "list"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Hooks {
+                action: HooksAction::List
+            })
+        ));
+    }
+
+    #[test]
+    fn parse_hooks_add_command() {
+        let cli = Cli::parse_from(["repo", "hooks", "add", "post-branch-create", "npm", "install"]);
+        match cli.command {
+            Some(Commands::Hooks {
+                action: HooksAction::Add { event, command, args },
+            }) => {
+                assert_eq!(event, "post-branch-create");
+                assert_eq!(command, "npm");
+                assert_eq!(args, vec!["install"]);
+            }
+            _ => panic!("Expected Hooks Add command"),
+        }
+    }
+
+    #[test]
+    fn parse_hooks_remove_command() {
+        let cli = Cli::parse_from(["repo", "hooks", "remove", "pre-sync"]);
+        match cli.command {
+            Some(Commands::Hooks {
+                action: HooksAction::Remove { event },
+            }) => {
+                assert_eq!(event, "pre-sync");
+            }
+            _ => panic!("Expected Hooks Remove command"),
         }
     }
 }

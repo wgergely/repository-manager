@@ -16,7 +16,7 @@ use colored::Colorize;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-use cli::{AgentAction, BranchAction, Cli, Commands, ConfigAction, PluginsAction};
+use cli::{AgentAction, BranchAction, Cli, Commands, ConfigAction, HooksAction, PluginsAction};
 use error::Result;
 
 fn main() {
@@ -91,6 +91,7 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::ToolInfo { name } => cmd_tool_info(&name),
         Commands::Plugins { action } => cmd_plugins(action),
         Commands::Agent { action } => cmd_agent(action),
+        Commands::Hooks { action } => cmd_hooks(action),
     }
 }
 
@@ -238,6 +239,19 @@ fn cmd_tool_info(name: &str) -> Result<()> {
 
 fn cmd_agent(action: AgentAction) -> Result<()> {
     commands::agent::run_agent(action)
+}
+
+fn cmd_hooks(action: HooksAction) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    match action {
+        HooksAction::List => commands::hooks::run_hooks_list(&cwd),
+        HooksAction::Add {
+            event,
+            command,
+            args,
+        } => commands::hooks::run_hooks_add(&cwd, &event, &command, args),
+        HooksAction::Remove { event } => commands::hooks::run_hooks_remove(&cwd, &event),
+    }
 }
 
 fn cmd_plugins(action: PluginsAction) -> Result<()> {

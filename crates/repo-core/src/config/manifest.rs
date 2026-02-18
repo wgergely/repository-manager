@@ -4,6 +4,7 @@
 //! Multiple manifests can be merged together to create a resolved configuration.
 
 use crate::Result;
+use crate::hooks::HookConfig;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -55,6 +56,10 @@ pub struct Manifest {
     /// List of rules to apply
     #[serde(default)]
     pub rules: Vec<String>,
+
+    /// Lifecycle hooks
+    #[serde(default)]
+    pub hooks: Vec<HookConfig>,
 }
 
 impl Manifest {
@@ -101,6 +106,7 @@ impl Manifest {
             presets: HashMap::new(),
             tools: Vec::new(),
             rules: Vec::new(),
+            hooks: Vec::new(),
         }
     }
 
@@ -152,6 +158,21 @@ impl Manifest {
             }
         }
 
+        // [[hooks]] array of tables
+        for hook in &self.hooks {
+            content.push_str("\n[[hooks]]\n");
+            content.push_str(&format!("event = \"{}\"\n", hook.event));
+            content.push_str(&format!("command = \"{}\"\n", hook.command));
+            if !hook.args.is_empty() {
+                let args_str: Vec<String> =
+                    hook.args.iter().map(|a| format!("\"{}\"", a)).collect();
+                content.push_str(&format!("args = [{}]\n", args_str.join(", ")));
+            }
+            if let Some(ref dir) = hook.working_dir {
+                content.push_str(&format!("working_dir = \"{}\"\n", dir.display()));
+            }
+        }
+
         content
     }
 
@@ -196,6 +217,9 @@ impl Manifest {
                 self.rules.push(rule.clone());
             }
         }
+
+        // Hooks: extend (append all from other)
+        self.hooks.extend(other.hooks.iter().cloned());
     }
 }
 
