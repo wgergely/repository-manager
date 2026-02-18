@@ -179,6 +179,9 @@ All Python variable names must use snake_case.
 <!-- /repo:block:550e8400-e29b-41d4-a716-446655440000 -->
 ```
 
+**Markdown Files (CLAUDE.md)**:
+For Markdown, we use managed blocks with `<!-- repo:block:{id} -->` markers, same as `.cursorrules`.
+
 **YAML/TOML Files**:
 
 Uses hash-comment markers:

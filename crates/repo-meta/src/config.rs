@@ -72,6 +72,11 @@ fn default_strategy() -> String {
 /// Complete repository configuration
 ///
 /// Loaded from `.repository/config.toml`
+///
+/// **Deprecated**: Use `repo_core::Manifest` instead. This struct expects
+/// `[active] tools = [...]` format while `Manifest` uses top-level `tools = [...]`.
+/// New code should use `Manifest::parse()`. This will be removed in a future release.
+#[deprecated(note = "Use repo_core::Manifest instead")]
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct RepositoryConfig {
     /// Core settings
@@ -93,6 +98,9 @@ pub struct RepositoryConfig {
 ///
 /// Looks for `.repository/config.toml` relative to the given root path.
 ///
+/// **Deprecated**: Use `repo_core::Manifest::parse()` instead. Read the file
+/// contents and call `Manifest::parse(&content)` directly.
+///
 /// # Arguments
 ///
 /// * `root` - The repository root path
@@ -100,14 +108,8 @@ pub struct RepositoryConfig {
 /// # Returns
 ///
 /// The loaded configuration or an error if not found or invalid.
-///
-/// # Example
-///
-/// ```ignore
-/// let root = NormalizedPath::new("/path/to/repo");
-/// let config = load_config(&root)?;
-/// println!("Mode: {:?}", config.core.mode);
-/// ```
+#[deprecated(note = "Use repo_core::Manifest::parse() instead")]
+#[allow(deprecated)]
 pub fn load_config(root: &NormalizedPath) -> Result<RepositoryConfig> {
     let config_path = root
         .join(RepoPath::RepositoryConfig.as_str())
@@ -164,6 +166,7 @@ pub fn load_config(root: &NormalizedPath) -> Result<RepositoryConfig> {
 ///     println!("Python config: {:?}", python_config);
 /// }
 /// ```
+#[allow(deprecated)]
 pub fn get_preset_config<'a>(
     config: &'a RepositoryConfig,
     preset_id: &str,
@@ -172,6 +175,7 @@ pub fn get_preset_config<'a>(
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
 

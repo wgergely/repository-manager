@@ -37,6 +37,7 @@ pub mod validation;
 
 // Note: tools.rs was removed - ToolRegistry is now only in validation.rs
 
+#[allow(deprecated)]
 pub use config::{
     ActiveConfig, CoreConfig, RepositoryConfig, RepositoryMode, SyncConfig, get_preset_config,
     load_config,

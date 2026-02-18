@@ -14,7 +14,6 @@ use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
 use repo_git::{
     ClassicLayout, ContainerLayout, LayoutProvider, NamingStrategy, naming::branch_to_directory,
 };
-use repo_meta::load_config;
 use repo_presets::{Context, PresetProvider, PresetStatus, PluginsProvider, UvProvider};
 use repo_tools::{
     Rule, SyncContext, ToolIntegration, VSCodeIntegration, antigravity_integration,
@@ -136,27 +135,33 @@ mod m1_init {
     /// M1.1: Init creates .repository/config.toml in standard mode
     #[test]
     fn m1_1_init_standard_mode_creates_config() {
+        use repo_core::Manifest;
+
         let mut repo = TestRepo::new();
         repo.init_git();
         repo.init_repo_manager("standard", &[], &[]);
 
         repo.assert_file_exists(".repository/config.toml");
 
-        let config = load_config(&NormalizedPath::new(repo.root())).unwrap();
-        assert_eq!(config.core.mode, repo_meta::RepositoryMode::Standard);
+        let content = fs::read_to_string(repo.root().join(".repository/config.toml")).unwrap();
+        let manifest = Manifest::parse(&content).unwrap();
+        assert_eq!(manifest.core.mode, "standard");
     }
 
     /// M1.2: Init creates .repository/config.toml in worktrees mode
     #[test]
     fn m1_2_init_worktrees_mode_creates_config() {
+        use repo_core::Manifest;
+
         let mut repo = TestRepo::new();
         repo.init_git();
         repo.init_repo_manager("worktrees", &[], &[]);
 
         repo.assert_file_exists(".repository/config.toml");
 
-        let config = load_config(&NormalizedPath::new(repo.root())).unwrap();
-        assert_eq!(config.core.mode, repo_meta::RepositoryMode::Worktrees);
+        let content = fs::read_to_string(repo.root().join(".repository/config.toml")).unwrap();
+        let manifest = Manifest::parse(&content).unwrap();
+        assert_eq!(manifest.core.mode, "worktrees");
     }
 
     /// M1.3: Init with tools records them in config

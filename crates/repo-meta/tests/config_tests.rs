@@ -1,4 +1,9 @@
 //! Integration tests for configuration loading
+//!
+//! Note: These tests exercise the deprecated RepositoryConfig/load_config API.
+//! New code should use repo_core::Manifest::parse() instead.
+
+#![allow(deprecated)]
 
 use repo_fs::NormalizedPath;
 use repo_meta::config::{RepositoryMode, get_preset_config, load_config};
