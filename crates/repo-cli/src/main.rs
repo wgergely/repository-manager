@@ -96,6 +96,7 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::Plugins { action } => cmd_plugins(action),
         Commands::Agent { action } => cmd_agent(action),
         Commands::Hooks { action } => cmd_hooks(action),
+        Commands::Open { worktree, tool } => cmd_open(&worktree, tool.as_deref()),
     }
 }
 
@@ -276,6 +277,11 @@ fn cmd_hooks(action: HooksAction) -> Result<()> {
         } => commands::hooks::run_hooks_add(&cwd, &event, &command, args),
         HooksAction::Remove { event } => commands::hooks::run_hooks_remove(&cwd, &event),
     }
+}
+
+fn cmd_open(worktree: &str, tool: Option<&str>) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    commands::open::run_open(&cwd, worktree, tool)
 }
 
 fn cmd_plugins(action: PluginsAction) -> Result<()> {

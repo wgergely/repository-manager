@@ -293,6 +293,24 @@ pub enum Commands {
         #[command(subcommand)]
         action: HooksAction,
     },
+
+    /// Open a worktree in an editor/IDE
+    ///
+    /// Launches the specified editor in the target worktree directory.
+    /// Runs sync before opening to ensure configs are up to date.
+    ///
+    /// Examples:
+    ///   repo open feature-x                # Open with auto-detected editor
+    ///   repo open feature-x --tool cursor  # Open with Cursor
+    ///   repo open feature-x --tool vscode  # Open with VS Code
+    Open {
+        /// Name of the worktree to open
+        worktree: String,
+
+        /// Editor to use (cursor, vscode, zed). Auto-detected if not specified.
+        #[arg(short, long)]
+        tool: Option<String>,
+    },
 }
 
 /// Branch management actions
@@ -1129,6 +1147,30 @@ mod tests {
                 assert_eq!(event, "pre-sync");
             }
             _ => panic!("Expected Hooks Remove command"),
+        }
+    }
+
+    #[test]
+    fn parse_open_command() {
+        let cli = Cli::parse_from(["repo", "open", "feature-x"]);
+        match cli.command {
+            Some(Commands::Open { worktree, tool }) => {
+                assert_eq!(worktree, "feature-x");
+                assert!(tool.is_none());
+            }
+            _ => panic!("Expected Open command"),
+        }
+    }
+
+    #[test]
+    fn parse_open_command_with_tool() {
+        let cli = Cli::parse_from(["repo", "open", "feature-x", "--tool", "cursor"]);
+        match cli.command {
+            Some(Commands::Open { worktree, tool }) => {
+                assert_eq!(worktree, "feature-x");
+                assert_eq!(tool, Some("cursor".to_string()));
+            }
+            _ => panic!("Expected Open command"),
         }
     }
 }

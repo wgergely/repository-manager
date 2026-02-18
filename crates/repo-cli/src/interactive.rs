@@ -105,7 +105,7 @@ pub fn interactive_init(default_name: &str) -> Result<InitConfig> {
         .interact()?;
 
     if !proceed {
-        return Err(crate::error::CliError::user("Init cancelled by user.").into());
+        return Err(crate::error::CliError::user("Init cancelled by user."));
     }
 
     Ok(InitConfig {

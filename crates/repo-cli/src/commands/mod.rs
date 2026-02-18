@@ -9,6 +9,7 @@ pub mod governance;
 pub mod hooks;
 pub mod init;
 pub mod list;
+pub mod open;
 pub mod rule;
 pub mod status;
 pub mod plugins;
