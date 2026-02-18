@@ -12,11 +12,9 @@ path = "src/main.rs"
 [dependencies]
 # Core repository crates
 # Note: repo-tools is not needed directly here; tool dispatch is handled via repo-core
-repo-agent = { path = "../repo-agent" }
 repo-core = { path = "../repo-core" }
 repo-fs = { path = "../repo-fs" }
 repo-meta = { path = "../repo-meta" }
-repo-presets = { path = "../repo-presets" }
 
 # Async runtime
 tokio = { workspace = true, features = ["full"] }

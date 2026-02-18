@@ -32,11 +32,6 @@
 //! - `preset_add` - Add a preset to configuration
 //! - `preset_remove` - Remove a preset from configuration
 //!
-//! ## Plugins
-//! - `plugins_install` - Install a Claude Code plugin
-//! - `plugins_status` - Check plugin installation status
-//! - `plugins_uninstall` - Uninstall a plugin
-
 use serde::{Deserialize, Serialize};
 
 /// Tool definition for MCP protocol
@@ -335,108 +330,6 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                 "required": ["name"]
             }),
         },
-        // Agent Orchestration
-        ToolDefinition {
-            name: "agent_check".to_string(),
-            description: "Check agent subsystem prerequisites (Python 3.13+, vaultspec)"
-                .to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {}
-            }),
-        },
-        ToolDefinition {
-            name: "agent_list".to_string(),
-            description: "List available agent definitions from vaultspec".to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {}
-            }),
-        },
-        ToolDefinition {
-            name: "agent_spawn".to_string(),
-            description: "Spawn an agent to work on a task in a worktree".to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Agent name or type (e.g., 'researcher', 'coder')"
-                    },
-                    "goal": {
-                        "type": "string",
-                        "description": "Goal or task description for the agent"
-                    },
-                    "worktree": {
-                        "type": "string",
-                        "description": "Worktree to run the agent in"
-                    }
-                },
-                "required": ["name"]
-            }),
-        },
-        ToolDefinition {
-            name: "agent_status".to_string(),
-            description: "Check status of running agents and tasks".to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "task_id": {
-                        "type": "string",
-                        "description": "Specific task ID to check (shows all if omitted)"
-                    }
-                }
-            }),
-        },
-        ToolDefinition {
-            name: "agent_stop".to_string(),
-            description: "Stop a running agent by task ID".to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "task_id": {
-                        "type": "string",
-                        "description": "Task ID or agent ID to stop"
-                    }
-                },
-                "required": ["task_id"]
-            }),
-        },
-        // Plugins
-        ToolDefinition {
-            name: "plugins_install".to_string(),
-            description: "Install a Claude Code plugin".to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "version": {
-                        "type": "string",
-                        "description": "Version tag to install (defaults to latest)"
-                    }
-                }
-            }),
-        },
-        ToolDefinition {
-            name: "plugins_status".to_string(),
-            description: "Check plugin installation status".to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {}
-            }),
-        },
-        ToolDefinition {
-            name: "plugins_uninstall".to_string(),
-            description: "Uninstall a Claude Code plugin".to_string(),
-            input_schema: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "version": {
-                        "type": "string",
-                        "description": "Version tag to uninstall (defaults to latest)"
-                    }
-                }
-            }),
-        },
     ]
 }
 
@@ -468,21 +361,13 @@ mod tests {
         assert!(names.contains(&"preset_list"));
         assert!(names.contains(&"preset_add"));
         assert!(names.contains(&"preset_remove"));
-        assert!(names.contains(&"agent_check"));
-        assert!(names.contains(&"agent_list"));
-        assert!(names.contains(&"agent_spawn"));
-        assert!(names.contains(&"agent_status"));
-        assert!(names.contains(&"agent_stop"));
-        assert!(names.contains(&"plugins_install"));
-        assert!(names.contains(&"plugins_status"));
-        assert!(names.contains(&"plugins_uninstall"));
     }
 
     #[test]
     fn test_tool_definitions_count() {
         let tools = get_tool_definitions();
-        // 4 repo lifecycle + 3 branch + 3 git + 4 config + 3 preset + 5 agent + 3 plugins = 25 tools
-        assert_eq!(tools.len(), 25);
+        // 4 repo lifecycle + 3 branch + 3 git + 4 config + 3 preset = 17 tools
+        assert_eq!(tools.len(), 17);
     }
 
     #[test]

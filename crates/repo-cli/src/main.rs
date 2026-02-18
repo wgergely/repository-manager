@@ -16,7 +16,7 @@ use colored::Colorize;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-use cli::{AgentAction, BranchAction, Cli, Commands, ConfigAction, HooksAction, PluginsAction};
+use cli::{BranchAction, Cli, Commands, ConfigAction, HooksAction};
 use error::Result;
 
 fn main() {
@@ -93,8 +93,6 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::Merge { source } => cmd_merge(&source),
         Commands::Config { action } => cmd_config(action),
         Commands::ToolInfo { name } => cmd_tool_info(&name),
-        Commands::Plugins { action } => cmd_plugins(action),
-        Commands::Agent { action } => cmd_agent(action),
         Commands::Hooks { action } => cmd_hooks(action),
         Commands::Open { worktree, tool } => cmd_open(&worktree, tool.as_deref()),
     }
@@ -262,10 +260,6 @@ fn cmd_tool_info(name: &str) -> Result<()> {
     commands::config::run_tool_info(&cwd, name)
 }
 
-fn cmd_agent(action: AgentAction) -> Result<()> {
-    commands::agent::run_agent(action)
-}
-
 fn cmd_hooks(action: HooksAction) -> Result<()> {
     let cwd = std::env::current_dir()?;
     match action {
@@ -282,15 +276,6 @@ fn cmd_hooks(action: HooksAction) -> Result<()> {
 fn cmd_open(worktree: &str, tool: Option<&str>) -> Result<()> {
     let cwd = std::env::current_dir()?;
     commands::open::run_open(&cwd, worktree, tool)
-}
-
-fn cmd_plugins(action: PluginsAction) -> Result<()> {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| error::CliError::user(format!("Failed to create runtime: {}", e)))?;
-
-    rt.block_on(commands::plugins::handle_plugins(action))
 }
 
 #[cfg(test)]

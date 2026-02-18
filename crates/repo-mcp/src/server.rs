@@ -338,10 +338,10 @@ mod tests {
         // Should have loaded tools
         assert!(!server.tools().is_empty());
         // Verify a minimum number of expected tools are loaded
-        // (4 repo + 3 branch + 3 git + 4 config + 3 preset + 5 agent + 3 plugins = 25 as of initial implementation)
+        // (4 repo + 3 branch + 3 git + 4 config + 3 preset = 17 tools)
         assert!(
-            server.tools().len() >= 20,
-            "Expected at least 20 tools, got {}",
+            server.tools().len() >= 15,
+            "Expected at least 15 tools, got {}",
             server.tools().len()
         );
 

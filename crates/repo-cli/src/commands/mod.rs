@@ -1,6 +1,5 @@
 //! Command implementations for repo-cli
 
-pub mod agent;
 pub mod branch;
 pub mod config;
 pub mod diff;
@@ -10,7 +9,7 @@ pub mod hooks;
 pub mod init;
 pub mod list;
 pub mod open;
-pub mod plugins;
+
 pub mod rule;
 pub mod status;
 pub mod sync;
