@@ -262,6 +262,7 @@ fn cmd_tool_info(name: &str) -> Result<()> {
     commands::config::run_tool_info(&cwd, name)
 }
 
+
 fn cmd_agent(action: AgentAction) -> Result<()> {
     commands::agent::run_agent(action)
 }
