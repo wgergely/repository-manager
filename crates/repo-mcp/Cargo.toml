@@ -13,6 +13,7 @@ path = "src/main.rs"
 # Core repository crates
 # Note: repo-tools is not needed directly here; tool dispatch is handled via repo-core
 repo-core = { path = "../repo-core" }
+repo-extensions = { path = "../repo-extensions" }
 repo-fs = { path = "../repo-fs" }
 repo-meta = { path = "../repo-meta" }
 

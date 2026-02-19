@@ -32,6 +32,13 @@
 //! - `preset_add` - Add a preset to configuration
 //! - `preset_remove` - Remove a preset from configuration
 //!
+//! ## Extension Management
+//! - `extension_install` - Install an extension from a URL or path
+//! - `extension_add` - Add a known extension by name
+//! - `extension_init` - Initialize a new extension scaffold
+//! - `extension_remove` - Remove an installed extension
+//! - `extension_list` - List installed and known extensions
+//!
 use serde::{Deserialize, Serialize};
 
 /// Tool definition for MCP protocol
@@ -103,6 +110,11 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                         "type": "array",
                         "items": { "type": "string" },
                         "description": "Tools to enable"
+                    },
+                    "extensions": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Extensions to enable (by name or source URL)"
                     }
                 },
                 "required": ["name"]
@@ -330,6 +342,71 @@ pub fn get_tool_definitions() -> Vec<ToolDefinition> {
                 "required": ["name"]
             }),
         },
+        // Extension Management
+        ToolDefinition {
+            name: "extension_install".to_string(),
+            description: "Install an extension from a URL or local path".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "type": "string",
+                        "description": "Source URL or local path for the extension"
+                    }
+                },
+                "required": ["source"]
+            }),
+        },
+        ToolDefinition {
+            name: "extension_add".to_string(),
+            description: "Add a known extension by name from the registry".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the known extension to add"
+                    }
+                },
+                "required": ["name"]
+            }),
+        },
+        ToolDefinition {
+            name: "extension_init".to_string(),
+            description: "Initialize a new extension scaffold".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name for the new extension"
+                    }
+                },
+                "required": ["name"]
+            }),
+        },
+        ToolDefinition {
+            name: "extension_remove".to_string(),
+            description: "Remove an installed extension".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the extension to remove"
+                    }
+                },
+                "required": ["name"]
+            }),
+        },
+        ToolDefinition {
+            name: "extension_list".to_string(),
+            description: "List installed and known extensions".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
     ]
 }
 
@@ -361,13 +438,18 @@ mod tests {
         assert!(names.contains(&"preset_list"));
         assert!(names.contains(&"preset_add"));
         assert!(names.contains(&"preset_remove"));
+        assert!(names.contains(&"extension_install"));
+        assert!(names.contains(&"extension_add"));
+        assert!(names.contains(&"extension_init"));
+        assert!(names.contains(&"extension_remove"));
+        assert!(names.contains(&"extension_list"));
     }
 
     #[test]
     fn test_tool_definitions_count() {
         let tools = get_tool_definitions();
-        // 4 repo lifecycle + 3 branch + 3 git + 4 config + 3 preset = 17 tools
-        assert_eq!(tools.len(), 17);
+        // 4 repo lifecycle + 3 branch + 3 git + 4 config + 3 preset + 5 extension = 22 tools
+        assert_eq!(tools.len(), 22);
     }
 
     #[test]

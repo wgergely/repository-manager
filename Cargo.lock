@@ -1549,16 +1549,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
 
 [[package]]
-name = "repo-agent"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "repo-blocks"
 version = "0.1.0"
 dependencies = [
@@ -1584,8 +1574,8 @@ dependencies = [
  "dialoguer",
  "git2",
  "predicates",
- "repo-agent",
  "repo-core",
+ "repo-extensions",
  "repo-fs",
  "repo-git",
  "repo-meta",
@@ -1627,6 +1617,7 @@ dependencies = [
  "fs2",
  "pretty_assertions",
  "repo-content",
+ "repo-extensions",
  "repo-fs",
  "repo-git",
  "repo-meta",
@@ -1640,6 +1631,20 @@ dependencies = [
  "toml",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "repo-extensions"
+version = "0.1.0"
+dependencies = [
+ "pretty_assertions",
+ "repo-fs",
+ "repo-meta",
+ "semver",
+ "serde",
+ "tempfile",
+ "thiserror 2.0.18",
+ "toml",
 ]
 
 [[package]]
@@ -1687,11 +1692,10 @@ name = "repo-mcp"
 version = "0.1.0"
 dependencies = [
  "clap",
- "repo-agent",
  "repo-core",
+ "repo-extensions",
  "repo-fs",
  "repo-meta",
- "repo-presets",
  "rstest",
  "serde",
  "serde_json",
@@ -1728,7 +1732,6 @@ dependencies = [
  "repo-fs",
  "repo-meta",
  "rstest",
- "serde_json",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
@@ -1842,6 +1845,10 @@ name = "semver"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
+dependencies = [
+ "serde",
+ "serde_core",
+]
 
 [[package]]
 name = "serde"

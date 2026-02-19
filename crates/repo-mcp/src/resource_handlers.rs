@@ -93,11 +93,7 @@ async fn read_rules(root: &Path) -> Result<ResourceContent> {
                     content.push_str("\n\n---\n\n");
                 }
                 Err(e) => {
-                    warn!(
-                        "Failed to read rule file {}: {}",
-                        entry.path().display(),
-                        e
-                    );
+                    warn!("Failed to read rule file {}: {}", entry.path().display(), e);
                 }
             }
         }

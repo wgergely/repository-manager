@@ -43,6 +43,7 @@ pub enum Commands {
     ///   repo init my-project         # Create and initialize my-project/
     ///   repo init --interactive      # Guided setup
     ///   repo init -t claude -t cursor # With specific tools
+    ///   repo init -e vaultspec        # With extensions
     Init {
         /// Project name (creates folder if not ".")
         #[arg(default_value = ".")]
@@ -59,6 +60,10 @@ pub enum Commands {
         /// Presets to apply
         #[arg(short, long)]
         presets: Vec<String>,
+
+        /// Extensions to enable (by name or URL)
+        #[arg(short, long)]
+        extensions: Vec<String>,
 
         /// Remote repository URL
         #[arg(short, long)]
@@ -281,6 +286,20 @@ pub enum Commands {
         action: HooksAction,
     },
 
+    /// Manage extensions
+    ///
+    /// Install, add, initialize, remove, and list extensions.
+    ///
+    /// Examples:
+    ///   repo extension list
+    ///   repo extension install https://github.com/example/ext.git
+    ///   repo ext add my-extension
+    #[command(alias = "ext")]
+    Extension {
+        #[command(subcommand)]
+        action: ExtensionAction,
+    },
+
     /// Open a worktree in an editor/IDE
     ///
     /// Launches the specified editor in the target worktree directory.
@@ -377,6 +396,45 @@ pub enum HooksAction {
     },
 }
 
+/// Extension management actions
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum ExtensionAction {
+    /// Install an extension from a URL or local path
+    Install {
+        /// Source URL or local path for the extension
+        source: String,
+
+        /// Don't activate the extension after installing
+        #[arg(long)]
+        no_activate: bool,
+    },
+
+    /// Add a known extension by name
+    Add {
+        /// Name of the extension to add
+        name: String,
+    },
+
+    /// Initialize a new extension scaffold
+    Init {
+        /// Name for the new extension
+        name: String,
+    },
+
+    /// Remove an installed extension
+    Remove {
+        /// Name of the extension to remove
+        name: String,
+    },
+
+    /// List installed and known extensions
+    List {
+        /// Output as JSON for scripting
+        #[arg(long)]
+        json: bool,
+    },
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -418,8 +476,9 @@ mod tests {
                 mode,
                 tools,
                 presets,
+                extensions,
                 ..
-            }) if name == "." && mode == "worktrees" && tools.is_empty() && presets.is_empty()
+            }) if name == "." && mode == "worktrees" && tools.is_empty() && presets.is_empty() && extensions.is_empty()
         ));
     }
 
@@ -448,6 +507,8 @@ mod tests {
             "prettier",
             "--presets",
             "typescript",
+            "--extensions",
+            "vaultspec",
             "--remote",
             "https://github.com/user/repo.git",
         ]);
@@ -457,6 +518,7 @@ mod tests {
                 mode,
                 tools,
                 presets,
+                extensions,
                 remote,
                 interactive,
             }) => {
@@ -464,6 +526,7 @@ mod tests {
                 assert_eq!(mode, "worktree");
                 assert_eq!(tools, vec!["eslint", "prettier"]);
                 assert_eq!(presets, vec!["typescript"]);
+                assert_eq!(extensions, vec!["vaultspec"]);
                 assert_eq!(remote, Some("https://github.com/user/repo.git".to_string()));
                 assert!(!interactive);
             }
@@ -938,5 +1001,124 @@ mod tests {
             }
             _ => panic!("Expected Open command"),
         }
+    }
+
+    #[test]
+    fn parse_extension_install_command() {
+        let cli = Cli::parse_from([
+            "repo",
+            "extension",
+            "install",
+            "https://github.com/example/ext.git",
+        ]);
+        match cli.command {
+            Some(Commands::Extension {
+                action:
+                    ExtensionAction::Install {
+                        source,
+                        no_activate,
+                    },
+            }) => {
+                assert_eq!(source, "https://github.com/example/ext.git");
+                assert!(!no_activate);
+            }
+            _ => panic!("Expected Extension Install command"),
+        }
+    }
+
+    #[test]
+    fn parse_extension_install_no_activate() {
+        let cli = Cli::parse_from([
+            "repo",
+            "extension",
+            "install",
+            "https://github.com/example/ext.git",
+            "--no-activate",
+        ]);
+        match cli.command {
+            Some(Commands::Extension {
+                action:
+                    ExtensionAction::Install {
+                        source,
+                        no_activate,
+                    },
+            }) => {
+                assert_eq!(source, "https://github.com/example/ext.git");
+                assert!(no_activate);
+            }
+            _ => panic!("Expected Extension Install command"),
+        }
+    }
+
+    #[test]
+    fn parse_extension_add_command() {
+        let cli = Cli::parse_from(["repo", "extension", "add", "vaultspec"]);
+        match cli.command {
+            Some(Commands::Extension {
+                action: ExtensionAction::Add { name },
+            }) => {
+                assert_eq!(name, "vaultspec");
+            }
+            _ => panic!("Expected Extension Add command"),
+        }
+    }
+
+    #[test]
+    fn parse_extension_init_command() {
+        let cli = Cli::parse_from(["repo", "extension", "init", "my-ext"]);
+        match cli.command {
+            Some(Commands::Extension {
+                action: ExtensionAction::Init { name },
+            }) => {
+                assert_eq!(name, "my-ext");
+            }
+            _ => panic!("Expected Extension Init command"),
+        }
+    }
+
+    #[test]
+    fn parse_extension_remove_command() {
+        let cli = Cli::parse_from(["repo", "extension", "remove", "my-ext"]);
+        match cli.command {
+            Some(Commands::Extension {
+                action: ExtensionAction::Remove { name },
+            }) => {
+                assert_eq!(name, "my-ext");
+            }
+            _ => panic!("Expected Extension Remove command"),
+        }
+    }
+
+    #[test]
+    fn parse_extension_list_command() {
+        let cli = Cli::parse_from(["repo", "extension", "list"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Extension {
+                action: ExtensionAction::List { json: false }
+            })
+        ));
+    }
+
+    #[test]
+    fn parse_extension_list_json() {
+        let cli = Cli::parse_from(["repo", "extension", "list", "--json"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Extension {
+                action: ExtensionAction::List { json: true }
+            })
+        ));
+    }
+
+    #[test]
+    fn parse_ext_alias() {
+        let cli = Cli::parse_from(["repo", "ext", "list"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Extension {
+                action: ExtensionAction::List { json: false }
+            })
+        ));
     }
 }

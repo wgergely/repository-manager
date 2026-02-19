@@ -12,6 +12,7 @@ repo-git = { path = "../repo-git" }
 repo-meta = { path = "../repo-meta" }
 repo-tools = { path = "../repo-tools" }
 repo-presets = { path = "../repo-presets" }
+repo-extensions = { path = "../repo-extensions" }
 repo-content = { path = "../repo-content" }
 
 # Serialization

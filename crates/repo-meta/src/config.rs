@@ -144,11 +144,26 @@ mod tests {
 
     #[test]
     fn test_from_str() {
-        assert_eq!("standard".parse::<RepositoryMode>().unwrap(), RepositoryMode::Standard);
-        assert_eq!("default".parse::<RepositoryMode>().unwrap(), RepositoryMode::Standard);
-        assert_eq!("worktrees".parse::<RepositoryMode>().unwrap(), RepositoryMode::Worktrees);
-        assert_eq!("worktree".parse::<RepositoryMode>().unwrap(), RepositoryMode::Worktrees);
-        assert_eq!("container".parse::<RepositoryMode>().unwrap(), RepositoryMode::Worktrees);
+        assert_eq!(
+            "standard".parse::<RepositoryMode>().unwrap(),
+            RepositoryMode::Standard
+        );
+        assert_eq!(
+            "default".parse::<RepositoryMode>().unwrap(),
+            RepositoryMode::Standard
+        );
+        assert_eq!(
+            "worktrees".parse::<RepositoryMode>().unwrap(),
+            RepositoryMode::Worktrees
+        );
+        assert_eq!(
+            "worktree".parse::<RepositoryMode>().unwrap(),
+            RepositoryMode::Worktrees
+        );
+        assert_eq!(
+            "container".parse::<RepositoryMode>().unwrap(),
+            RepositoryMode::Worktrees
+        );
         assert!("invalid".parse::<RepositoryMode>().is_err());
     }
 

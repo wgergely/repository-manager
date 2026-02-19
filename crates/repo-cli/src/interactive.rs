@@ -4,6 +4,7 @@
 
 use colored::Colorize;
 use dialoguer::{Confirm, Input, MultiSelect, Select};
+use repo_extensions::ExtensionRegistry;
 use repo_meta::Registry;
 use repo_tools::ToolRegistry;
 
@@ -61,6 +62,29 @@ pub fn interactive_init(default_name: &str) -> Result<InitConfig> {
         .map(|&i| available_presets[i].clone())
         .collect();
 
+    // Extension selection (multi-select) - from ExtensionRegistry + custom option
+    let ext_registry = ExtensionRegistry::with_known();
+    let known_extensions = ext_registry.known_extensions();
+    let mut ext_items: Vec<String> = known_extensions.clone();
+    ext_items.push("Custom (enter URL)".to_string());
+    let ext_indices = MultiSelect::new()
+        .with_prompt("Select extensions (space to toggle, enter to confirm)")
+        .items(&ext_items)
+        .interact()?;
+    let mut extensions: Vec<String> = Vec::new();
+    let custom_idx = ext_items.len() - 1;
+    for &i in &ext_indices {
+        if i == custom_idx {
+            // Prompt for custom extension URL
+            let url: String = Input::new().with_prompt("Extension URL").interact_text()?;
+            if !url.trim().is_empty() {
+                extensions.push(url.trim().to_string());
+            }
+        } else {
+            extensions.push(known_extensions[i].clone());
+        }
+    }
+
     // Remote URL (optional)
     let add_remote = Confirm::new()
         .with_prompt("Add a git remote?")
@@ -93,6 +117,15 @@ pub fn interactive_init(default_name: &str) -> Result<InitConfig> {
     } else {
         println!("  {}: {}", "Presets".dimmed(), presets.join(", ").cyan());
     }
+    if extensions.is_empty() {
+        println!("  {}: {}", "Extensions".dimmed(), "(none)".dimmed());
+    } else {
+        println!(
+            "  {}: {}",
+            "Extensions".dimmed(),
+            extensions.join(", ").cyan()
+        );
+    }
     match &remote {
         Some(url) => println!("  {}: {}", "Remote".dimmed(), url.cyan()),
         None => println!("  {}: {}", "Remote".dimmed(), "(none)".dimmed()),
@@ -113,6 +146,7 @@ pub fn interactive_init(default_name: &str) -> Result<InitConfig> {
         mode,
         tools,
         presets,
+        extensions,
         remote,
     })
 }

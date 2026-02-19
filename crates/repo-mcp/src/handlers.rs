@@ -51,6 +51,13 @@ pub async fn handle_tool_call(root: &Path, tool_name: &str, arguments: Value) ->
         "preset_add" => handle_preset_add(root, arguments).await,
         "preset_remove" => handle_preset_remove(root, arguments).await,
 
+        // Extension Management
+        "extension_install" => handle_extension_install(arguments).await,
+        "extension_add" => handle_extension_add(arguments).await,
+        "extension_init" => handle_extension_init(arguments).await,
+        "extension_remove" => handle_extension_remove(arguments).await,
+        "extension_list" => handle_extension_list().await,
+
         _ => Err(Error::UnknownTool(tool_name.to_string())),
     }
 }
@@ -138,6 +145,8 @@ struct RepoInitArgs {
     mode: Option<String>,
     #[serde(default)]
     tools: Option<Vec<String>>,
+    #[serde(default)]
+    extensions: Option<Vec<String>>,
 }
 
 /// Handle repo_init - Initialize a new repository configuration
@@ -167,13 +176,14 @@ async fn handle_repo_init(root: &Path, arguments: Value) -> Result<Value> {
 
     // Create config.toml
     let tools = args.tools.unwrap_or_default();
+    let extensions = args.extensions.unwrap_or_default();
     let tools_toml = if tools.is_empty() {
         "tools = []".to_string()
     } else {
         format!("tools = {:?}", tools)
     };
 
-    let config_content = format!(
+    let mut config_content = format!(
         r#"# Repository Manager Configuration
 # Project: {}
 
@@ -184,6 +194,26 @@ mode = "{}"
 "#,
         args.name, tools_toml, mode
     );
+
+    // Add extensions sections
+    if !extensions.is_empty() {
+        use repo_extensions::ExtensionRegistry;
+        let registry = ExtensionRegistry::with_known();
+        for ext in &extensions {
+            config_content.push('\n');
+            if let Some(entry) = registry.get(ext) {
+                config_content.push_str(&format!(
+                    "[extensions.\"{}\"]\nsource = \"{}\"\nref = \"main\"\n",
+                    ext, entry.source
+                ));
+            } else {
+                config_content.push_str(&format!(
+                    "[extensions.\"{}\"]\nsource = \"{}\"\nref = \"main\"\n",
+                    ext, ext
+                ));
+            }
+        }
+    }
 
     let config_path = repo_dir.join("config.toml");
     fs::write(config_path.as_ref(), &config_content)?;
@@ -566,6 +596,127 @@ async fn handle_preset_remove(root: &Path, arguments: Value) -> Result<Value> {
 }
 
 // ============================================================================
+// Extension Management Handlers
+// ============================================================================
+
+/// Arguments for extension_install
+#[derive(Debug, Deserialize)]
+struct ExtensionInstallArgs {
+    source: String,
+}
+
+/// Handle extension_install - Install an extension from a URL or local path
+async fn handle_extension_install(arguments: Value) -> Result<Value> {
+    let args: ExtensionInstallArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    // Stub: actual install logic (clone, validate manifest, activate) comes later
+    Ok(json!({
+        "success": true,
+        "source": args.source,
+        "message": format!("Extension install from '{}' (stub - not yet implemented)", args.source),
+    }))
+}
+
+/// Arguments for extension_add
+#[derive(Debug, Deserialize)]
+struct ExtensionAddArgs {
+    name: String,
+}
+
+/// Handle extension_add - Add a known extension by name from the registry
+async fn handle_extension_add(arguments: Value) -> Result<Value> {
+    use repo_extensions::ExtensionRegistry;
+
+    let args: ExtensionAddArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    let registry = ExtensionRegistry::with_known();
+    if let Some(entry) = registry.get(&args.name) {
+        // Stub: actual add logic (resolve from registry, install, activate) comes later
+        Ok(json!({
+            "success": true,
+            "name": args.name,
+            "description": entry.description,
+            "source": entry.source,
+            "message": format!("Extension '{}' added (stub - not yet implemented)", args.name),
+        }))
+    } else {
+        Ok(json!({
+            "success": false,
+            "name": args.name,
+            "message": format!("Extension '{}' is not in the known registry. Use extension_install with a source URL instead.", args.name),
+        }))
+    }
+}
+
+/// Arguments for extension_init
+#[derive(Debug, Deserialize)]
+struct ExtensionInitArgs {
+    name: String,
+}
+
+/// Handle extension_init - Initialize a new extension scaffold
+async fn handle_extension_init(arguments: Value) -> Result<Value> {
+    let args: ExtensionInitArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    // Stub: actual init logic (create extension.toml, directory structure) comes later
+    Ok(json!({
+        "success": true,
+        "name": args.name,
+        "message": format!("Extension '{}' initialized (stub - not yet implemented)", args.name),
+    }))
+}
+
+/// Arguments for extension_remove
+#[derive(Debug, Deserialize)]
+struct ExtensionRemoveArgs {
+    name: String,
+}
+
+/// Handle extension_remove - Remove an installed extension
+async fn handle_extension_remove(arguments: Value) -> Result<Value> {
+    let args: ExtensionRemoveArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    // Stub: actual remove logic (deactivate, remove files, update config) comes later
+    Ok(json!({
+        "success": true,
+        "name": args.name,
+        "message": format!("Extension '{}' removed (stub - not yet implemented)", args.name),
+    }))
+}
+
+/// Handle extension_list - List installed and known extensions
+async fn handle_extension_list() -> Result<Value> {
+    use repo_extensions::ExtensionRegistry;
+
+    let registry = ExtensionRegistry::with_known();
+    let known: Vec<Value> = registry
+        .known_extensions()
+        .iter()
+        .filter_map(|name| {
+            registry.get(name).map(|entry| {
+                json!({
+                    "name": entry.name,
+                    "description": entry.description,
+                    "source": entry.source,
+                })
+            })
+        })
+        .collect();
+
+    Ok(json!({
+        "known": known,
+        "known_count": known.len(),
+        "installed": [],
+        "installed_count": 0,
+        "message": "Extension list (installed extensions not yet tracked)",
+    }))
+}
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -792,6 +943,33 @@ mod tests {
 
         // Verify config was created
         assert!(temp.path().join(".repository/config.toml").exists());
+    }
+
+    #[tokio::test]
+    async fn test_handle_repo_init_with_extensions() {
+        let temp = TempDir::new().unwrap();
+        fs::create_dir_all(temp.path().join(".git")).unwrap();
+
+        let result = handle_tool_call(
+            temp.path(),
+            "repo_init",
+            json!({
+                "name": "ext-project",
+                "mode": "standard",
+                "extensions": ["vaultspec"]
+            }),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        assert_eq!(value.get("success"), Some(&json!(true)));
+
+        // Verify extensions section was written to config
+        let content = fs::read_to_string(temp.path().join(".repository/config.toml")).unwrap();
+        assert!(content.contains("[extensions.\"vaultspec\"]"));
+        assert!(content.contains("source = \"https://github.com/vaultspec/vaultspec.git\""));
+        assert!(content.contains("ref = \"main\""));
     }
 
     #[tokio::test]
@@ -1059,5 +1237,94 @@ mod tests {
         assert_eq!(json_to_toml_value(&json!(42)), "42");
         assert_eq!(json_to_toml_value(&json!(true)), "true");
         assert_eq!(json_to_toml_value(&json!([1, 2, 3])), "[1, 2, 3]");
+    }
+
+    #[tokio::test]
+    async fn test_handle_extension_install() {
+        let temp = TempDir::new().unwrap();
+        let result = handle_tool_call(
+            temp.path(),
+            "extension_install",
+            json!({ "source": "https://github.com/example/ext.git" }),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        assert_eq!(value.get("success"), Some(&json!(true)));
+        assert_eq!(
+            value.get("source"),
+            Some(&json!("https://github.com/example/ext.git"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_handle_extension_add_known() {
+        let temp = TempDir::new().unwrap();
+        let result =
+            handle_tool_call(temp.path(), "extension_add", json!({ "name": "vaultspec" })).await;
+
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        assert_eq!(value.get("success"), Some(&json!(true)));
+        assert_eq!(value.get("name"), Some(&json!("vaultspec")));
+        assert!(value.get("source").is_some());
+    }
+
+    #[tokio::test]
+    async fn test_handle_extension_add_unknown() {
+        let temp = TempDir::new().unwrap();
+        let result = handle_tool_call(
+            temp.path(),
+            "extension_add",
+            json!({ "name": "nonexistent" }),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        assert_eq!(value.get("success"), Some(&json!(false)));
+    }
+
+    #[tokio::test]
+    async fn test_handle_extension_init() {
+        let temp = TempDir::new().unwrap();
+        let result =
+            handle_tool_call(temp.path(), "extension_init", json!({ "name": "my-ext" })).await;
+
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        assert_eq!(value.get("success"), Some(&json!(true)));
+        assert_eq!(value.get("name"), Some(&json!("my-ext")));
+    }
+
+    #[tokio::test]
+    async fn test_handle_extension_remove() {
+        let temp = TempDir::new().unwrap();
+        let result =
+            handle_tool_call(temp.path(), "extension_remove", json!({ "name": "my-ext" })).await;
+
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        assert_eq!(value.get("success"), Some(&json!(true)));
+        assert_eq!(value.get("name"), Some(&json!("my-ext")));
+    }
+
+    #[tokio::test]
+    async fn test_handle_extension_list() {
+        let temp = TempDir::new().unwrap();
+        let result = handle_tool_call(temp.path(), "extension_list", json!({})).await;
+
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        assert!(value.get("known").is_some());
+        assert!(value.get("known_count").is_some());
+        // Should contain at least the "vaultspec" known extension
+        let known = value.get("known").unwrap().as_array().unwrap();
+        assert!(
+            known
+                .iter()
+                .any(|e| e.get("name") == Some(&json!("vaultspec")))
+        );
     }
 }
