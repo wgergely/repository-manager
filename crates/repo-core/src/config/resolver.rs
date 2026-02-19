@@ -29,6 +29,9 @@ pub struct ResolvedConfig {
 
     /// Combined list of rules (unique)
     pub rules: Vec<String>,
+
+    /// Merged extension configurations
+    pub extensions: HashMap<String, Value>,
 }
 
 impl Default for ResolvedConfig {
@@ -38,6 +41,7 @@ impl Default for ResolvedConfig {
             presets: HashMap::new(),
             tools: Vec::new(),
             rules: Vec::new(),
+            extensions: HashMap::new(),
         }
     }
 }
@@ -49,6 +53,7 @@ impl From<Manifest> for ResolvedConfig {
             presets: manifest.presets,
             tools: manifest.tools,
             rules: manifest.rules,
+            extensions: manifest.extensions,
         }
     }
 }

@@ -577,7 +577,6 @@ mod m5_presets {
         assert!(!registry.has_provider("env:nonexistent"));
         assert_eq!(registry.get_provider("env:nonexistent"), None);
     }
-
 }
 
 // =============================================================================

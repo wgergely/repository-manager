@@ -369,6 +369,7 @@ mod runtime_context_tests {
             presets,
             tools: vec!["cargo".to_string(), "python".to_string()],
             rules: vec!["no-unsafe".to_string()],
+            extensions: HashMap::new(),
         }
     }
 
@@ -420,6 +421,7 @@ mod runtime_context_tests {
             presets: HashMap::new(),
             tools: vec![],
             rules: vec![],
+            extensions: HashMap::new(),
         };
         let context = RuntimeContext::from_resolved(&config);
 

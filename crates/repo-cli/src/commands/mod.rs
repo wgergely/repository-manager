@@ -3,6 +3,7 @@
 pub mod branch;
 pub mod config;
 pub mod diff;
+pub mod extension;
 pub mod git;
 pub mod governance;
 pub mod hooks;

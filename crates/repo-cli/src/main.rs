@@ -16,7 +16,7 @@ use colored::Colorize;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-use cli::{BranchAction, Cli, Commands, ConfigAction, HooksAction};
+use cli::{BranchAction, Cli, Commands, ConfigAction, ExtensionAction, HooksAction};
 use error::Result;
 
 fn main() {
@@ -63,9 +63,10 @@ fn execute_command(cmd: Commands) -> Result<()> {
             mode,
             tools,
             presets,
+            extensions,
             remote,
             interactive,
-        } => cmd_init(name, mode, tools, presets, remote, interactive),
+        } => cmd_init(name, mode, tools, presets, extensions, remote, interactive),
         Commands::Check => cmd_check(),
         Commands::Sync { dry_run, json } => cmd_sync(dry_run, json),
         Commands::Fix { dry_run } => cmd_fix(dry_run),
@@ -94,6 +95,7 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::Config { action } => cmd_config(action),
         Commands::ToolInfo { name } => cmd_tool_info(&name),
         Commands::Hooks { action } => cmd_hooks(action),
+        Commands::Extension { action } => cmd_extension(action),
         Commands::Open { worktree, tool } => cmd_open(&worktree, tool.as_deref()),
     }
 }
@@ -122,6 +124,7 @@ fn cmd_init(
     mode: String,
     tools: Vec<String>,
     presets: Vec<String>,
+    extensions: Vec<String>,
     remote: Option<String>,
     interactive_flag: bool,
 ) -> Result<()> {
@@ -136,6 +139,7 @@ fn cmd_init(
             mode,
             tools,
             presets,
+            extensions,
             remote,
         }
     };
@@ -270,6 +274,19 @@ fn cmd_hooks(action: HooksAction) -> Result<()> {
             args,
         } => commands::hooks::run_hooks_add(&cwd, &event, &command, args),
         HooksAction::Remove { event } => commands::hooks::run_hooks_remove(&cwd, &event),
+    }
+}
+
+fn cmd_extension(action: ExtensionAction) -> Result<()> {
+    match action {
+        ExtensionAction::Install {
+            source,
+            no_activate,
+        } => commands::extension::handle_extension_install(&source, no_activate),
+        ExtensionAction::Add { name } => commands::extension::handle_extension_add(&name),
+        ExtensionAction::Init { name } => commands::extension::handle_extension_init(&name),
+        ExtensionAction::Remove { name } => commands::extension::handle_extension_remove(&name),
+        ExtensionAction::List { json } => commands::extension::handle_extension_list(json),
     }
 }
 

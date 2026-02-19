@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 repo-core = { path = "../repo-core" }
+repo-extensions = { path = "../repo-extensions" }
 repo-fs = { path = "../repo-fs" }
 repo-git = { path = "../repo-git" }
 repo-meta = { path = "../repo-meta" }

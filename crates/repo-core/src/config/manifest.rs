@@ -57,6 +57,20 @@ pub struct Manifest {
     #[serde(default)]
     pub rules: Vec<String>,
 
+    /// Extension configurations keyed by extension name
+    ///
+    /// Keys are extension names, e.g.:
+    /// - "vaultspec" - VaultSpec extension
+    ///
+    /// Each value is the extension's configuration table from config.toml:
+    /// ```toml
+    /// [extensions."vaultspec"]
+    /// source = "https://github.com/org/vaultspec"
+    /// ref = "v0.1.0"
+    /// ```
+    #[serde(default)]
+    pub extensions: HashMap<String, Value>,
+
     /// Lifecycle hooks
     #[serde(default)]
     pub hooks: Vec<HookConfig>,
@@ -106,6 +120,7 @@ impl Manifest {
             presets: HashMap::new(),
             tools: Vec::new(),
             rules: Vec::new(),
+            extensions: HashMap::new(),
             hooks: Vec::new(),
         }
     }
@@ -165,6 +180,15 @@ impl Manifest {
         for rule in &other.rules {
             if !self.rules.contains(rule) {
                 self.rules.push(rule.clone());
+            }
+        }
+
+        // Extensions: deep merge (same strategy as presets)
+        for (key, other_value) in &other.extensions {
+            if let Some(base_value) = self.extensions.get_mut(key) {
+                deep_merge_value(base_value, other_value);
+            } else {
+                self.extensions.insert(key.clone(), other_value.clone());
             }
         }
 
@@ -268,5 +292,98 @@ mode = "worktree"
         assert_eq!(base["b"]["y"], 25);
         assert_eq!(base["b"]["z"], 30);
         assert_eq!(base["c"], 3);
+    }
+
+    #[test]
+    fn test_parse_extensions_section() {
+        let toml_content = r#"
+[core]
+mode = "worktrees"
+
+[extensions."vaultspec"]
+source = "https://github.com/vaultspec/vaultspec.git"
+ref = "v0.1.0"
+"#;
+        let manifest = Manifest::parse(toml_content).unwrap();
+        assert!(manifest.extensions.contains_key("vaultspec"));
+        let ext = &manifest.extensions["vaultspec"];
+        assert_eq!(ext["source"], "https://github.com/vaultspec/vaultspec.git");
+        assert_eq!(ext["ref"], "v0.1.0");
+    }
+
+    #[test]
+    fn test_parse_multiple_extensions() {
+        let toml_content = r#"
+[extensions."vaultspec"]
+source = "https://github.com/vaultspec/vaultspec.git"
+
+[extensions."other-ext"]
+source = "https://github.com/org/other-ext.git"
+custom_setting = true
+"#;
+        let manifest = Manifest::parse(toml_content).unwrap();
+        assert_eq!(manifest.extensions.len(), 2);
+        assert!(manifest.extensions.contains_key("vaultspec"));
+        assert!(manifest.extensions.contains_key("other-ext"));
+        assert_eq!(manifest.extensions["other-ext"]["custom_setting"], true);
+    }
+
+    #[test]
+    fn test_merge_extensions() {
+        let mut base = Manifest::parse(
+            r#"
+[extensions."vaultspec"]
+source = "https://github.com/vaultspec/vaultspec.git"
+ref = "v0.1.0"
+"#,
+        )
+        .unwrap();
+
+        let overlay = Manifest::parse(
+            r#"
+[extensions."vaultspec"]
+ref = "v0.2.0"
+
+[extensions."new-ext"]
+source = "https://example.com/new.git"
+"#,
+        )
+        .unwrap();
+
+        base.merge(&overlay);
+
+        // vaultspec.ref should be overridden
+        assert_eq!(base.extensions["vaultspec"]["ref"], "v0.2.0");
+        // vaultspec.source should be preserved (deep merge)
+        assert_eq!(
+            base.extensions["vaultspec"]["source"],
+            "https://github.com/vaultspec/vaultspec.git"
+        );
+        // new-ext should be added
+        assert!(base.extensions.contains_key("new-ext"));
+    }
+
+    #[test]
+    fn test_extensions_toml_round_trip() {
+        let toml_content = r#"
+[core]
+mode = "worktrees"
+
+[extensions."vaultspec"]
+source = "https://github.com/vaultspec/vaultspec.git"
+ref = "v0.1.0"
+"#;
+        let manifest = Manifest::parse(toml_content).unwrap();
+        let serialized = manifest.to_toml();
+        let reparsed = Manifest::parse(&serialized).unwrap();
+
+        assert_eq!(
+            manifest.extensions["vaultspec"]["source"],
+            reparsed.extensions["vaultspec"]["source"]
+        );
+        assert_eq!(
+            manifest.extensions["vaultspec"]["ref"],
+            reparsed.extensions["vaultspec"]["ref"]
+        );
     }
 }

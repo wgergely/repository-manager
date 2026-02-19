@@ -15,6 +15,7 @@ pub struct InitConfig {
     pub mode: String,
     pub tools: Vec<String>,
     pub presets: Vec<String>,
+    pub extensions: Vec<String>,
     pub remote: Option<String>,
 }
 
@@ -54,8 +55,17 @@ pub fn run_init(cwd: &Path, config: InitConfig) -> Result<PathBuf> {
     if !config.presets.is_empty() {
         println!("   Presets: {}", config.presets.join(", ").yellow());
     }
+    if !config.extensions.is_empty() {
+        println!("   Extensions: {}", config.extensions.join(", ").yellow());
+    }
 
-    init_repository(&target_path, &config.mode, &config.tools, &config.presets)?;
+    init_repository(
+        &target_path,
+        &config.mode,
+        &config.tools,
+        &config.presets,
+        &config.extensions,
+    )?;
 
     // Add remote if specified
     if let Some(remote_url) = &config.remote {
@@ -132,6 +142,7 @@ pub fn init_repository(
     mode: &str,
     tools: &[String],
     presets: &[String],
+    extensions: &[String],
 ) -> Result<()> {
     // Validate mode (accept both "worktree" and "worktrees")
     let is_worktree_mode = mode == "worktree" || mode == "worktrees";
@@ -147,7 +158,7 @@ pub fn init_repository(
     std::fs::create_dir_all(&repo_dir)?;
 
     // Generate and write config.toml
-    let config_content = generate_config(mode, tools, presets);
+    let config_content = generate_config(mode, tools, presets, extensions);
     let config_path = repo_dir.join("config.toml");
     std::fs::write(&config_path, config_content)?;
 
@@ -180,7 +191,14 @@ pub fn init_repository(
 /// [presets."env:python"]
 /// version = "3.12"
 /// ```
-pub fn generate_config(mode: &str, tools: &[String], presets: &[String]) -> String {
+pub fn generate_config(
+    mode: &str,
+    tools: &[String],
+    presets: &[String],
+    extensions: &[String],
+) -> String {
+    use repo_extensions::ExtensionRegistry;
+
     let mut config = String::new();
 
     // tools array at top level (before [core] section)
@@ -197,6 +215,25 @@ pub fn generate_config(mode: &str, tools: &[String], presets: &[String]) -> Stri
         for preset in presets {
             config.push('\n');
             config.push_str(&format!("[presets.\"{}\"]\n", preset));
+        }
+    }
+
+    // [extensions] section
+    if !extensions.is_empty() {
+        let registry = ExtensionRegistry::with_known();
+        for ext in extensions {
+            config.push('\n');
+            if let Some(entry) = registry.get(ext) {
+                // Known extension: use registry source
+                config.push_str(&format!("[extensions.\"{}\"]\n", ext));
+                config.push_str(&format!("source = \"{}\"\n", entry.source));
+                config.push_str("ref = \"main\"\n");
+            } else {
+                // Custom extension: treat the value as a source URL
+                config.push_str(&format!("[extensions.\"{}\"]\n", ext));
+                config.push_str(&format!("source = \"{}\"\n", ext));
+                config.push_str("ref = \"main\"\n");
+            }
         }
     }
 
@@ -273,6 +310,7 @@ mod tests {
             mode: "standard".to_string(),
             tools: vec![],
             presets: vec![],
+            extensions: vec![],
             remote: None,
         };
 
@@ -294,6 +332,7 @@ mod tests {
             mode: "standard".to_string(),
             tools: vec![],
             presets: vec![],
+            extensions: vec![],
             remote: None,
         };
 
@@ -315,6 +354,7 @@ mod tests {
             mode: "standard".to_string(),
             tools: vec![],
             presets: vec![],
+            extensions: vec![],
             remote: None,
         };
 
@@ -332,7 +372,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
 
-        let result = init_repository(path, "standard", &[], &[]);
+        let result = init_repository(path, "standard", &[], &[], &[]);
         assert!(result.is_ok());
 
         // Verify .repository directory exists
@@ -356,7 +396,7 @@ mod tests {
         let path = temp_dir.path();
 
         let tools = vec!["eslint".to_string(), "prettier".to_string()];
-        let result = init_repository(path, "standard", &tools, &[]);
+        let result = init_repository(path, "standard", &tools, &[], &[]);
         assert!(result.is_ok());
 
         // Verify tools in config using top-level array format
@@ -373,7 +413,7 @@ mod tests {
         let path = temp_dir.path();
 
         let presets = vec!["typescript".to_string(), "react".to_string()];
-        let result = init_repository(path, "standard", &[], &presets);
+        let result = init_repository(path, "standard", &[], &presets, &[]);
         assert!(result.is_ok());
 
         // Verify presets in config using [presets.X] section format
@@ -386,30 +426,43 @@ mod tests {
     #[test]
     fn test_generate_config() {
         // Test basic config (always has tools array)
-        let config = generate_config("standard", &[], &[]);
+        let config = generate_config("standard", &[], &[], &[]);
         assert!(config.contains("tools = []"));
         assert!(config.contains("[core]\nmode = \"standard\"\n"));
 
         // Test with tools
         let tools = vec!["eslint".to_string()];
-        let config = generate_config("standard", &tools, &[]);
+        let config = generate_config("standard", &tools, &[], &[]);
         assert!(config.contains("[core]\nmode = \"standard\"\n"));
         assert!(config.contains("tools = [\"eslint\"]"));
 
         // Test with presets
         let presets = vec!["typescript".to_string()];
-        let config = generate_config("standard", &[], &presets);
+        let config = generate_config("standard", &[], &presets, &[]);
         assert!(config.contains("[core]\nmode = \"standard\"\n"));
         assert!(config.contains("[presets.\"typescript\"]"));
 
         // Test with both tools and presets
         let tools = vec!["eslint".to_string(), "prettier".to_string()];
         let presets = vec!["typescript".to_string()];
-        let config = generate_config("worktree", &tools, &presets);
+        let config = generate_config("worktree", &tools, &presets, &[]);
         assert!(config.contains("[core]\nmode = \"worktree\"\n"));
         assert!(config.contains("\"eslint\""));
         assert!(config.contains("\"prettier\""));
         assert!(config.contains("[presets.\"typescript\"]"));
+
+        // Test with extensions (known)
+        let extensions = vec!["vaultspec".to_string()];
+        let config = generate_config("standard", &[], &[], &extensions);
+        assert!(config.contains("[extensions.\"vaultspec\"]"));
+        assert!(config.contains("source = \"https://github.com/vaultspec/vaultspec.git\""));
+        assert!(config.contains("ref = \"main\""));
+
+        // Test with custom extension URL
+        let extensions = vec!["https://github.com/custom/ext.git".to_string()];
+        let config = generate_config("standard", &[], &[], &extensions);
+        assert!(config.contains("source = \"https://github.com/custom/ext.git\""));
+        assert!(config.contains("ref = \"main\""));
     }
 
     #[test]
@@ -417,7 +470,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
 
-        let result = init_repository(path, "worktree", &[], &[]);
+        let result = init_repository(path, "worktree", &[], &[], &[]);
         assert!(result.is_ok());
 
         // Verify main/ directory exists for worktree mode
@@ -434,7 +487,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
 
-        let result = init_repository(path, "standard", &[], &[]);
+        let result = init_repository(path, "standard", &[], &[], &[]);
         assert!(result.is_ok());
 
         // Verify main/ directory does NOT exist for standard mode
@@ -450,7 +503,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
 
-        let result = init_repository(path, "invalid", &[], &[]);
+        let result = init_repository(path, "invalid", &[], &[], &[]);
         assert!(result.is_err());
 
         let err = result.unwrap_err();
@@ -466,7 +519,7 @@ mod tests {
         // Ensure .git doesn't exist
         assert!(!path.join(".git").exists());
 
-        let result = init_repository(path, "standard", &[], &[]);
+        let result = init_repository(path, "standard", &[], &[], &[]);
         assert!(result.is_ok());
 
         // Verify .git was created
@@ -483,7 +536,7 @@ mod tests {
         std::fs::create_dir(path.join(".git")).unwrap();
         std::fs::write(path.join(".git").join("marker"), "test").unwrap();
 
-        let result = init_repository(path, "standard", &[], &[]);
+        let result = init_repository(path, "standard", &[], &[], &[]);
         assert!(result.is_ok());
 
         // Verify marker file still exists (git was not reinitialized)
@@ -503,6 +556,7 @@ mod tests {
             mode: "standard".to_string(),
             tools: vec!["cursor".to_string(), "claude".to_string()],
             presets: vec![],
+            extensions: vec![],
             remote: None,
         };
 
@@ -524,6 +578,7 @@ mod tests {
             mode: "standard".to_string(),
             tools: vec![],
             presets: vec![],
+            extensions: vec![],
             remote: None,
         };
 

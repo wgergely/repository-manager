@@ -78,6 +78,7 @@ impl RuntimeContext {
     ///     presets,
     ///     tools: vec![],
     ///     rules: vec![],
+    ///     extensions: HashMap::new(),
     /// };
     ///
     /// let context = RuntimeContext::from_resolved(&config);
@@ -169,6 +170,7 @@ mod tests {
             presets,
             tools: vec![],
             rules: vec![],
+            extensions: HashMap::new(),
         };
 
         let ctx = RuntimeContext::from_resolved(&config);
@@ -196,6 +198,7 @@ mod tests {
             presets: HashMap::new(),
             tools: vec![],
             rules: vec![],
+            extensions: HashMap::new(),
         };
 
         let ctx = RuntimeContext::from_resolved(&config);
@@ -220,6 +223,7 @@ mod tests {
             presets,
             tools: vec![],
             rules: vec![],
+            extensions: HashMap::new(),
         };
 
         let ctx = RuntimeContext::from_resolved(&config);

@@ -740,6 +740,7 @@ fn test_runtime_context_edge_cases() {
         presets,
         tools: vec![],
         rules: vec![],
+        extensions: HashMap::new(),
     };
 
     let context = RuntimeContext::from_resolved(&config);
@@ -758,6 +759,7 @@ fn test_runtime_context_edge_cases() {
         presets: presets2,
         tools: vec![],
         rules: vec![],
+        extensions: HashMap::new(),
     };
 
     let context2 = RuntimeContext::from_resolved(&config2);
