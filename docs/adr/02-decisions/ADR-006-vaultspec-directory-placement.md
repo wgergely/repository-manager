@@ -111,15 +111,15 @@ version = ">=3.13"
 
 [runtime]
 type = "python"
-install = "pip install -r requirements.txt"
+install = "pip install -e '.[dev]'"
 
 [entry_points]
-cli = "{runtime.python} {source}/.vaultspec/lib/scripts/cli.py"
-mcp = "{runtime.python} {source}/.vaultspec/lib/scripts/subagent.py serve"
+cli = ".vaultspec/lib/scripts/cli.py"
+mcp = ".vaultspec/lib/scripts/subagent.py serve"
 
 [provides]
-mcp = "mcp.json"
-content_types = ["rules", "agents", "skills", "system", "constitution"]
+mcp = ["vs-subagent-mcp"]
+content_types = ["rules", "agents", "skills", "system", "templates"]
 
 [outputs]
 claude_dir = ".claude/"
