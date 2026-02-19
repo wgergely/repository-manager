@@ -31,13 +31,13 @@ my-project/
 my-project/                             <- container root (NOT a git working tree)
   .gt/                                  <- bare git repo
   .repository/extensions/vaultspec/     <- framework + venv
+  .vaultspec/                           <- authored content (shared across worktrees)
+  .vault/                               <- knowledge base (shared across worktrees)
   .claude/                              <- generated output (shared)
   .gemini/                              <- generated output (shared)
-  main/                                 <- git worktree
-    .vaultspec/                         <- authored content (git-tracked)
+  main/                                 <- git worktree (source code only)
     src/
-  feature-branch/                       <- another worktree
-    .vaultspec/                         <- same content, different branch
+  feature-branch/                       <- git worktree (source code only)
     src/
 ```
 
@@ -50,7 +50,7 @@ When embedded by the repo manager, VaultSpec needs to handle **three independent
 | Path | What | Example (worktree mode) |
 |---|---|---|
 | **Framework path** | Python code, scripts, lib/ | `.repository/extensions/vaultspec/source/.vaultspec/lib/` |
-| **Content path** | Rules, agents, skills, system prompts, constitution | `main/.vaultspec/` (inside the git worktree) |
+| **Content path** | Rules, agents, skills, system prompts, constitution | Container root `my-project/.vaultspec/` |
 | **Output root** | Where `.claude/`, `.gemini/`, `.agent/`, `AGENTS.md` get written | Container root (`my-project/`) |
 
 Today these three are all derived from one `ROOT_DIR`. They need to be independently configurable.
@@ -74,9 +74,8 @@ The repo manager would invoke VaultSpec like:
 VAULTSPEC_ROOT_DIR=/path/to/repo \
   /path/to/.venv/bin/python /path/to/source/.vaultspec/lib/scripts/cli.py sync-all
 
-# Worktree mode - content in worktree, output at container root
+# Worktree mode - content and output both at container root
 VAULTSPEC_ROOT_DIR=/path/to/container \
-VAULTSPEC_CONTENT_DIR=/path/to/container/main/.vaultspec \
   /path/to/.venv/bin/python /path/to/source/.vaultspec/lib/scripts/cli.py sync-all
 ```
 
@@ -152,8 +151,66 @@ Items 1-3 are the critical path. Item 4 is a bugfix regardless. Item 5 is a new 
 
 ## Consequences
 
-- VaultSpec authored content (rules, agents, skills) lives inside git worktrees and is version-controlled per-branch
-- Generated output (.claude/, .gemini/) lives at the shared container root
+- VaultSpec authored content (rules, agents, skills) lives at the container root alongside generated output
 - Framework code lives in `.repository/extensions/vaultspec/` managed by the repo manager
 - Standalone VaultSpec usage is unaffected (all defaults preserve current behavior)
 - The repo manager passes explicit paths via env vars when invoking VaultSpec CLI/MCP
+
+---
+
+## Appendix A: Correction — `.vaultspec/` and `.vault/` Placement in Worktree Mode
+
+**The worktree layout diagrams in this document and in the VaultSpec team's response ADR contain an error.** `.vaultspec/` and `.vault/` must NOT go inside individual worktrees. They go at the container root.
+
+### Correct layout
+
+```
+my-project/                             <- container root
+  .gt/                                  <- bare git repo
+  .repository/extensions/vaultspec/     <- framework + venv (managed by repo manager)
+  .vaultspec/                           <- authored content (shared across worktrees)
+  .vault/                               <- knowledge base (shared across worktrees)
+  .claude/                              <- generated output (shared)
+  .gemini/                              <- generated output (shared)
+  .agent/                               <- generated output (shared)
+  AGENTS.md                             <- generated output (shared)
+  main/                                 <- git worktree (source code only)
+    src/
+  feature-branch/                       <- git worktree (source code only)
+    src/
+```
+
+### Why NOT inside worktrees
+
+1. **Output depends on content.** `.claude/` is generated from `.vaultspec/rules/`. Both live at the container root. If content were inside `main/.vaultspec/` but output at `my-project/.claude/`, then which worktree's rules are active? When `feature-branch/` has different rules than `main/`, the shared `.claude/` output becomes incoherent. One root, one source of truth.
+
+2. **Consistency with all other shared state.** `.repository/`, `.claude/`, `.gemini/`, `CLAUDE.md`, `.cursorrules` — everything the repo manager manages is at the container root, shared across worktrees. `.vaultspec/` and `.vault/` are no different. Worktrees contain source code, not project configuration.
+
+3. **VaultSpec is project-level configuration, not branch-specific code.** Rules define how agents behave across the whole project. The knowledge base (`.vault/`) is shared understanding. These don't diverge per branch any more than `.claude/settings.local.json` diverges per branch.
+
+4. **Avoids duplication and drift.** N worktrees would mean N copies of `.vaultspec/`. Editing rules in one worktree wouldn't affect the others. There's no mechanism to keep them in sync, and no reason they should differ.
+
+### Impact on the three-path model
+
+In worktree mode, content and output share the same root (the container). The invocation simplifies:
+
+```bash
+# Worktree mode — single ROOT_DIR is sufficient
+VAULTSPEC_ROOT_DIR=/path/to/container \
+  /path/to/.venv/bin/python /path/to/source/.vaultspec/lib/scripts/cli.py sync-all
+```
+
+`VAULTSPEC_CONTENT_DIR` is NOT needed in worktree mode because content (`{root}/.vaultspec/`) and output (`{root}/.claude/`) are both relative to the same container root. The `VAULTSPEC_CONTENT_DIR` override remains available for non-standard layouts but is not the primary worktree path.
+
+The framework path decoupling (Python code at `.repository/extensions/vaultspec/source/` vs content at container root) is still required. The core problem `_paths.py` has — walking up from the script location to find content — still needs fixing. But the content/output split within the container is a non-issue: they're peers at the same root.
+
+### Impact on VaultSpec team's ADR
+
+The resolution matrix row for container/worktree mode should read:
+
+| Condition | Mode | content_root | output_root |
+|---|---|---|---|
+| Container git (`.gt/` detected) | WORKTREE | `container_root / fw_dir` | `container_root` |
+| `ROOT_DIR` set, container detected | WORKTREE | `root / fw_dir` | `root` |
+
+NOT `worktree / fw_dir`. The container root is the root for everything.
