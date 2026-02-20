@@ -14,7 +14,7 @@
 //! | `{{root}}`             | Absolute path to the repository / container root   |
 //! | `{{extension.source}}` | Absolute path to the extension's source directory  |
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
@@ -62,16 +62,53 @@ pub fn resolve_mcp_config(
         None => return Ok(None),
     };
 
-    // Resolve the path relative to the extension source directory
-    let full_path = source_dir.join(mcp_config_path);
-    if !full_path.exists() {
-        return Err(Error::McpConfigNotFound {
-            path: full_path.clone(),
-            extension: manifest.extension.name.clone(),
+    // Reject absolute paths — mcp_config must be relative to source_dir
+    if Path::new(mcp_config_path).is_absolute() {
+        return Err(Error::McpConfigParse {
+            path: PathBuf::from(mcp_config_path),
+            reason: "mcp_config must be a relative path, not absolute".to_string(),
         });
     }
 
-    let content = std::fs::read_to_string(&full_path).map_err(|e| Error::Io(e))?;
+    // Resolve the path relative to the extension source directory
+    let full_path = source_dir.join(mcp_config_path);
+
+    // Read the file (single operation — no TOCTOU race)
+    let content = match std::fs::read_to_string(&full_path) {
+        Ok(c) => c,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Err(Error::McpConfigNotFound {
+                path: full_path,
+                extension: manifest.extension.name.clone(),
+            });
+        }
+        Err(e) => return Err(Error::Io(e)),
+    };
+
+    // Verify the resolved path is still inside source_dir (blocks ../ traversal and symlinks)
+    // We check after reading to avoid a separate TOCTOU race on canonicalize
+    match (full_path.canonicalize(), source_dir.canonicalize()) {
+        (Ok(canon_full), Ok(canon_source)) => {
+            if !canon_full.starts_with(&canon_source) {
+                return Err(Error::McpConfigParse {
+                    path: full_path,
+                    reason: format!(
+                        "mcp_config path escapes extension source directory (resolves to {:?})",
+                        canon_full
+                    ),
+                });
+            }
+        }
+        // If canonicalize fails (e.g. dangling symlink), we already have the content
+        // from read_to_string, so just log and proceed — the file was readable
+        _ => {
+            tracing::warn!(
+                "Could not canonicalize paths for containment check: {:?}",
+                full_path
+            );
+        }
+    }
+
     let mut json: Value =
         serde_json::from_str(&content).map_err(|e| Error::McpConfigParse {
             path: full_path.clone(),
@@ -95,13 +132,20 @@ pub fn resolve_mcp_config(
 /// Collect MCP configs from all extensions into a single merged object.
 ///
 /// Each extension contributes its own MCP server entries. If two extensions
-/// define the same server name, the later one wins (last-write-wins).
+/// define the same server name, the later one wins (last-write-wins) and a
+/// warning is emitted.
 pub fn merge_mcp_configs(configs: &[Value]) -> Value {
     let mut merged = serde_json::Map::new();
 
     for config in configs {
         if let Some(obj) = config.as_object() {
             for (key, value) in obj {
+                if merged.contains_key(key) {
+                    tracing::warn!(
+                        "MCP server '{}' defined by multiple extensions — last definition wins",
+                        key
+                    );
+                }
                 merged.insert(key.clone(), value.clone());
             }
         }
@@ -131,13 +175,48 @@ fn resolve_templates(value: &mut Value, ctx: &ResolveContext) {
 }
 
 /// Resolve template placeholders in a single string.
+///
+/// Uses a single left-to-right scan to avoid chaining issues where a
+/// replacement value itself contains `{{...}}` markers.
 fn resolve_string(s: &str, ctx: &ResolveContext) -> String {
-    let mut result = s.to_string();
-    result = result.replace("{{root}}", &ctx.root);
-    result = result.replace("{{extension.source}}", &ctx.extension_source);
-    if let Some(ref python) = ctx.python_path {
-        result = result.replace("{{runtime.python}}", python);
+    let mut result = String::with_capacity(s.len());
+    let mut remaining = s;
+
+    while let Some(start) = remaining.find("{{") {
+        // Copy everything before the marker
+        result.push_str(&remaining[..start]);
+
+        if let Some(end) = remaining[start..].find("}}") {
+            let end_abs = start + end + 2;
+            let var_name = &remaining[start + 2..start + end];
+
+            match var_name {
+                "root" => result.push_str(&ctx.root),
+                "extension.source" => result.push_str(&ctx.extension_source),
+                "runtime.python" => {
+                    if let Some(ref python) = ctx.python_path {
+                        result.push_str(python);
+                    } else {
+                        // Keep the unresolved placeholder as-is
+                        result.push_str(&remaining[start..end_abs]);
+                    }
+                }
+                _ => {
+                    // Unknown variable — keep as-is
+                    result.push_str(&remaining[start..end_abs]);
+                }
+            }
+
+            remaining = &remaining[end_abs..];
+        } else {
+            // Unclosed `{{` — copy the rest literally
+            result.push_str(&remaining[start..]);
+            remaining = "";
+        }
     }
+
+    // Copy any trailing content after the last marker
+    result.push_str(remaining);
     result
 }
 
@@ -310,5 +389,104 @@ version = "1.0.0"
         resolve_templates(&mut value, &ctx);
         // Unresolved template stays as-is when python_path is None
         assert_eq!(value["cmd"], "{{runtime.python}}");
+    }
+
+    // === Security tests ===
+
+    #[test]
+    fn test_absolute_path_rejected() {
+        let tmp = TempDir::new().unwrap();
+        let manifest = make_manifest(Some("/etc/passwd"));
+        let ctx = make_ctx();
+        let result = resolve_mcp_config(&manifest, tmp.path(), &ctx);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("relative path"),
+            "Error should mention relative path, got: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_parent_traversal_rejected() {
+        // Create a file outside the extension dir, then try to reference it
+        let tmp = TempDir::new().unwrap();
+        let ext_dir = tmp.path().join("extensions/my-ext");
+        fs::create_dir_all(&ext_dir).unwrap();
+
+        // Create a file outside the extension dir
+        let outside_file = tmp.path().join("secret.json");
+        fs::write(&outside_file, r#"{"evil": {"command": "rm -rf /"}}"#).unwrap();
+
+        // The manifest points to ../../secret.json
+        let manifest = make_manifest(Some("../../secret.json"));
+        let ctx = make_ctx();
+        let result = resolve_mcp_config(&manifest, &ext_dir, &ctx);
+        assert!(result.is_err(), "Path traversal should be rejected");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("escapes"),
+            "Error should mention path escape, got: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_template_chaining_does_not_expand() {
+        // If ctx.root contains a template marker, it should NOT be re-expanded
+        let ctx = ResolveContext {
+            root: "/repo/{{extension.source}}/subdir".to_string(),
+            extension_source: "INJECTED".to_string(),
+            python_path: None,
+        };
+        let mut value = json!({"path": "{{root}}/file"});
+        resolve_templates(&mut value, &ctx);
+        // The resolved value should contain the literal {{extension.source}}, NOT "INJECTED"
+        assert_eq!(
+            value["path"],
+            "/repo/{{extension.source}}/subdir/file",
+            "Template chaining must not expand context values"
+        );
+    }
+
+    #[test]
+    fn test_unknown_template_variable_preserved() {
+        let ctx = make_ctx();
+        let mut value = json!({"cmd": "{{unknown.var}}"});
+        resolve_templates(&mut value, &ctx);
+        assert_eq!(value["cmd"], "{{unknown.var}}");
+    }
+
+    #[test]
+    fn test_unclosed_template_preserved() {
+        let ctx = make_ctx();
+        let mut value = json!({"cmd": "prefix-{{root"});
+        resolve_templates(&mut value, &ctx);
+        assert_eq!(value["cmd"], "prefix-{{root");
+    }
+
+    #[test]
+    fn test_empty_mcp_json_object() {
+        let tmp = TempDir::new().unwrap();
+        fs::write(tmp.path().join("mcp.json"), "{}").unwrap();
+
+        let manifest = make_manifest(Some("mcp.json"));
+        let ctx = make_ctx();
+        let result = resolve_mcp_config(&manifest, tmp.path(), &ctx)
+            .unwrap()
+            .unwrap();
+        assert!(result.as_object().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_multiple_templates_in_single_string() {
+        let ctx = make_ctx();
+        let mut value = json!({"cmd": "{{root}}/bin/{{extension.source}}/run"});
+        resolve_templates(&mut value, &ctx);
+        assert_eq!(
+            value["cmd"],
+            "/repo/bin//repo/.repository/extensions/test-ext/run"
+        );
     }
 }
