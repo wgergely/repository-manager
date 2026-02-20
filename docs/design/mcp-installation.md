@@ -52,6 +52,7 @@ All 13 supported tools were investigated against official documentation. Below i
 | **Cline** | `cline` | Yes | stdio, http, sse | N/A (global only) | VS Code globalStorage | `mcpServers` |
 | **Roo Code** | `roo` | Yes | stdio, http, sse | `.roo/mcp.json` | VS Code globalStorage | `mcpServers` |
 | **Amazon Q** | `amazonq` | Yes | stdio, http | `.amazonq/mcp.json` (CLI) / `.amazonq/default.json` (IDE) | `~/.aws/amazonq/mcp.json` (CLI) / `~/.aws/amazonq/default.json` (IDE) | `mcpServers` |
+| **Claude Desktop** | `claude_desktop` | Yes | stdio | N/A (user-only) | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) | `mcpServers` |
 | **Aider** | `aider` | **No** | N/A | N/A | N/A | N/A |
 | **GitHub Copilot** | `copilot` | Yes (via VS Code) | stdio, http, sse(dep) | `.vscode/mcp.json` | `<UserData>/mcp.json` | `servers` |
 
@@ -59,7 +60,7 @@ All 13 supported tools were investigated against official documentation. Below i
 
 ### Critical Findings
 
-1. **11 of 13 tools support MCP** — only Aider lacks native support
+1. **13 of 14 tools support MCP** — only Aider lacks native support (includes `claude_desktop` added in Phase 1)
 2. **Two naming conventions exist**: Most use `mcpServers` as the top-level key, but VS Code/Copilot uses `servers`, and Zed uses `context_servers`
 3. **Scope support varies**: Most tools support both project and user scopes; Antigravity and Cline are user-only
 4. **Transport types are universal**: stdio and Streamable HTTP are supported by all 11 MCP-capable tools; SSE is deprecated but still supported as fallback
@@ -646,8 +647,9 @@ Current vs correct values:
 | `copilot` | `false` | **`true`** | **Update** |
 | `amazonq` | `false` | **`true`** | **Update** |
 | `aider` | `false` | `false` | No change |
+| `claude_desktop` | N/A (new) | **`true`** | **Added in Phase 1** |
 
-**8 tools need `supports_mcp` set to `true`.**
+**8 tools need `supports_mcp` set to `true`.** Plus `claude_desktop` added as new tool with `supports_mcp: true`.
 
 ---
 
@@ -718,6 +720,20 @@ Current vs correct values:
 - Registered in builtins (BUILTIN_COUNT: 13 → 14)
 - Added to dispatcher, validation registry
 - MCP-only tool (no custom instructions support)
+
+### Intentional deviations from Proposed Design
+
+The implementation refined several aspects of the proposed design:
+
+| Proposed | Implemented | Reason |
+|----------|-------------|--------|
+| `project_config_path` | `project_path` | Shorter, clearer |
+| `user_config_path` | `user_path` | Shorter, clearer |
+| `format: McpConfigFormat` | `embedding: McpConfigEmbedding` | `ExtensionStorage` is handled by `McpUserPath::VsCodeExtStorage` instead |
+| `env_interpolation` | `env_syntax` | More precise name |
+| `transports: Vec<McpTransport>` | `transports: &'static [McpTransport]` | All specs are compile-time constants |
+| `McpConfigEmbedding::Nested { path }` | `McpConfigEmbedding::Nested` (unit variant) | Nesting path can be derived from `servers_key`; may restore for Phase 2 |
+| `McpServerConfig.auto_approve` | Omitted | Deferred to Phase 2 — only needed for Roo/Cline/Amazon Q |
 
 ---
 

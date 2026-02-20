@@ -507,4 +507,75 @@ mod tests {
             );
         }
     }
+
+    /// Asserts a path is a safe relative path: no `..`, no leading `/` or `\`,
+    /// no UNC prefix, no null bytes.
+    fn assert_safe_relative_path(path: &str, context: &str) {
+        assert!(
+            !path.starts_with('/'),
+            "{context}: path must not be absolute (starts with /): {path}"
+        );
+        assert!(
+            !path.starts_with('\\'),
+            "{context}: path must not start with backslash: {path}"
+        );
+        assert!(
+            !path.starts_with("//"),
+            "{context}: path must not be UNC: {path}"
+        );
+        assert!(
+            !path.contains(".."),
+            "{context}: path must not contain traversal (..): {path}"
+        );
+        assert!(
+            !path.contains('\0'),
+            "{context}: path must not contain null bytes: {path}"
+        );
+    }
+
+    #[test]
+    fn test_all_project_paths_are_safe() {
+        for slug in MCP_CAPABLE_TOOLS {
+            let spec = mcp_config_spec(slug).unwrap();
+            if let Some(p) = spec.project_path {
+                assert_safe_relative_path(p, &format!("{slug} project_path"));
+            }
+        }
+    }
+
+    #[test]
+    fn test_all_user_paths_are_safe() {
+        for slug in MCP_CAPABLE_TOOLS {
+            let spec = mcp_config_spec(slug).unwrap();
+            if let Some(ref user_path) = spec.user_path {
+                let resolved = user_path.resolve().unwrap();
+                assert_safe_relative_path(
+                    &resolved,
+                    &format!("{slug} user_path (resolved)"),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_servers_key_is_non_empty() {
+        for slug in MCP_CAPABLE_TOOLS {
+            let spec = mcp_config_spec(slug).unwrap();
+            assert!(
+                !spec.servers_key.is_empty(),
+                "{slug} must have a non-empty servers_key"
+            );
+        }
+    }
+
+    #[test]
+    fn test_transports_non_empty() {
+        for slug in MCP_CAPABLE_TOOLS {
+            let spec = mcp_config_spec(slug).unwrap();
+            assert!(
+                !spec.transports.is_empty(),
+                "{slug} must support at least one transport"
+            );
+        }
+    }
 }
