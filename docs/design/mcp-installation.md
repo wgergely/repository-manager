@@ -1,6 +1,6 @@
 # Design: MCP Server Installation Management
 
-**Status:** Phase 1 Complete
+**Status:** Phase 2 Complete
 **Date:** 2026-02-20
 **Feature:** `mcp-installation`
 
@@ -733,7 +733,54 @@ The implementation refined several aspects of the proposed design:
 | `env_interpolation` | `env_syntax` | More precise name |
 | `transports: Vec<McpTransport>` | `transports: &'static [McpTransport]` | All specs are compile-time constants |
 | `McpConfigEmbedding::Nested { path }` | `McpConfigEmbedding::Nested` (unit variant) | Nesting path can be derived from `servers_key`; may restore for Phase 2 |
-| `McpServerConfig.auto_approve` | Omitted | Deferred to Phase 2 — only needed for Roo/Cline/Amazon Q |
+| `McpServerConfig.auto_approve` | ~~Omitted~~ Added in Phase 2 | Restored with `#[serde(default, skip_serializing_if)]` |
+
+---
+
+## Phase 2 Implementation (completed)
+
+### Translation layer (`repo-tools/src/mcp_translate.rs`)
+- `to_tool_json(config, spec)` — converts canonical `McpServerConfig` to tool-native JSON
+  - Handles `url` vs `serverUrl` vs `httpUrl` field naming
+  - Handles `type` field presence/absence and tool-specific values (`"command"`, `"streamable-http"`)
+  - Handles separate SSE URL fields (Gemini uses `"url"` for SSE, `"httpUrl"` for HTTP)
+  - Omits empty `args` and `env` for clean output
+  - Intentionally omits `auto_approve` (tool-specific field names like `alwaysAllow`/`autoApprove`)
+- `from_tool_json(value, spec)` — parses tool-native JSON back to canonical config
+  - Detects transport via `command` field presence (stdio) or URL field name (http/sse)
+  - Falls back to `type` field for disambiguation
+  - Handles Gemini's distinct SSE vs HTTP URL fields correctly
+
+### MCP installer (`repo-tools/src/mcp_installer.rs`)
+- `McpInstaller::new(slug, root)` — creates installer bound to a tool and repo root
+- `install(scope, server_name, config)` — writes a server entry to the tool's config
+- `remove(scope, server_name)` — removes a server entry, returns whether it existed
+- `list(scope)` — lists all installed servers as `(name, json)` pairs
+- `verify(scope, server_name)` — checks if a server is installed and well-formed
+- `sync(scope, managed_servers)` — upserts managed servers, preserves user-added ones, returns diff
+
+### Updated types (`repo-meta/src/schema/mcp.rs`)
+- `McpServerConfig.auto_approve` — restored from proposed design with serde skip-if-false
+- `McpVerifyResult` — verification result with `exists`, `config_exists`, `server_json`, `issues`
+- `McpSyncResult` — sync diff with `added`, `updated`, `removed`, `unchanged` + `is_empty()`
+
+### Error types (`repo-tools/src/error.rs`)
+- `McpNotSupported` — tool doesn't support MCP
+- `McpScopeNotSupported` — tool doesn't support the requested scope (e.g., project for Antigravity)
+- `McpConfig` — config read/write/parse errors
+- `HomeDirNotFound` — could not resolve home directory
+
+### Key design decisions
+1. **Concrete struct, not trait**: `McpInstaller` is a concrete struct, not a trait. All tools share the same install/remove/list/verify/sync logic — they differ only by their `McpConfigSpec`. No per-tool trait implementations needed.
+2. **User servers preserved**: `sync()` only manages servers it knows about. Servers not in the `managed_servers` map are left untouched (assumed user-managed).
+3. **No removal on sync**: Sync does not remove servers that were previously managed but are no longer in the managed set. This prevents accidental deletion. Explicit `remove()` is the mechanism for cleanup.
+4. **Project-scope via NormalizedPath**: Project paths are resolved relative to the repo root via `NormalizedPath::join()`. User paths are resolved relative to `$HOME`.
+
+### Test coverage
+- **17 tests** in `repo-meta` (schema types, serde roundtrips, result types)
+- **25 tests** in `mcp_translate` (per-tool field mapping, roundtrips, edge cases, all 13 tools)
+- **18 tests** in `mcp_installer` (CRUD, scope validation, nested config, tool-specific keys)
+- **80 total MCP tests** across the codebase
 
 ---
 

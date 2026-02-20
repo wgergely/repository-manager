@@ -31,7 +31,9 @@ pub mod gemini;
 pub mod generic;
 pub mod integration;
 pub mod jetbrains;
+pub mod mcp_installer;
 pub mod mcp_registry;
+pub mod mcp_translate;
 pub mod registry;
 pub mod roo;
 pub mod syncer;
@@ -73,8 +75,10 @@ pub use writer::{
     ConfigWriter, JsonWriter, MarkdownWriter, SchemaKeys, TextWriter, WriterRegistry,
 };
 
-// MCP registry
+// MCP registry, translation, and installation
+pub use mcp_installer::McpInstaller;
 pub use mcp_registry::{MCP_CAPABLE_TOOLS, mcp_config_spec};
+pub use mcp_translate::{from_tool_json, to_tool_json};
 
 // Syncer
 pub use syncer::ToolCapabilitySyncer;

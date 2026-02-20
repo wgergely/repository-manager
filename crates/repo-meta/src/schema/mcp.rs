@@ -247,6 +247,10 @@ pub struct McpServerConfig {
     /// Environment variables to pass to the server process.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub env: Option<std::collections::BTreeMap<String, String>>,
+    /// Whether to auto-approve all tools from this server.
+    /// Used by Roo Code (`alwaysAllow`), Cline (`alwaysAllow`), and Amazon Q (`autoApprove`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub auto_approve: bool,
 }
 
 /// Transport-specific configuration for an MCP server.
@@ -286,6 +290,43 @@ pub enum McpScope {
     Project,
     /// User-level: config stored in user's home dir, available across projects.
     User,
+}
+
+// ===========================================================================
+// Operation result types
+// ===========================================================================
+
+/// Result of verifying an MCP server installation.
+#[derive(Debug, Clone)]
+pub struct McpVerifyResult {
+    /// Whether the server entry exists in the config file.
+    pub exists: bool,
+    /// Whether the config file itself exists on disk.
+    pub config_exists: bool,
+    /// The raw JSON value of the server entry, if found.
+    pub server_json: Option<serde_json::Value>,
+    /// Any issues found during verification.
+    pub issues: Vec<String>,
+}
+
+/// Result of syncing MCP servers to a tool's config.
+#[derive(Debug, Clone)]
+pub struct McpSyncResult {
+    /// Servers that were newly added.
+    pub added: Vec<String>,
+    /// Servers that were updated (already existed, value changed).
+    pub updated: Vec<String>,
+    /// Servers that were removed.
+    pub removed: Vec<String>,
+    /// Servers that were unchanged.
+    pub unchanged: Vec<String>,
+}
+
+impl McpSyncResult {
+    /// Returns true if no changes were made.
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.updated.is_empty() && self.removed.is_empty()
+    }
 }
 
 #[cfg(test)]
@@ -335,6 +376,7 @@ mod tests {
                 cwd: None,
             },
             env: None,
+            auto_approve: false,
         };
         let json = serde_json::to_string(&config).unwrap();
         assert!(json.contains("\"type\":\"stdio\""));
@@ -349,6 +391,7 @@ mod tests {
                 headers: None,
             },
             env: None,
+            auto_approve: false,
         };
         let json = serde_json::to_string(&config).unwrap();
         assert!(json.contains("\"type\":\"http\""));
@@ -370,5 +413,117 @@ mod tests {
     #[test]
     fn test_mcp_scope() {
         assert_ne!(McpScope::Project, McpScope::User);
+    }
+
+    #[test]
+    fn test_mcp_server_config_auto_approve() {
+        let config = McpServerConfig {
+            transport: McpTransportConfig::Stdio {
+                command: "npx".into(),
+                args: vec![],
+                cwd: None,
+            },
+            env: None,
+            auto_approve: true,
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("\"auto_approve\":true"));
+
+        // false should be skipped
+        let config2 = McpServerConfig {
+            transport: McpTransportConfig::Stdio {
+                command: "npx".into(),
+                args: vec![],
+                cwd: None,
+            },
+            env: None,
+            auto_approve: false,
+        };
+        let json2 = serde_json::to_string(&config2).unwrap();
+        assert!(!json2.contains("auto_approve"));
+    }
+
+    #[test]
+    fn test_mcp_verify_result() {
+        let result = McpVerifyResult {
+            exists: true,
+            config_exists: true,
+            server_json: Some(serde_json::json!({"command":"npx"})),
+            issues: vec![],
+        };
+        assert!(result.exists);
+        assert!(result.config_exists);
+        assert!(result.issues.is_empty());
+    }
+
+    #[test]
+    fn test_mcp_sync_result_empty() {
+        let result = McpSyncResult {
+            added: vec![],
+            updated: vec![],
+            removed: vec![],
+            unchanged: vec!["existing-server".to_string()],
+        };
+        assert!(result.added.is_empty());
+        assert_eq!(result.unchanged.len(), 1);
+    }
+
+    #[test]
+    fn test_mcp_server_config_auto_approve_default() {
+        let json = r#"{"transport":{"type":"stdio","command":"test"}}"#;
+        let config: McpServerConfig = serde_json::from_str(json).unwrap();
+        assert!(!config.auto_approve);
+    }
+
+    #[test]
+    fn test_mcp_server_config_auto_approve_true() {
+        let config = McpServerConfig {
+            transport: McpTransportConfig::Stdio {
+                command: "test".into(),
+                args: vec![],
+                cwd: None,
+            },
+            env: None,
+            auto_approve: true,
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("\"auto_approve\":true"));
+    }
+
+    #[test]
+    fn test_mcp_server_config_auto_approve_false_skipped() {
+        let config = McpServerConfig {
+            transport: McpTransportConfig::Stdio {
+                command: "test".into(),
+                args: vec![],
+                cwd: None,
+            },
+            env: None,
+            auto_approve: false,
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(!json.contains("auto_approve"));
+    }
+
+    #[test]
+    fn test_mcp_sync_result_is_empty() {
+        let result = McpSyncResult {
+            added: vec![],
+            updated: vec![],
+            removed: vec![],
+            unchanged: vec!["server1".into()],
+        };
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_mcp_sync_result_not_empty() {
+        let result = McpSyncResult {
+            added: vec!["new-server".into()],
+            updated: vec![],
+            removed: vec![],
+            unchanged: vec![],
+        };
+        assert!(!result.is_empty());
     }
 }
