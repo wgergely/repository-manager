@@ -6,12 +6,12 @@
 
 use super::{ToolCategory, ToolRegistration};
 use crate::{
-    aider, amazonq, antigravity, claude, cline, copilot, cursor, gemini, jetbrains, roo, vscode,
-    windsurf, zed,
+    aider, amazonq, antigravity, claude, claude_desktop, cline, copilot, cursor, gemini, jetbrains,
+    roo, vscode, windsurf, zed,
 };
 
 /// Number of built-in tools.
-pub const BUILTIN_COUNT: usize = 13;
+pub const BUILTIN_COUNT: usize = 14;
 
 /// Returns all built-in tool registrations.
 ///
@@ -57,12 +57,20 @@ pub fn builtin_registrations() -> Vec<ToolRegistration> {
             ToolCategory::Ide,
             antigravity::antigravity_integration().definition().clone(),
         ),
-        // CLI Agents (3 tools)
+        // CLI Agents (4 tools)
         ToolRegistration::new(
             "claude",
             "Claude Code",
             ToolCategory::CliAgent,
             claude::claude_integration().definition().clone(),
+        ),
+        ToolRegistration::new(
+            "claude_desktop",
+            "Claude Desktop",
+            ToolCategory::CliAgent,
+            claude_desktop::claude_desktop_integration()
+                .definition()
+                .clone(),
         ),
         ToolRegistration::new(
             "aider",
@@ -137,6 +145,7 @@ mod tests {
 
         // CLI Agents
         assert!(slugs.contains("claude"));
+        assert!(slugs.contains("claude_desktop"));
         assert!(slugs.contains("aider"));
         assert!(slugs.contains("gemini"));
 
@@ -171,7 +180,7 @@ mod tests {
             .count();
 
         assert_eq!(ide_count, 6);
-        assert_eq!(cli_count, 3);
+        assert_eq!(cli_count, 4);
         assert_eq!(auto_count, 2);
         assert_eq!(copilot_count, 2);
     }

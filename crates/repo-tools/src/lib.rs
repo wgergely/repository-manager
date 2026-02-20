@@ -21,6 +21,7 @@ pub mod aider;
 pub mod amazonq;
 pub mod antigravity;
 pub mod claude;
+pub mod claude_desktop;
 pub mod cline;
 pub mod copilot;
 pub mod cursor;
@@ -30,6 +31,7 @@ pub mod gemini;
 pub mod generic;
 pub mod integration;
 pub mod jetbrains;
+pub mod mcp_registry;
 pub mod registry;
 pub mod roo;
 pub mod syncer;
@@ -43,6 +45,7 @@ pub use aider::aider_integration;
 pub use amazonq::amazonq_integration;
 pub use antigravity::{AntigravityIntegration, antigravity_integration};
 pub use claude::{ClaudeIntegration, claude_integration};
+pub use claude_desktop::claude_desktop_integration;
 pub use cline::cline_integration;
 pub use copilot::copilot_integration;
 pub use cursor::{CursorIntegration, cursor_integration};
@@ -69,6 +72,9 @@ pub use translator::{CapabilityTranslator, RuleTranslator, TranslatedContent};
 pub use writer::{
     ConfigWriter, JsonWriter, MarkdownWriter, SchemaKeys, TextWriter, WriterRegistry,
 };
+
+// MCP registry
+pub use mcp_registry::{MCP_CAPABLE_TOOLS, mcp_config_spec};
 
 // Syncer
 pub use syncer::ToolCapabilitySyncer;

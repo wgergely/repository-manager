@@ -8,6 +8,7 @@ description = "Metadata and configuration management for Repository Manager"
 [dependencies]
 repo-fs = { path = "../repo-fs" }
 serde = { workspace = true }
+serde_json = { workspace = true }
 toml = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

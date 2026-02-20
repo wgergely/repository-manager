@@ -32,7 +32,7 @@ pub fn vscode_definition() -> ToolDefinition {
             // VSCode itself doesn't support custom instructions
             // but handles python path via schema_keys
             supports_custom_instructions: false,
-            supports_mcp: false,
+            supports_mcp: true,
             supports_rules_directory: false,
         },
         schema_keys: Some(ToolSchemaKeys {

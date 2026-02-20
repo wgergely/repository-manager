@@ -31,7 +31,7 @@ pub fn cline_integration() -> GenericToolIntegration {
         },
         capabilities: ToolCapabilities {
             supports_custom_instructions: true,
-            supports_mcp: false,
+            supports_mcp: true,
             supports_rules_directory: true,
         },
         schema_keys: None,

@@ -1,6 +1,6 @@
 # Design: MCP Server Installation Management
 
-**Status:** Draft
+**Status:** Phase 1 Complete
 **Date:** 2026-02-20
 **Feature:** `mcp-installation`
 
@@ -675,20 +675,49 @@ Current vs correct values:
 
 ---
 
-## Open Questions
+## Resolved Decisions
 
-1. **Managed server identification**: How do we distinguish RepoManager-managed MCP servers from user-added ones in a tool's config? Options:
-   - Server name prefix (e.g., `repo:server-name`)
-   - Separate tracking file (`.repository/mcp-state.json`)
-   - Comment/metadata field if the tool supports it
+1. **Managed server identification**: All extension/MCP server names in the repo universe are unique. No special prefix or tracking file is needed — server names are the identity.
 
-2. **VS Code extension storage tools (Cline)**: Cline stores its config in VS Code's extension globalStorage, which is not a user-facing file path. Should we support writing to this location, or skip Cline for user-scope installations?
+2. **VS Code extension storage tools (Cline)**: Supported. The `McpUserPath::VsCodeExtStorage` variant resolves the globalStorage path per OS. This is low-effort since it's just a predictable file path.
 
-3. **Conflicting scopes**: If a server is installed at both project and user scope, most tools resolve project > user. Should RepoManager enforce this or just install as requested?
+3. **Conflicting scopes**: Install as requested. Most tools resolve project > user natively. RepoManager does not need to enforce scope precedence.
 
-4. **Env var interpolation**: Different tools use different syntaxes (`${VAR}`, `$VAR`, `${env:VAR}`, `${VAR:-default}`). Should we normalize to one syntax in the canonical config and translate, or pass through raw?
+4. **Env var interpolation**: **Standardized.** The canonical config uses `${VAR}` syntax (via `McpEnvSyntax`). The translation layer converts to each tool's native syntax:
+   - `${VAR}` / `${VAR:-default}` — Claude Code (`DollarBrace`)
+   - `$VAR` / `${VAR}` — Gemini CLI (`DollarSign`)
+   - `${env:VAR}` — Cursor, Windsurf, Roo, Cline (`DollarEnvColon`)
+   - `${input:id}` — VS Code / Copilot (`VsCodeInput`)
 
-5. **Claude Desktop**: Claude Desktop (the GUI app) has a separate config from Claude Code (the CLI). Should we treat them as one tool or two? Currently the codebase has a single `claude` slug.
+5. **Claude Desktop vs Claude Code**: **Separate tools.** `claude` = Claude Code (CLI), `claude_desktop` = Claude Desktop (GUI app). They have different config paths, scopes, and transport support.
+
+---
+
+## Phase 1 Implementation (completed)
+
+### New types (`repo-meta/src/schema/mcp.rs`)
+- `McpConfigSpec` — full description of how a tool stores MCP config
+- `McpUserPath` — OS-aware user-scope path resolution (HomeRelative, OsSpecific, VsCodeExtStorage)
+- `McpConfigEmbedding` — Dedicated vs Nested config files
+- `McpTransport` — Stdio, Http, Sse
+- `McpFieldMappings` / `McpTypeValues` — tool-specific JSON field naming
+- `McpEnvSyntax` — env var interpolation syntax variants
+- `McpServerConfig` / `McpTransportConfig` — canonical tool-agnostic server definition
+- `McpScope` — Project vs User
+
+### MCP config registry (`repo-tools/src/mcp_registry.rs`)
+- `MCP_CAPABLE_TOOLS` — 13 tool slugs that support MCP (alphabetically sorted)
+- `mcp_config_spec(slug)` — lookup function returning `Option<McpConfigSpec>`
+- Per-tool spec functions for all 13 MCP-capable tools (including `claude_desktop`)
+
+### Updated `supports_mcp` flags
+8 tools updated from `false` to `true`: cursor, windsurf, gemini, vscode, antigravity, cline, copilot, amazonq.
+
+### New tool: `claude_desktop`
+- Added `repo-tools/src/claude_desktop.rs`
+- Registered in builtins (BUILTIN_COUNT: 13 → 14)
+- Added to dispatcher, validation registry
+- MCP-only tool (no custom instructions support)
 
 ---
 
