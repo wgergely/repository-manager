@@ -13,6 +13,7 @@ use repo_meta::schema::{
 };
 use serde_json::{Map, Value, json};
 use std::path::PathBuf;
+use tracing::warn;
 
 /// Manages MCP server installations for a specific tool.
 ///
@@ -43,6 +44,29 @@ impl McpInstaller {
     // -----------------------------------------------------------------------
     // Private helpers
     // -----------------------------------------------------------------------
+
+    /// Validate that a server name is acceptable as a JSON key in MCP configs.
+    fn validate_server_name(name: &str) -> Result<()> {
+        if name.is_empty() {
+            return Err(Error::McpInvalidServerName {
+                message: "server name must not be empty".into(),
+            });
+        }
+        if name.len() > 255 {
+            return Err(Error::McpInvalidServerName {
+                message: format!(
+                    "server name exceeds maximum length of 255 characters (got {})",
+                    name.len()
+                ),
+            });
+        }
+        if name.chars().any(|c| c.is_control()) {
+            return Err(Error::McpInvalidServerName {
+                message: "server name must not contain control characters".into(),
+            });
+        }
+        Ok(())
+    }
 
     /// Resolve the config file path for the given scope.
     fn config_path(&self, scope: McpScope) -> Result<PathBuf> {
@@ -85,10 +109,22 @@ impl McpInstaller {
             if content.trim().is_empty() {
                 json!({})
             } else {
-                serde_json::from_str(&content).map_err(|e| Error::McpConfig {
-                    tool: self.slug.clone(),
-                    message: format!("Failed to parse {}: {e}", path.display()),
-                })?
+                let parsed: Value =
+                    serde_json::from_str(&content).map_err(|e| Error::McpConfig {
+                        tool: self.slug.clone(),
+                        message: format!("Failed to parse {}: {e}", path.display()),
+                    })?;
+                if !parsed.is_object() {
+                    return Err(Error::McpConfig {
+                        tool: self.slug.clone(),
+                        message: format!(
+                            "Config file {} contains a JSON {}, expected an object",
+                            path.display(),
+                            json_type_name(&parsed),
+                        ),
+                    });
+                }
+                parsed
             }
         } else {
             json!({})
@@ -97,6 +133,9 @@ impl McpInstaller {
     }
 
     /// Write JSON to the config file, creating parent directories as needed.
+    ///
+    /// Uses atomic write-to-temp-then-rename to prevent config corruption if
+    /// the process is interrupted mid-write.
     fn write_config(&self, path: &PathBuf, value: &Value) -> Result<()> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| Error::McpConfig {
@@ -104,10 +143,18 @@ impl McpInstaller {
                 message: format!("Failed to create directory {}: {e}", parent.display()),
             })?;
         }
-        let content = serde_json::to_string_pretty(value)?;
-        std::fs::write(path, content.as_bytes()).map_err(|e| Error::McpConfig {
+        let mut content = serde_json::to_string_pretty(value)?;
+        content.push('\n');
+
+        // Atomic write: write to a sibling temp file, then rename.
+        let tmp_path = path.with_extension("tmp");
+        std::fs::write(&tmp_path, content.as_bytes()).map_err(|e| Error::McpConfig {
             tool: self.slug.clone(),
-            message: format!("Failed to write {}: {e}", path.display()),
+            message: format!("Failed to write {}: {e}", tmp_path.display()),
+        })?;
+        std::fs::rename(&tmp_path, path).map_err(|e| Error::McpConfig {
+            tool: self.slug.clone(),
+            message: format!("Failed to rename {} -> {}: {e}", tmp_path.display(), path.display()),
         })?;
         Ok(())
     }
@@ -121,15 +168,18 @@ impl McpInstaller {
     }
 
     /// Get or create a mutable servers map within the config.
+    ///
+    /// Callers must ensure `config` is a JSON object (enforced by `read_config`).
     fn get_or_create_servers<'a>(&self, config: &'a mut Value) -> &'a mut Map<String, Value> {
-        if !config.is_object() {
-            *config = json!({});
-        }
-        let obj = config.as_object_mut().unwrap();
+        let obj = config
+            .as_object_mut()
+            .expect("invariant: config must be a JSON object (enforced by read_config)");
         if !obj.contains_key(self.spec.servers_key) {
             obj.insert(self.spec.servers_key.to_string(), json!({}));
         }
-        obj[self.spec.servers_key].as_object_mut().unwrap()
+        obj[self.spec.servers_key]
+            .as_object_mut()
+            .expect("invariant: servers_key value is always inserted as json!({})")
     }
 
     // -----------------------------------------------------------------------
@@ -138,16 +188,25 @@ impl McpInstaller {
 
     /// Install an MCP server into the tool's config at the given scope.
     ///
-    /// If a server with the same name already exists, it is overwritten.
+    /// If a server with the same name already exists, it is overwritten and a
+    /// warning is logged.
     pub fn install(
         &self,
         scope: McpScope,
         server_name: &str,
         config: &McpServerConfig,
     ) -> Result<()> {
+        Self::validate_server_name(server_name)?;
         let (path, mut root_value) = self.read_config(scope)?;
         let tool_json = to_tool_json(config, &self.spec);
         let servers = self.get_or_create_servers(&mut root_value);
+        if servers.contains_key(server_name) {
+            warn!(
+                tool = %self.slug,
+                server = server_name,
+                "overwriting existing server entry with the same name"
+            );
+        }
         servers.insert(server_name.to_string(), tool_json);
         self.write_config(&path, &root_value)
     }
@@ -157,6 +216,7 @@ impl McpInstaller {
     /// Returns `Ok(true)` if the server was found and removed, `Ok(false)` if
     /// the server was not present.
     pub fn remove(&self, scope: McpScope, server_name: &str) -> Result<bool> {
+        Self::validate_server_name(server_name)?;
         let (path, mut root_value) = self.read_config(scope)?;
         let servers = self.get_or_create_servers(&mut root_value);
         let removed = servers.remove(server_name).is_some();
@@ -183,6 +243,7 @@ impl McpInstaller {
 
     /// Verify that an MCP server is correctly installed.
     pub fn verify(&self, scope: McpScope, server_name: &str) -> Result<McpVerifyResult> {
+        Self::validate_server_name(server_name)?;
         let path = self.config_path(scope)?;
         let config_exists = path.exists();
 
@@ -209,10 +270,7 @@ impl McpInstaller {
             issues.push(format!("Server '{server_name}' not found in config"));
         } else if let Some(ref json) = server_json {
             // Basic validation: the entry must be a JSON object.
-            if !json.is_object() {
-                issues.push("Server entry is not a JSON object".into());
-            } else {
-                let obj = json.as_object().unwrap();
+            if let Some(obj) = json.as_object() {
                 // Check for command (stdio) or a URL field (http/sse).
                 let has_command = obj.contains_key("command");
                 let has_url = obj.contains_key(self.spec.field_mappings.http_url_field)
@@ -224,6 +282,8 @@ impl McpInstaller {
                 if !has_command && !has_url {
                     issues.push("Server entry has neither 'command' nor a URL field".into());
                 }
+            } else {
+                issues.push("Server entry is not a JSON object".into());
             }
         }
 
@@ -237,20 +297,41 @@ impl McpInstaller {
 
     /// Sync a set of servers to the tool's config, computing a diff.
     ///
-    /// `managed_servers` is a map of `server_name -> McpServerConfig` for
-    /// servers that should be managed by RepoManager. User-added servers
-    /// (not in this map) are preserved.
+    /// `managed_servers` is the authoritative set of servers that should be
+    /// managed by the repo-manager. The sync applies the following policy:
+    ///
+    /// - **Name collision with existing entry**: the managed definition wins
+    ///   (overwrite) and a warning is logged so the user knows.
+    /// - **Managed server no longer in the set**: it is removed from the config
+    ///   and a warning is logged.
+    /// - **Unknown servers** (not in `managed_servers` and not in
+    ///   `previously_managed`): preserved untouched — they belong to the user
+    ///   or another extension.
+    ///
+    /// `previously_managed` is the set of server names that were managed by
+    /// the repo-manager in a prior sync. This is how we tell "ours, now
+    /// removed" apart from "user-added". Pass an empty slice on the first sync.
     pub fn sync(
         &self,
         scope: McpScope,
         managed_servers: &std::collections::BTreeMap<String, McpServerConfig>,
+        previously_managed: &[String],
     ) -> Result<McpSyncResult> {
+        for name in managed_servers.keys() {
+            Self::validate_server_name(name)?;
+        }
+
         let (path, mut root_value) = self.read_config(scope)?;
         let servers = self.get_or_create_servers(&mut root_value);
 
         let mut added = Vec::new();
         let mut updated = Vec::new();
+        let mut removed = Vec::new();
         let mut unchanged = Vec::new();
+
+        // Build the set of previously managed names for quick lookup.
+        let prev_set: std::collections::HashSet<&str> =
+            previously_managed.iter().map(|s| s.as_str()).collect();
 
         // Compute the desired state for every managed server.
         let mut desired: std::collections::BTreeMap<String, Value> = managed_servers
@@ -260,7 +341,6 @@ impl McpInstaller {
 
         // Walk existing servers and reconcile with the desired state.
         let existing_names: Vec<String> = servers.keys().cloned().collect();
-        let removed = Vec::new();
 
         for name in &existing_names {
             if let Some(new_value) = desired.remove(name) {
@@ -268,15 +348,38 @@ impl McpInstaller {
                 if servers[name] == new_value {
                     unchanged.push(name.clone());
                 } else {
+                    warn!(
+                        tool = %self.slug,
+                        server = %name,
+                        "overwriting existing server entry during sync"
+                    );
                     servers.insert(name.clone(), new_value);
                     updated.push(name.clone());
                 }
+            } else if prev_set.contains(name.as_str()) {
+                // Was previously managed but is no longer in the desired set —
+                // remove it.
+                warn!(
+                    tool = %self.slug,
+                    server = %name,
+                    "removing previously-managed server that is no longer in the managed set"
+                );
+                servers.remove(name);
+                removed.push(name.clone());
             }
-            // If not in desired, it is a user-managed server — preserve it.
+            // Otherwise it is a user-managed server — preserve it.
         }
 
         // Add servers that are in desired but not yet in the config.
         for (name, value) in desired {
+            if servers.contains_key(&name) {
+                // Should not happen (we removed from desired above), but guard.
+                warn!(
+                    tool = %self.slug,
+                    server = %name,
+                    "overwriting unexpected existing entry during sync add"
+                );
+            }
             servers.insert(name.clone(), value);
             added.push(name);
         }
@@ -305,6 +408,18 @@ fn home_dir() -> Result<PathBuf> {
         .map_err(|_| Error::HomeDirNotFound)
 }
 
+/// Return a human-readable name for the JSON value type.
+fn json_type_name(v: &Value) -> &'static str {
+    match v {
+        Value::Null => "null",
+        Value::Bool(_) => "boolean",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    }
+}
+
 // ===========================================================================
 // Tests
 // ===========================================================================
@@ -328,7 +443,6 @@ mod tests {
         }
     }
 
-    #[allow(dead_code)]
     fn http_config(url: &str) -> McpServerConfig {
         McpServerConfig {
             transport: McpTransportConfig::Http {
@@ -354,6 +468,74 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let root = NormalizedPath::new(temp.path());
         assert!(McpInstaller::new("claude", root).is_ok());
+    }
+
+    // -- Server name validation ----------------------------------------------
+
+    #[test]
+    fn test_validate_server_name_empty() {
+        let temp = TempDir::new().unwrap();
+        let installer = McpInstaller::new("cursor", NormalizedPath::new(temp.path())).unwrap();
+        let result = installer.install(McpScope::Project, "", &stdio_config("cmd"));
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("empty"), "expected 'empty' in: {err}");
+    }
+
+    #[test]
+    fn test_validate_server_name_too_long() {
+        let temp = TempDir::new().unwrap();
+        let installer = McpInstaller::new("cursor", NormalizedPath::new(temp.path())).unwrap();
+        let long_name = "a".repeat(256);
+        let result = installer.install(McpScope::Project, &long_name, &stdio_config("cmd"));
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("maximum length"),
+            "expected 'maximum length' in: {err}"
+        );
+    }
+
+    #[test]
+    fn test_validate_server_name_control_chars() {
+        let temp = TempDir::new().unwrap();
+        let installer = McpInstaller::new("cursor", NormalizedPath::new(temp.path())).unwrap();
+        let result = installer.install(McpScope::Project, "bad\0name", &stdio_config("cmd"));
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("control characters"),
+            "expected 'control characters' in: {err}"
+        );
+    }
+
+    #[test]
+    fn test_validate_server_name_accepts_normal_names() {
+        let temp = TempDir::new().unwrap();
+        let installer = McpInstaller::new("cursor", NormalizedPath::new(temp.path())).unwrap();
+        // Various valid server names (spaces, dots, hyphens, unicode are OK)
+        for name in &[
+            "my-server",
+            "my.server",
+            "my server",
+            "server_1",
+            "MCP Server (v2)",
+            "unicode-日本語",
+        ] {
+            installer
+                .install(McpScope::Project, name, &stdio_config("cmd"))
+                .unwrap();
+        }
+    }
+
+    #[test]
+    fn test_validate_server_name_max_length_boundary() {
+        let temp = TempDir::new().unwrap();
+        let installer = McpInstaller::new("cursor", NormalizedPath::new(temp.path())).unwrap();
+        let name_255 = "a".repeat(255);
+        installer
+            .install(McpScope::Project, &name_255, &stdio_config("cmd"))
+            .unwrap();
     }
 
     // -- Install + list roundtrip -------------------------------------------
@@ -407,6 +589,25 @@ mod tests {
         let servers = installer.list(McpScope::Project).unwrap();
         assert_eq!(servers.len(), 1);
         assert_eq!(servers[0].1["command"], "new");
+    }
+
+    #[test]
+    fn test_install_http_config() {
+        let temp = TempDir::new().unwrap();
+        let root = NormalizedPath::new(temp.path());
+        let installer = McpInstaller::new("windsurf", root).unwrap();
+
+        installer
+            .install(
+                McpScope::Project,
+                "remote",
+                &http_config("https://example.com/mcp"),
+            )
+            .unwrap();
+
+        let servers = installer.list(McpScope::Project).unwrap();
+        assert_eq!(servers.len(), 1);
+        assert_eq!(servers[0].1["serverUrl"], "https://example.com/mcp");
     }
 
     // -- Remove --------------------------------------------------------------
@@ -470,6 +671,42 @@ mod tests {
         assert!(result.config_exists);
     }
 
+    #[test]
+    fn test_verify_non_object_server_entry() {
+        let temp = TempDir::new().unwrap();
+        let cursor_dir = temp.path().join(".cursor");
+        std::fs::create_dir_all(&cursor_dir).unwrap();
+        std::fs::write(
+            cursor_dir.join("mcp.json"),
+            r#"{"mcpServers":{"bad": "not-an-object"}}"#,
+        )
+        .unwrap();
+
+        let installer = McpInstaller::new("cursor", NormalizedPath::new(temp.path())).unwrap();
+        let result = installer.verify(McpScope::Project, "bad").unwrap();
+        assert!(result.exists);
+        assert!(!result.issues.is_empty());
+        assert!(result.issues[0].contains("not a JSON object"));
+    }
+
+    #[test]
+    fn test_verify_server_missing_command_and_url() {
+        let temp = TempDir::new().unwrap();
+        let cursor_dir = temp.path().join(".cursor");
+        std::fs::create_dir_all(&cursor_dir).unwrap();
+        std::fs::write(
+            cursor_dir.join("mcp.json"),
+            r#"{"mcpServers":{"empty": {}}}"#,
+        )
+        .unwrap();
+
+        let installer = McpInstaller::new("cursor", NormalizedPath::new(temp.path())).unwrap();
+        let result = installer.verify(McpScope::Project, "empty").unwrap();
+        assert!(result.exists);
+        assert!(!result.issues.is_empty());
+        assert!(result.issues[0].contains("neither"));
+    }
+
     // -- Sync ----------------------------------------------------------------
 
     #[test]
@@ -482,7 +719,9 @@ mod tests {
         managed.insert("s1".into(), stdio_config("cmd1"));
         managed.insert("s2".into(), stdio_config("cmd2"));
 
-        let result = installer.sync(McpScope::Project, &managed).unwrap();
+        let result = installer
+            .sync(McpScope::Project, &managed, &[])
+            .unwrap();
         assert_eq!(result.added.len(), 2);
         assert!(result.updated.is_empty());
         assert!(result.removed.is_empty());
@@ -502,7 +741,9 @@ mod tests {
         // Sync managed servers (not including user-server)
         let mut managed = BTreeMap::new();
         managed.insert("managed-server".into(), stdio_config("managed"));
-        let result = installer.sync(McpScope::Project, &managed).unwrap();
+        let result = installer
+            .sync(McpScope::Project, &managed, &[])
+            .unwrap();
 
         // user-server should still be there
         let all = installer.list(McpScope::Project).unwrap();
@@ -513,6 +754,70 @@ mod tests {
 
         // Only the managed server should be reported as added
         assert_eq!(result.added, vec!["managed-server"]);
+    }
+
+    #[test]
+    fn test_sync_removes_previously_managed() {
+        let temp = TempDir::new().unwrap();
+        let root = NormalizedPath::new(temp.path());
+        let installer = McpInstaller::new("cursor", root).unwrap();
+
+        // Install two managed servers initially
+        installer
+            .install(McpScope::Project, "keep-me", &stdio_config("keep"))
+            .unwrap();
+        installer
+            .install(McpScope::Project, "remove-me", &stdio_config("bye"))
+            .unwrap();
+
+        // Sync with only "keep-me" in managed set, but both in previously_managed
+        let mut managed = BTreeMap::new();
+        managed.insert("keep-me".into(), stdio_config("keep"));
+        let previously = vec!["keep-me".into(), "remove-me".into()];
+
+        let result = installer
+            .sync(McpScope::Project, &managed, &previously)
+            .unwrap();
+
+        assert!(result.added.is_empty());
+        assert_eq!(result.removed, vec!["remove-me"]);
+        assert_eq!(result.unchanged, vec!["keep-me"]);
+
+        // Verify only keep-me remains
+        let all = installer.list(McpScope::Project).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].0, "keep-me");
+    }
+
+    #[test]
+    fn test_sync_does_not_remove_user_servers_when_not_previously_managed() {
+        let temp = TempDir::new().unwrap();
+        let root = NormalizedPath::new(temp.path());
+        let installer = McpInstaller::new("cursor", root).unwrap();
+
+        // User adds their own server
+        installer
+            .install(McpScope::Project, "user-added", &stdio_config("user"))
+            .unwrap();
+        // We also installed a managed server
+        installer
+            .install(McpScope::Project, "managed", &stdio_config("ours"))
+            .unwrap();
+
+        // Sync with empty managed set but only "managed" was previously ours
+        let managed = BTreeMap::new();
+        let previously = vec!["managed".into()];
+
+        let result = installer
+            .sync(McpScope::Project, &managed, &previously)
+            .unwrap();
+
+        assert_eq!(result.removed, vec!["managed"]);
+
+        // user-added should be preserved
+        let all = installer.list(McpScope::Project).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].0, "user-added");
     }
 
     #[test]
@@ -529,7 +834,9 @@ mod tests {
         // Sync with updated version
         let mut managed = BTreeMap::new();
         managed.insert("s1".into(), stdio_config("new"));
-        let result = installer.sync(McpScope::Project, &managed).unwrap();
+        let result = installer
+            .sync(McpScope::Project, &managed, &[])
+            .unwrap();
 
         assert!(result.added.is_empty());
         assert_eq!(result.updated, vec!["s1"]);
@@ -550,10 +857,36 @@ mod tests {
 
         let mut managed = BTreeMap::new();
         managed.insert("s1".into(), stdio_config("test"));
-        let result = installer.sync(McpScope::Project, &managed).unwrap();
+        let result = installer
+            .sync(McpScope::Project, &managed, &[])
+            .unwrap();
 
         assert!(result.is_empty());
         assert_eq!(result.unchanged, vec!["s1"]);
+    }
+
+    #[test]
+    fn test_sync_empty_managed_set() {
+        let temp = TempDir::new().unwrap();
+        let root = NormalizedPath::new(temp.path());
+        let installer = McpInstaller::new("cursor", root).unwrap();
+
+        // User has some servers
+        installer
+            .install(McpScope::Project, "user-s1", &stdio_config("user"))
+            .unwrap();
+
+        // Sync with empty set — nothing should change
+        let managed = BTreeMap::new();
+        let result = installer
+            .sync(McpScope::Project, &managed, &[])
+            .unwrap();
+        assert!(result.is_empty());
+        assert!(result.added.is_empty());
+        assert!(result.removed.is_empty());
+
+        let all = installer.list(McpScope::Project).unwrap();
+        assert_eq!(all.len(), 1);
     }
 
     // -- Scope not supported -------------------------------------------------
@@ -565,6 +898,71 @@ mod tests {
 
         let result = installer.install(McpScope::Project, "s1", &stdio_config("test"));
         assert!(result.is_err());
+    }
+
+    // -- Non-object JSON root ------------------------------------------------
+
+    #[test]
+    fn test_read_config_rejects_json_array() {
+        let temp = TempDir::new().unwrap();
+        let cursor_dir = temp.path().join(".cursor");
+        std::fs::create_dir_all(&cursor_dir).unwrap();
+        std::fs::write(cursor_dir.join("mcp.json"), "[1, 2, 3]").unwrap();
+
+        let installer = McpInstaller::new("cursor", NormalizedPath::new(temp.path())).unwrap();
+        let result = installer.list(McpScope::Project);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("array"), "expected 'array' in: {err}");
+    }
+
+    #[test]
+    fn test_read_config_rejects_json_string() {
+        let temp = TempDir::new().unwrap();
+        let cursor_dir = temp.path().join(".cursor");
+        std::fs::create_dir_all(&cursor_dir).unwrap();
+        std::fs::write(cursor_dir.join("mcp.json"), r#""hello""#).unwrap();
+
+        let installer = McpInstaller::new("cursor", NormalizedPath::new(temp.path())).unwrap();
+        let result = installer.list(McpScope::Project);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("string"), "expected 'string' in: {err}");
+    }
+
+    // -- Trailing newline ----------------------------------------------------
+
+    #[test]
+    fn test_written_json_has_trailing_newline() {
+        let temp = TempDir::new().unwrap();
+        let installer = McpInstaller::new("cursor", NormalizedPath::new(temp.path())).unwrap();
+        installer
+            .install(McpScope::Project, "s1", &stdio_config("test"))
+            .unwrap();
+
+        let path = temp.path().join(".cursor").join("mcp.json");
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            content.ends_with('\n'),
+            "config file should end with a newline"
+        );
+    }
+
+    // -- Atomic write --------------------------------------------------------
+
+    #[test]
+    fn test_no_leftover_tmp_file() {
+        let temp = TempDir::new().unwrap();
+        let installer = McpInstaller::new("cursor", NormalizedPath::new(temp.path())).unwrap();
+        installer
+            .install(McpScope::Project, "s1", &stdio_config("test"))
+            .unwrap();
+
+        let tmp_path = temp.path().join(".cursor").join("mcp.tmp");
+        assert!(
+            !tmp_path.exists(),
+            "temp file should be cleaned up after atomic write"
+        );
     }
 
     // -- Nested config preservation ------------------------------------------

@@ -30,6 +30,9 @@ pub enum Error {
     #[error("Tool {tool} does not support MCP")]
     McpNotSupported { tool: String },
 
+    #[error("Invalid MCP server name: {message}")]
+    McpInvalidServerName { message: String },
+
     #[error("Home directory not found")]
     HomeDirNotFound,
 }
