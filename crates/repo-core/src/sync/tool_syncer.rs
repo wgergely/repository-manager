@@ -16,6 +16,7 @@ use crate::projection::compute_checksum;
 use crate::{Error, Result};
 use repo_fs::NormalizedPath;
 use repo_tools::{Rule, SyncContext, ToolDispatcher};
+use serde_json::Value;
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -45,6 +46,8 @@ pub struct ToolSyncer {
     backup_manager: BackupManager,
     /// Tool dispatcher for routing to appropriate integrations
     dispatcher: ToolDispatcher,
+    /// Resolved MCP server configuration from extensions.
+    mcp_servers: Option<Value>,
 }
 
 impl ToolSyncer {
@@ -62,7 +65,14 @@ impl ToolSyncer {
             dry_run,
             backup_manager,
             dispatcher,
+            mcp_servers: None,
         }
+    }
+
+    /// Set the resolved MCP server configuration from extensions.
+    pub fn with_mcp_servers(mut self, servers: Value) -> Self {
+        self.mcp_servers = Some(servers);
+        self
     }
 
     /// Check if a backup exists for a tool
@@ -314,7 +324,7 @@ impl ToolSyncer {
     /// This is the write-side counterpart to `get_tool_config_files`.
     fn ensure_tool_config_files(&self, tool_name: &str) -> Vec<(String, String)> {
         if let Some(integration) = self.dispatcher.get_integration(tool_name) {
-            let context = SyncContext::new(self.root.clone());
+            let context = self.make_sync_context();
             let initial_rule = Rule {
                 id: format!("{}-init", tool_name),
                 content: format!(
@@ -377,8 +387,8 @@ impl ToolSyncer {
             }
         };
 
-        // Create sync context
-        let context = SyncContext::new(self.root.clone());
+        // Create sync context (with MCP servers if available)
+        let context = self.make_sync_context();
 
         if self.dry_run {
             actions.push(format!(
@@ -427,6 +437,15 @@ impl ToolSyncer {
         }
 
         Ok(actions)
+    }
+
+    /// Create a SyncContext with MCP servers if available.
+    fn make_sync_context(&self) -> SyncContext {
+        let mut ctx = SyncContext::new(self.root.clone());
+        if let Some(ref servers) = self.mcp_servers {
+            ctx.mcp_servers = Some(servers.clone());
+        }
+        ctx
     }
 
     /// Check if a tool is supported

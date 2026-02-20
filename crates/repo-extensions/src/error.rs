@@ -33,6 +33,20 @@ pub enum Error {
     /// Extension not found in registry.
     #[error("unknown extension: {0}")]
     UnknownExtension(String),
+
+    /// MCP config file declared in extension manifest was not found.
+    #[error("MCP config not found at {path} for extension '{extension}'")]
+    McpConfigNotFound {
+        path: PathBuf,
+        extension: String,
+    },
+
+    /// Failed to parse MCP config JSON.
+    #[error("failed to parse MCP config at {path}: {reason}")]
+    McpConfigParse {
+        path: PathBuf,
+        reason: String,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -18,6 +18,11 @@ pub struct Rule {
 pub struct SyncContext {
     pub root: NormalizedPath,
     pub python_path: Option<NormalizedPath>,
+    /// Resolved MCP server configuration from extensions.
+    ///
+    /// This is a JSON object where keys are server names and values are
+    /// their full configuration (command, args, env, etc.).
+    pub mcp_servers: Option<serde_json::Value>,
 }
 
 impl SyncContext {
@@ -25,11 +30,17 @@ impl SyncContext {
         Self {
             root,
             python_path: None,
+            mcp_servers: None,
         }
     }
 
     pub fn with_python(mut self, path: NormalizedPath) -> Self {
         self.python_path = Some(path);
+        self
+    }
+
+    pub fn with_mcp_servers(mut self, servers: serde_json::Value) -> Self {
+        self.mcp_servers = Some(servers);
         self
     }
 }

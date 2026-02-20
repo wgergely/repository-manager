@@ -7,15 +7,18 @@ use crate::translator::CapabilityTranslator;
 use crate::writer::{SchemaKeys, WriterRegistry};
 use repo_fs::NormalizedPath;
 use repo_meta::schema::{RuleDefinition, ToolDefinition};
+use serde_json::Value;
 
-/// Main entry point for syncing rules to tool configs.
+/// Main entry point for syncing rules (and MCP config) to tool configs.
 ///
 /// This syncer:
 /// 1. Checks tool capabilities via CapabilityTranslator
-/// 2. Translates rules into tool-specific format
+/// 2. Translates rules and MCP config into tool-specific format
 /// 3. Writes using the appropriate ConfigWriter
 pub struct ToolCapabilitySyncer {
     writers: WriterRegistry,
+    /// Resolved MCP server config from extensions (all servers merged).
+    mcp_servers: Option<Value>,
 }
 
 impl ToolCapabilitySyncer {
@@ -23,7 +26,14 @@ impl ToolCapabilitySyncer {
     pub fn new() -> Self {
         Self {
             writers: WriterRegistry::new(),
+            mcp_servers: None,
         }
+    }
+
+    /// Create a syncer with pre-resolved MCP server configuration.
+    pub fn with_mcp_servers(mut self, servers: Value) -> Self {
+        self.mcp_servers = Some(servers);
+        self
     }
 
     /// Sync rules to a tool's config.
@@ -43,8 +53,12 @@ impl ToolCapabilitySyncer {
             return Ok(false);
         }
 
-        // Translate rules for this tool
-        let content = CapabilityTranslator::translate(tool, rules);
+        // Translate rules and MCP config for this tool
+        let content = CapabilityTranslator::translate_with_mcp(
+            tool,
+            rules,
+            self.mcp_servers.as_ref(),
+        );
         if content.is_empty() {
             return Ok(false);
         }
@@ -206,5 +220,65 @@ mod tests {
         assert!(temp.path().join(".a").exists());
         assert!(!temp.path().join(".b").exists());
         assert!(temp.path().join(".c").exists());
+    }
+
+    fn make_mcp_tool(slug: &str) -> ToolDefinition {
+        use repo_meta::schema::ToolSchemaKeys;
+        ToolDefinition {
+            meta: ToolMeta {
+                name: slug.to_uppercase(),
+                slug: slug.into(),
+                description: None,
+            },
+            integration: ToolIntegrationConfig {
+                config_path: format!(".{}/settings.json", slug),
+                config_type: ConfigType::Json,
+                additional_paths: vec![],
+            },
+            capabilities: ToolCapabilities {
+                supports_custom_instructions: false,
+                supports_mcp: true,
+                supports_rules_directory: false,
+            },
+            schema_keys: Some(ToolSchemaKeys {
+                instruction_key: None,
+                mcp_key: Some("mcpServers".into()),
+                python_path_key: None,
+            }),
+        }
+    }
+
+    #[test]
+    fn test_sync_mcp_servers_to_json_tool() {
+        use serde_json::json;
+
+        let temp = TempDir::new().unwrap();
+        let root = NormalizedPath::new(temp.path());
+
+        let servers = json!({"my-server": {"command": "python", "args": ["serve"]}});
+        let syncer = ToolCapabilitySyncer::new().with_mcp_servers(servers);
+
+        let tool = make_mcp_tool("mcp-tool");
+        let result = syncer.sync(&root, &tool, &[]).unwrap();
+        assert!(result);
+
+        let config_path = temp.path().join(".mcp-tool/settings.json");
+        assert!(config_path.exists());
+
+        let written = fs::read_to_string(&config_path).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&written).unwrap();
+        assert_eq!(json["mcpServers"]["my-server"]["command"], "python");
+    }
+
+    #[test]
+    fn test_sync_no_mcp_servers_when_none_configured() {
+        let temp = TempDir::new().unwrap();
+        let root = NormalizedPath::new(temp.path());
+        let syncer = ToolCapabilitySyncer::new(); // No MCP servers
+
+        let tool = make_mcp_tool("mcp-tool");
+        let result = syncer.sync(&root, &tool, &[]).unwrap();
+        // MCP-only tool with no servers => nothing to write
+        assert!(!result);
     }
 }
