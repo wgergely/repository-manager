@@ -7,6 +7,7 @@ use crate::aider::aider_integration;
 use crate::amazonq::amazonq_integration;
 use crate::antigravity::antigravity_integration;
 use crate::claude::claude_integration;
+use crate::claude_desktop::claude_desktop_integration;
 use crate::cline::cline_integration;
 use crate::copilot::copilot_integration;
 use crate::cursor::cursor_integration;
@@ -82,6 +83,7 @@ impl ToolDispatcher {
             "vscode" => Box::new(VSCodeIntegration::new()),
             "cursor" => Box::new(cursor_integration()),
             "claude" => Box::new(claude_integration()),
+            "claude_desktop" => Box::new(claude_desktop_integration()),
             "windsurf" => Box::new(windsurf_integration()),
             "antigravity" => Box::new(antigravity_integration()),
             "gemini" => Box::new(gemini_integration()),
@@ -214,6 +216,7 @@ mod tests {
         assert!(dispatcher.get_integration("vscode").is_some());
         assert!(dispatcher.get_integration("cursor").is_some());
         assert!(dispatcher.get_integration("claude").is_some());
+        assert!(dispatcher.get_integration("claude_desktop").is_some());
         assert!(dispatcher.get_integration("windsurf").is_some());
         assert!(dispatcher.get_integration("antigravity").is_some());
         assert!(dispatcher.get_integration("gemini").is_some());
@@ -234,6 +237,7 @@ mod tests {
         assert!(dispatcher.has_tool("vscode"));
         assert!(dispatcher.has_tool("cursor"));
         assert!(dispatcher.has_tool("claude"));
+        assert!(dispatcher.has_tool("claude_desktop"));
         assert!(dispatcher.has_tool("windsurf"));
         assert!(dispatcher.has_tool("antigravity"));
         assert!(dispatcher.has_tool("gemini"));
