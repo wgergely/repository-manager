@@ -225,9 +225,18 @@ impl ModeBackend for WorktreeBackend {
             &["worktree", "remove", "--", worktree_path.as_str()],
         )?;
 
-        // Also try to delete the branch
-        let _ =
-            self.git_command_in_worktree(&self.current_worktree, &["branch", "-d", "--", name]);
+        // Also try to delete the branch ref. If this fails, log a warning
+        // but don't fail the overall operation — the worktree is already removed,
+        // and the stale branch ref is a minor cleanup issue.
+        if let Err(e) =
+            self.git_command_in_worktree(&self.current_worktree, &["branch", "-d", "--", name])
+        {
+            tracing::warn!(
+                "Worktree removed but failed to delete branch ref '{}': {}",
+                name,
+                e
+            );
+        }
 
         Ok(())
     }

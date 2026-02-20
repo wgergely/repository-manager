@@ -43,23 +43,32 @@ pub fn detect_context(cwd: &Path) -> RepoContext {
 
         if config_path.exists() {
             // Found a repository - determine mode
-            if let Ok(content) = std::fs::read_to_string(&config_path) {
-                let mode = parse_mode(&content);
+            match std::fs::read_to_string(&config_path) {
+                Ok(content) => {
+                    let mode = parse_mode(&content);
 
-                return match mode.as_str() {
-                    "worktrees" | "worktree" => RepoContext::ContainerRoot {
+                    return match mode.as_str() {
+                        "worktrees" | "worktree" => RepoContext::ContainerRoot {
+                            path: current.clone(),
+                        },
+                        _ => RepoContext::StandardRepo {
+                            path: current.clone(),
+                        },
+                    };
+                }
+                Err(e) => {
+                    // Config exists but couldn't be read (permissions, encoding, etc.)
+                    // Warn the user rather than silently falling back.
+                    eprintln!(
+                        "warning: found {} but could not read it: {}",
+                        config_path.display(),
+                        e
+                    );
+                    return RepoContext::StandardRepo {
                         path: current.clone(),
-                    },
-                    _ => RepoContext::StandardRepo {
-                        path: current.clone(),
-                    },
-                };
+                    };
+                }
             }
-
-            // Config exists but couldn't read - assume standard
-            return RepoContext::StandardRepo {
-                path: current.clone(),
-            };
         }
 
         // Check if we're inside a worktree
@@ -68,23 +77,32 @@ pub fn detect_context(cwd: &Path) -> RepoContext {
             let parent_repo = parent.join(".repository");
             let parent_config = parent_repo.join("config.toml");
 
-            if parent_config.exists()
-                && let Ok(content) = std::fs::read_to_string(&parent_config)
-            {
-                let mode = parse_mode(&content);
+            if parent_config.exists() {
+                match std::fs::read_to_string(&parent_config) {
+                    Ok(content) => {
+                        let mode = parse_mode(&content);
 
-                if mode == "worktrees" || mode == "worktree" {
-                    // We're in a worktree
-                    let worktree_name = current
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("unknown")
-                        .to_string();
+                        if mode == "worktrees" || mode == "worktree" {
+                            // We're in a worktree
+                            let worktree_name = current
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .unwrap_or("unknown")
+                                .to_string();
 
-                    return RepoContext::Worktree {
-                        container: parent.to_path_buf(),
-                        worktree: worktree_name,
-                    };
+                            return RepoContext::Worktree {
+                                container: parent.to_path_buf(),
+                                worktree: worktree_name,
+                            };
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "warning: found {} but could not read it: {}",
+                            parent_config.display(),
+                            e
+                        );
+                    }
                 }
             }
         }
