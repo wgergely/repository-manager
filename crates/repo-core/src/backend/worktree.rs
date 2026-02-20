@@ -184,16 +184,18 @@ impl ModeBackend for WorktreeBackend {
         let worktree_path = self.worktree_path(name);
 
         // Create worktree with new branch
+        // Use "--" to separate flags from branch/path names (defense-in-depth)
         let args = match base {
             Some(base_branch) => vec![
                 "worktree",
                 "add",
                 "-b",
                 name,
+                "--",
                 worktree_path.as_str(),
                 base_branch,
             ],
-            None => vec!["worktree", "add", "-b", name, worktree_path.as_str()],
+            None => vec!["worktree", "add", "-b", name, "--", worktree_path.as_str()],
         };
 
         self.git_command_in_worktree(&self.current_worktree, &args)?;
@@ -220,11 +222,12 @@ impl ModeBackend for WorktreeBackend {
         // Remove the worktree
         self.git_command_in_worktree(
             &self.current_worktree,
-            &["worktree", "remove", worktree_path.as_str()],
+            &["worktree", "remove", "--", worktree_path.as_str()],
         )?;
 
         // Also try to delete the branch
-        let _ = self.git_command_in_worktree(&self.current_worktree, &["branch", "-d", name]);
+        let _ =
+            self.git_command_in_worktree(&self.current_worktree, &["branch", "-d", "--", name]);
 
         Ok(())
     }

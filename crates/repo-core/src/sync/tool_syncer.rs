@@ -400,9 +400,11 @@ impl ToolSyncer {
         }
 
         // Sync rules using the integration
-        integration
-            .sync(&context, rules)
-            .map_err(|e| Error::Io(std::io::Error::other(format!("Tool sync failed: {}", e))))?;
+        integration.sync(&context, rules).map_err(|e| {
+            Error::SyncError {
+                message: format!("Tool sync failed for {}: {}", tool_name, e),
+            }
+        })?;
 
         // Create projections for ledger
         let mut projections = Vec::new();

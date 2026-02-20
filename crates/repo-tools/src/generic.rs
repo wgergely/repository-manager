@@ -87,7 +87,10 @@ impl GenericToolIntegration {
 
         // Load existing content or start empty
         let mut content = if path.exists() {
-            io::read_text(&path).unwrap_or_default()
+            io::read_text(&path).map_err(|e| {
+                tracing::warn!("Failed to read existing config at {}: {}", path.as_str(), e);
+                e
+            })?
         } else {
             String::new()
         };

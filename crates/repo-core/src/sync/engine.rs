@@ -384,7 +384,11 @@ impl SyncEngine {
             Ok(m) => m,
             Err(e) => {
                 tracing::warn!("Failed to parse config.toml: {}", e);
-                return Ok(report.with_action(format!("Failed to parse config.toml: {}", e)));
+                report.success = false;
+                report
+                    .errors
+                    .push(format!("Failed to parse config.toml: {}", e));
+                return Ok(report);
             }
         };
         let tool_names = &manifest.tools;

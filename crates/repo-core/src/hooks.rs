@@ -156,15 +156,30 @@ pub fn run_hooks(
     for hook in matching {
         let result = execute_hook(hook, context, default_dir)?;
         let failed = !result.success;
-        results.push(result);
 
         if failed {
+            // Include stderr in the error message for actionable diagnostics
+            let stderr_snippet = result.stderr.trim();
+            let message = if stderr_snippet.is_empty() {
+                format!(
+                    "Hook exited with non-zero status (exit code: {:?})",
+                    result.exit_code
+                )
+            } else {
+                format!(
+                    "Hook exited with non-zero status (exit code: {:?}): {}",
+                    result.exit_code, stderr_snippet
+                )
+            };
+            results.push(result);
             return Err(Error::HookFailed {
                 event: event.to_string(),
                 command: hook.command.clone(),
-                message: "Hook exited with non-zero status".to_string(),
+                message,
             });
         }
+
+        results.push(result);
     }
 
     Ok(results)

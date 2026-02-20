@@ -158,8 +158,18 @@ impl EntryPoints {
         };
 
         let script_path = Path::new(script);
+
+        // Security: Reject absolute paths in entry points. Entry points must be
+        // relative to the extension source directory to prevent executing arbitrary
+        // binaries outside the extension.
         let resolved_script = if script_path.is_absolute() {
-            script_path.to_path_buf()
+            tracing::warn!(
+                "Extension entry_point uses absolute path {:?} — forcing relative resolution",
+                script
+            );
+            // Strip the leading / and resolve relative to source_dir
+            let relative = script.trim_start_matches('/').trim_start_matches('\\');
+            source_dir.join(relative)
         } else {
             source_dir.join(script_path)
         };

@@ -4,7 +4,7 @@
 
 use crate::Result;
 use chrono::{DateTime, Utc};
-use repo_fs::NormalizedPath;
+use repo_fs::{NormalizedPath, validate_path_identifier};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -57,6 +57,13 @@ impl BackupManager {
         Self { root, backups_dir }
     }
 
+    /// Validate that a tool name is safe for use as a directory component.
+    fn validate_tool_name(tool: &str) -> crate::Result<()> {
+        validate_path_identifier(tool, "Tool name").map_err(|msg| crate::Error::SyncError {
+            message: msg,
+        })
+    }
+
     /// Get the backup directory for a tool
     fn tool_backup_dir(&self, tool: &str) -> NormalizedPath {
         self.backups_dir.join(tool)
@@ -81,6 +88,7 @@ impl BackupManager {
     /// # Returns
     /// The created ToolBackup
     pub fn create_backup(&self, tool: &str, files: &[PathBuf]) -> Result<ToolBackup> {
+        Self::validate_tool_name(tool)?;
         let backup_dir = self.tool_backup_dir(tool);
 
         // Create backup directory
@@ -121,6 +129,7 @@ impl BackupManager {
 
     /// Get backup information for a tool
     pub fn get_backup(&self, tool: &str) -> Result<Option<ToolBackup>> {
+        Self::validate_tool_name(tool)?;
         let metadata_path = self.metadata_path(tool);
 
         if !metadata_path.exists() {
@@ -145,6 +154,7 @@ impl BackupManager {
     /// # Returns
     /// List of restored file paths
     pub fn restore_backup(&self, tool: &str) -> Result<Vec<PathBuf>> {
+        Self::validate_tool_name(tool)?;
         let backup = self
             .get_backup(tool)?
             .ok_or_else(|| crate::Error::SyncError {
@@ -153,6 +163,9 @@ impl BackupManager {
 
         let mut restored = Vec::new();
         let backup_dir = self.tool_backup_dir(tool);
+
+        // Resolve root to an absolute path for containment checking
+        let root_prefix = self.root.as_str();
 
         for file_path in &backup.metadata.files {
             let file = PathBuf::from(file_path);
@@ -163,6 +176,19 @@ impl BackupManager {
 
             let source = backup_dir.join(filename);
             let dest = self.root.join(file_path);
+
+            // Security: Verify the destination stays within the repository root.
+            // NormalizedPath::join resolves ".." but the result could still land
+            // outside root (e.g. file_path = "../../etc/crontab").
+            if !dest.as_str().starts_with(root_prefix) {
+                return Err(crate::Error::SyncError {
+                    message: format!(
+                        "Refusing to restore file outside repository: {} (resolves to {})",
+                        file_path,
+                        dest.as_str()
+                    ),
+                });
+            }
 
             if source.exists() {
                 // Create parent directory if needed
@@ -183,6 +209,7 @@ impl BackupManager {
 
     /// Delete a tool's backup
     pub fn delete_backup(&self, tool: &str) -> Result<()> {
+        Self::validate_tool_name(tool)?;
         let backup_dir = self.tool_backup_dir(tool);
 
         if backup_dir.exists() {
