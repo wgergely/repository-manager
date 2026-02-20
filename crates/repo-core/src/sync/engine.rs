@@ -14,6 +14,7 @@ use crate::backend::{ModeBackend, StandardBackend, WorktreeBackend};
 use crate::config::Manifest;
 use crate::ledger::{Ledger, ProjectionKind};
 use crate::mode::Mode;
+use repo_extensions::{ExtensionManifest, ResolveContext, merge_mcp_configs, resolve_mcp_config};
 use repo_fs::NormalizedPath;
 
 use super::check::{CheckReport, CheckStatus, DriftItem};
@@ -383,11 +384,23 @@ impl SyncEngine {
             Ok(m) => m,
             Err(e) => {
                 tracing::warn!("Failed to parse config.toml: {}", e);
-                return Ok(report.with_action(format!("Failed to parse config.toml: {}", e)));
+                report.success = false;
+                report
+                    .errors
+                    .push(format!("Failed to parse config.toml: {}", e));
+                return Ok(report);
             }
         };
-        let tool_syncer = ToolSyncer::new(self.root.clone(), options.dry_run);
         let tool_names = &manifest.tools;
+
+        // Resolve MCP server configs from extensions
+        let mcp_servers = self.resolve_extension_mcp_configs(&manifest, &mut report);
+
+        let tool_syncer = if let Some(servers) = mcp_servers {
+            ToolSyncer::new(self.root.clone(), options.dry_run).with_mcp_servers(servers)
+        } else {
+            ToolSyncer::new(self.root.clone(), options.dry_run)
+        };
 
         // Sync tool configurations
         for tool_name in tool_names {
@@ -497,6 +510,117 @@ impl SyncEngine {
     /// Get the repository mode
     pub fn mode(&self) -> Mode {
         self.mode
+    }
+
+    /// Resolve MCP server configurations from all configured extensions.
+    ///
+    /// For each extension in the manifest:
+    /// 1. Loads the extension's `extension.toml` from its source directory
+    /// 2. If the extension declares `provides.mcp_config`, reads and resolves
+    ///    template variables in the referenced `mcp.json`
+    /// 3. Merges all resolved configs into a single JSON object
+    ///
+    /// Returns `None` if no extensions provide MCP configuration.
+    fn resolve_extension_mcp_configs(
+        &self,
+        manifest: &Manifest,
+        report: &mut SyncReport,
+    ) -> Option<Value> {
+        if manifest.extensions.is_empty() {
+            return None;
+        }
+
+        let extensions_dir = self.root.join(".repository/extensions");
+        let mut mcp_configs: Vec<Value> = Vec::new();
+
+        for (ext_name, _ext_config) in &manifest.extensions {
+            let ext_source_dir = extensions_dir.join(ext_name);
+            let manifest_path = ext_source_dir.join("extension.toml");
+
+            // Read the extension manifest
+            let ext_manifest = match fs::read_to_string(manifest_path.as_ref()) {
+                Ok(content) => match ExtensionManifest::from_toml(&content) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to parse extension.toml for '{}': {}",
+                            ext_name,
+                            e
+                        );
+                        report.errors.push(format!(
+                            "Failed to parse extension.toml for '{}': {}",
+                            ext_name, e
+                        ));
+                        continue;
+                    }
+                },
+                Err(_) => {
+                    // Extension source not installed yet - skip silently
+                    tracing::debug!(
+                        "Extension '{}' source not found at {:?}, skipping MCP resolution",
+                        ext_name,
+                        ext_source_dir.as_ref()
+                    );
+                    continue;
+                }
+            };
+
+            // Build resolve context for this extension
+            let ctx = ResolveContext {
+                root: self.root.as_ref().to_string_lossy().to_string(),
+                extension_source: ext_source_dir.as_ref().to_string_lossy().to_string(),
+                python_path: self.find_extension_python(&ext_source_dir),
+            };
+
+            // Resolve MCP config if declared
+            match resolve_mcp_config(&ext_manifest, ext_source_dir.as_ref(), &ctx) {
+                Ok(Some(config)) => {
+                    let server_count = config.as_object().map_or(0, |o| o.len());
+                    report.actions.push(format!(
+                        "Resolved {} MCP server(s) from extension '{}'",
+                        server_count, ext_name
+                    ));
+                    mcp_configs.push(config);
+                }
+                Ok(None) => {
+                    // Extension doesn't provide MCP config - that's fine
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to resolve MCP config for extension '{}': {}",
+                        ext_name,
+                        e
+                    );
+                    report.errors.push(format!(
+                        "Failed to resolve MCP config for extension '{}': {}",
+                        ext_name, e
+                    ));
+                }
+            }
+        }
+
+        if mcp_configs.is_empty() {
+            None
+        } else {
+            Some(merge_mcp_configs(&mcp_configs))
+        }
+    }
+
+    /// Try to find the Python interpreter in an extension's virtual environment.
+    fn find_extension_python(&self, ext_source_dir: &NormalizedPath) -> Option<String> {
+        // Check common venv locations
+        let candidates = [
+            ext_source_dir.join(".venv/bin/python"),
+            ext_source_dir.join("venv/bin/python"),
+            ext_source_dir.join(".venv/Scripts/python.exe"),
+        ];
+
+        for candidate in &candidates {
+            if candidate.exists() {
+                return Some(candidate.as_ref().to_string_lossy().to_string());
+            }
+        }
+        None
     }
 }
 

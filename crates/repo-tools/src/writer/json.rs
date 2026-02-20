@@ -23,14 +23,19 @@ impl JsonWriter {
     }
 
     /// Parse existing JSON file or return empty object.
-    fn parse_existing(path: &NormalizedPath) -> Value {
+    ///
+    /// Returns an empty object if the file does not exist. Propagates I/O
+    /// and parse errors so callers can distinguish missing files from corrupted ones.
+    fn parse_existing(path: &NormalizedPath) -> crate::error::Result<Value> {
         if !path.exists() {
-            return json!({});
+            return Ok(json!({}));
         }
-        io::read_text(path)
-            .ok()
-            .and_then(|c| serde_json::from_str(&c).ok())
-            .unwrap_or_else(|| json!({}))
+        let content = io::read_text(path).map_err(|e| {
+            tracing::warn!("Failed to read existing JSON config at {}: {}", path.as_str(), e);
+            e
+        })?;
+        let value = serde_json::from_str(&content)?;
+        Ok(value)
     }
 
     /// Merge content into existing JSON.
@@ -74,7 +79,7 @@ impl ConfigWriter for JsonWriter {
         content: &TranslatedContent,
         keys: Option<&SchemaKeys>,
     ) -> Result<()> {
-        let mut existing = Self::parse_existing(path);
+        let mut existing = Self::parse_existing(path)?;
 
         // Ensure we have an object
         if !existing.is_object() {

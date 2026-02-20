@@ -24,6 +24,7 @@
 //!
 //! [provides]
 //! mcp = ["vs-subagent-mcp"]
+//! mcp_config = "mcp.json"
 //! content_types = ["rules", "agents", "skills", "system", "templates"]
 //!
 //! [outputs]
@@ -157,8 +158,18 @@ impl EntryPoints {
         };
 
         let script_path = Path::new(script);
+
+        // Security: Reject absolute paths in entry points. Entry points must be
+        // relative to the extension source directory to prevent executing arbitrary
+        // binaries outside the extension.
         let resolved_script = if script_path.is_absolute() {
-            script_path.to_path_buf()
+            tracing::warn!(
+                "Extension entry_point uses absolute path {:?} — forcing relative resolution",
+                script
+            );
+            // Strip the leading / and resolve relative to source_dir
+            let relative = script.trim_start_matches('/').trim_start_matches('\\');
+            source_dir.join(relative)
         } else {
             source_dir.join(script_path)
         };
@@ -178,6 +189,13 @@ pub struct Provides {
     /// MCP server names provided.
     #[serde(default)]
     pub mcp: Vec<String>,
+    /// Path to an `mcp.json` file relative to the extension source directory.
+    ///
+    /// When set, the repo manager reads MCP server definitions from this file,
+    /// resolves runtime paths (e.g., Python venv, repo root), and writes the
+    /// resolved configuration into each tool that supports MCP.
+    #[serde(default)]
+    pub mcp_config: Option<String>,
     /// Content types this extension manages.
     #[serde(default)]
     pub content_types: Vec<String>,
@@ -613,5 +631,39 @@ version = "1.0.0"
         let resolved = ep.resolve(Path::new("/py"), Path::new("/ext"));
         assert!(resolved.cli.is_none());
         assert!(resolved.mcp.is_none());
+    }
+
+    #[test]
+    fn test_parse_provides_with_mcp_config() {
+        let toml = r#"
+[extension]
+name = "mcp-ext"
+version = "1.0.0"
+
+[provides]
+mcp = ["my-server"]
+mcp_config = "mcp.json"
+content_types = []
+"#;
+        let manifest = ExtensionManifest::from_toml(toml).unwrap();
+        let provides = manifest.provides.unwrap();
+        assert_eq!(provides.mcp, vec!["my-server"]);
+        assert_eq!(provides.mcp_config.as_deref(), Some("mcp.json"));
+    }
+
+    #[test]
+    fn test_parse_provides_without_mcp_config() {
+        let toml = r#"
+[extension]
+name = "no-mcp-ext"
+version = "1.0.0"
+
+[provides]
+mcp = ["server"]
+content_types = ["rules"]
+"#;
+        let manifest = ExtensionManifest::from_toml(toml).unwrap();
+        let provides = manifest.provides.unwrap();
+        assert!(provides.mcp_config.is_none());
     }
 }

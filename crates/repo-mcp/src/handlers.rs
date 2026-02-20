@@ -177,12 +177,34 @@ async fn handle_repo_init(root: &Path, arguments: Value) -> Result<Value> {
     // Create config.toml
     let tools = args.tools.unwrap_or_default();
     let extensions = args.extensions.unwrap_or_default();
+    // Escape all user-supplied values for safe TOML interpolation
+    let escape_toml = |s: &str| -> String {
+        let mut escaped = String::with_capacity(s.len());
+        for c in s.chars() {
+            match c {
+                '"' => escaped.push_str("\\\""),
+                '\\' => escaped.push_str("\\\\"),
+                '\n' => escaped.push_str("\\n"),
+                '\r' => escaped.push_str("\\r"),
+                '\t' => escaped.push_str("\\t"),
+                c if c.is_control() => {}
+                c => escaped.push(c),
+            }
+        }
+        escaped
+    };
+
     let tools_toml = if tools.is_empty() {
         "tools = []".to_string()
     } else {
-        format!("tools = {:?}", tools)
+        let escaped: Vec<String> = tools
+            .iter()
+            .map(|t| format!("\"{}\"", escape_toml(t)))
+            .collect();
+        format!("tools = [{}]", escaped.join(", "))
     };
 
+    let escaped_name = escape_toml(&args.name);
     let mut config_content = format!(
         r#"# Repository Manager Configuration
 # Project: {}
@@ -192,7 +214,7 @@ async fn handle_repo_init(root: &Path, arguments: Value) -> Result<Value> {
 [core]
 mode = "{}"
 "#,
-        args.name, tools_toml, mode
+        escaped_name, tools_toml, mode
     );
 
     // Add extensions sections
@@ -200,16 +222,18 @@ mode = "{}"
         use repo_extensions::ExtensionRegistry;
         let registry = ExtensionRegistry::with_known();
         for ext in &extensions {
+            let escaped_ext = escape_toml(ext);
             config_content.push('\n');
             if let Some(entry) = registry.get(ext) {
                 config_content.push_str(&format!(
                     "[extensions.\"{}\"]\nsource = \"{}\"\nref = \"main\"\n",
-                    ext, entry.source
+                    escaped_ext,
+                    escape_toml(&entry.source)
                 ));
             } else {
                 config_content.push_str(&format!(
                     "[extensions.\"{}\"]\nsource = \"{}\"\nref = \"main\"\n",
-                    ext, ext
+                    escaped_ext, escaped_ext
                 ));
             }
         }
@@ -265,10 +289,64 @@ struct BranchCreateArgs {
     base: Option<String>,
 }
 
+/// Validate a branch name for safety.
+///
+/// Rejects names that could be interpreted as git flags, contain path traversal
+/// sequences, null bytes, or other dangerous characters.
+fn validate_branch_name(name: &str) -> Result<()> {
+    if name.is_empty() {
+        return Err(Error::InvalidArgument(
+            "Branch name must not be empty".to_string(),
+        ));
+    }
+    if name.starts_with('-') {
+        return Err(Error::InvalidArgument(
+            "Branch name must not start with '-' (would be interpreted as a git flag)".to_string(),
+        ));
+    }
+    if name.contains('\0') {
+        return Err(Error::InvalidArgument(
+            "Branch name must not contain null bytes".to_string(),
+        ));
+    }
+    if name.contains("..") {
+        return Err(Error::InvalidArgument(
+            "Branch name must not contain '..' (path traversal)".to_string(),
+        ));
+    }
+    if name.len() > 255 {
+        return Err(Error::InvalidArgument(
+            "Branch name exceeds maximum length of 255 characters".to_string(),
+        ));
+    }
+    // Git ref restrictions: no space, ~, ^, :, ?, *, [, \, control chars
+    let invalid_chars = [' ', '~', '^', ':', '?', '*', '[', '\\'];
+    for ch in &invalid_chars {
+        if name.contains(*ch) {
+            return Err(Error::InvalidArgument(format!(
+                "Branch name contains invalid character '{}'",
+                ch
+            )));
+        }
+    }
+    if name.ends_with('/') || name.ends_with('.') || name.ends_with(".lock") {
+        return Err(Error::InvalidArgument(
+            "Branch name must not end with '/', '.', or '.lock'".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 /// Handle branch_create - Create a new branch (with worktree in worktrees mode)
 async fn handle_branch_create(root: &Path, arguments: Value) -> Result<Value> {
     let args: BranchCreateArgs =
         serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    // Validate branch names before passing to git
+    validate_branch_name(&args.name)?;
+    if let Some(ref base) = args.base {
+        validate_branch_name(base)?;
+    }
 
     let ctx = RepoContext::new(root)?;
     let backend = ctx.backend()?;
@@ -306,6 +384,9 @@ struct BranchDeleteArgs {
 async fn handle_branch_delete(root: &Path, arguments: Value) -> Result<Value> {
     let args: BranchDeleteArgs =
         serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    // Validate branch name before passing to git
+    validate_branch_name(&args.name)?;
 
     let ctx = RepoContext::new(root)?;
     let backend = ctx.backend()?;
@@ -465,6 +546,18 @@ struct RuleRemoveArgs {
 async fn handle_rule_remove(root: &Path, arguments: Value) -> Result<Value> {
     let args: RuleRemoveArgs =
         serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    // Validate rule ID (same validation as rule_add to prevent path traversal)
+    if !args
+        .id
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(Error::InvalidArgument(
+            "Rule ID must contain only alphanumeric characters, hyphens, and underscores"
+                .to_string(),
+        ));
+    }
 
     let normalized_root = NormalizedPath::new(root);
     let rules_dir = find_rules_dir(&normalized_root)?;

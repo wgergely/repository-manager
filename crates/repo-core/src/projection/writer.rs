@@ -10,8 +10,7 @@ use uuid::Uuid;
 
 /// Write content to a file safely (with symlink protection)
 fn safe_write(path: &NormalizedPath, content: &str) -> Result<()> {
-    repo_fs::io::write_text(path, content)
-        .map_err(|e| Error::Io(std::io::Error::other(e.to_string())))
+    repo_fs::io::write_text(path, content).map_err(Error::Fs)
 }
 
 /// Writes projections to filesystem
@@ -88,10 +87,12 @@ impl ProjectionWriter {
             let end_idx = existing
                 .find(&marker_end)
                 .map(|i| i + marker_end.len())
-                .ok_or_else(|| Error::Io(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    format!("Malformed text block: start marker found but end marker missing for {}", marker),
-                )))?;
+                .ok_or_else(|| Error::SyncError {
+                    message: format!(
+                        "Malformed text block: start marker found but end marker missing for {}",
+                        marker
+                    ),
+                })?;
             format!(
                 "{}{}{}",
                 &existing[..start_idx],
@@ -125,19 +126,9 @@ impl ProjectionWriter {
             "{}".to_string()
         };
 
-        let mut json: serde_json::Value = serde_json::from_str(&existing).map_err(|e| {
-            Error::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                e.to_string(),
-            ))
-        })?;
+        let mut json: serde_json::Value = serde_json::from_str(&existing)?;
 
-        let value: serde_json::Value = serde_json::from_str(value).map_err(|e| {
-            Error::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                e.to_string(),
-            ))
-        })?;
+        let value: serde_json::Value = serde_json::from_str(value)?;
 
         set_json_path(&mut json, key_path, value);
 
@@ -218,12 +209,7 @@ impl ProjectionWriter {
         }
 
         let existing = fs::read_to_string(path.as_ref())?;
-        let mut json: serde_json::Value = serde_json::from_str(&existing).map_err(|e| {
-            Error::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                e.to_string(),
-            ))
-        })?;
+        let mut json: serde_json::Value = serde_json::from_str(&existing)?;
 
         remove_json_path(&mut json, key_path);
 

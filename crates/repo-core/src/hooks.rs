@@ -156,15 +156,30 @@ pub fn run_hooks(
     for hook in matching {
         let result = execute_hook(hook, context, default_dir)?;
         let failed = !result.success;
-        results.push(result);
 
         if failed {
+            // Include stderr in the error message for actionable diagnostics
+            let stderr_snippet = result.stderr.trim();
+            let message = if stderr_snippet.is_empty() {
+                format!(
+                    "Hook exited with non-zero status (exit code: {:?})",
+                    result.exit_code
+                )
+            } else {
+                format!(
+                    "Hook exited with non-zero status (exit code: {:?}): {}",
+                    result.exit_code, stderr_snippet
+                )
+            };
+            results.push(result);
             return Err(Error::HookFailed {
                 event: event.to_string(),
                 command: hook.command.clone(),
-                message: "Hook exited with non-zero status".to_string(),
+                message,
             });
         }
+
+        results.push(result);
     }
 
     Ok(results)
@@ -177,6 +192,27 @@ fn execute_hook(
     default_dir: &Path,
 ) -> Result<HookResult> {
     let work_dir = hook.working_dir.as_deref().unwrap_or(default_dir);
+
+    // Validate working_dir is within the repository root (default_dir) to prevent
+    // hooks from executing in arbitrary directories
+    if let Some(ref custom_dir) = hook.working_dir {
+        if let (Ok(canon_custom), Ok(canon_default)) =
+            (custom_dir.canonicalize(), default_dir.canonicalize())
+        {
+            if !canon_custom.starts_with(&canon_default) {
+                return Err(Error::HookFailed {
+                    event: hook.event.to_string(),
+                    command: hook.command.clone(),
+                    message: format!(
+                        "Hook working_dir {:?} is outside the repository root {:?}",
+                        custom_dir, default_dir
+                    ),
+                });
+            }
+        }
+        // If canonicalize fails (directory doesn't exist yet), allow it — the
+        // Command::new call will fail with a clear OS error.
+    }
 
     // Substitute context variables in args
     let args: Vec<String> = hook

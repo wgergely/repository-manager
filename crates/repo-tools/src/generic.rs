@@ -87,7 +87,10 @@ impl GenericToolIntegration {
 
         // Load existing content or start empty
         let mut content = if path.exists() {
-            io::read_text(&path).unwrap_or_default()
+            io::read_text(&path).map_err(|e| {
+                tracing::warn!("Failed to read existing config at {}: {}", path.as_str(), e);
+                e
+            })?
         } else {
             String::new()
         };
@@ -216,6 +219,13 @@ impl GenericToolIntegration {
                         .join("\n\n")
                 };
                 settings[key] = json!(instructions);
+            }
+
+            // MCP servers
+            if let (Some(key), Some(mcp_servers)) =
+                (&schema_keys.mcp_key, &context.mcp_servers)
+            {
+                settings[key] = mcp_servers.clone();
             }
         }
 
@@ -386,5 +396,147 @@ mod tests {
 
         assert!(json.get("customInstructions").is_some());
         assert_eq!(json["pythonPath"], "/usr/bin/python3");
+    }
+
+    #[test]
+    fn test_sync_json_with_mcp_servers() {
+        let temp = TempDir::new().unwrap();
+
+        let definition = ToolDefinition {
+            meta: ToolMeta {
+                name: "MCP Tool".to_string(),
+                slug: "mcp-tool".to_string(),
+                description: None,
+            },
+            integration: ToolIntegrationConfig {
+                config_path: "config.json".to_string(),
+                config_type: ConfigType::Json,
+                additional_paths: vec![],
+            },
+            capabilities: ToolCapabilities {
+                supports_custom_instructions: false,
+                supports_mcp: true,
+                supports_rules_directory: false,
+            },
+            schema_keys: Some(ToolSchemaKeys {
+                instruction_key: None,
+                mcp_key: Some("mcpServers".to_string()),
+                python_path_key: None,
+            }),
+        };
+
+        let integration = GenericToolIntegration::new(definition);
+        let mcp_data = serde_json::json!({
+            "my-server": {
+                "command": "/usr/bin/python3",
+                "args": ["serve.py", "--port", "8080"]
+            }
+        });
+        let context = SyncContext::new(NormalizedPath::new(temp.path()))
+            .with_mcp_servers(mcp_data);
+
+        // No rules — just MCP config
+        integration.sync(&context, &[]).unwrap();
+
+        let content = fs::read_to_string(temp.path().join("config.json")).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        assert!(json["mcpServers"].is_object(), "mcpServers must exist as object");
+        assert_eq!(json["mcpServers"]["my-server"]["command"], "/usr/bin/python3");
+        assert_eq!(json["mcpServers"]["my-server"]["args"][0], "serve.py");
+        assert_eq!(json["mcpServers"]["my-server"]["args"][1], "--port");
+        assert_eq!(json["mcpServers"]["my-server"]["args"][2], "8080");
+    }
+
+    #[test]
+    fn test_sync_json_mcp_without_mcp_key_is_noop() {
+        let temp = TempDir::new().unwrap();
+
+        let definition = ToolDefinition {
+            meta: ToolMeta {
+                name: "No MCP Key".to_string(),
+                slug: "no-mcp-key".to_string(),
+                description: None,
+            },
+            integration: ToolIntegrationConfig {
+                config_path: "config.json".to_string(),
+                config_type: ConfigType::Json,
+                additional_paths: vec![],
+            },
+            capabilities: ToolCapabilities::default(),
+            // No mcp_key in schema_keys
+            schema_keys: Some(ToolSchemaKeys {
+                instruction_key: None,
+                mcp_key: None,
+                python_path_key: None,
+            }),
+        };
+
+        let integration = GenericToolIntegration::new(definition);
+        let mcp_data = serde_json::json!({"server": {"command": "test"}});
+        let context = SyncContext::new(NormalizedPath::new(temp.path()))
+            .with_mcp_servers(mcp_data);
+
+        integration.sync(&context, &[]).unwrap();
+
+        let content = fs::read_to_string(temp.path().join("config.json")).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        // MCP servers should NOT be written because no mcp_key is configured
+        assert!(json.get("mcpServers").is_none());
+        assert!(json.get("server").is_none());
+    }
+
+    #[test]
+    fn test_sync_json_preserves_existing_with_mcp() {
+        let temp = TempDir::new().unwrap();
+        let config_path = temp.path().join("config.json");
+
+        // Create existing config
+        let existing = serde_json::json!({
+            "existingSetting": true,
+            "mcpServers": {
+                "old-server": {"command": "old"}
+            }
+        });
+        fs::write(&config_path, serde_json::to_string_pretty(&existing).unwrap()).unwrap();
+
+        let definition = ToolDefinition {
+            meta: ToolMeta {
+                name: "Test".to_string(),
+                slug: "test".to_string(),
+                description: None,
+            },
+            integration: ToolIntegrationConfig {
+                config_path: "config.json".to_string(),
+                config_type: ConfigType::Json,
+                additional_paths: vec![],
+            },
+            capabilities: ToolCapabilities {
+                supports_custom_instructions: false,
+                supports_mcp: true,
+                supports_rules_directory: false,
+            },
+            schema_keys: Some(ToolSchemaKeys {
+                instruction_key: None,
+                mcp_key: Some("mcpServers".to_string()),
+                python_path_key: None,
+            }),
+        };
+
+        let integration = GenericToolIntegration::new(definition);
+        let mcp_data = serde_json::json!({"new-server": {"command": "new"}});
+        let context = SyncContext::new(NormalizedPath::new(temp.path()))
+            .with_mcp_servers(mcp_data);
+
+        integration.sync(&context, &[]).unwrap();
+
+        let content = fs::read_to_string(&config_path).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        // existingSetting must be preserved
+        assert_eq!(json["existingSetting"], true);
+        // MCP servers are replaced (not merged) — the whole key is overwritten
+        assert_eq!(json["mcpServers"]["new-server"]["command"], "new");
     }
 }

@@ -9,9 +9,11 @@ description = "Extension system for Repository Manager"
 repo-fs = { path = "../repo-fs" }
 repo-meta = { path = "../repo-meta" }
 serde = { workspace = true }
+serde_json = { workspace = true }
 toml = { workspace = true }
 semver = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

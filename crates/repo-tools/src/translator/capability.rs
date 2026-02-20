@@ -5,6 +5,7 @@
 
 use super::{RuleTranslator, TranslatedContent};
 use repo_meta::schema::{RuleDefinition, ToolDefinition};
+use serde_json::Value;
 
 /// Main translator that orchestrates capability-based content generation.
 ///
@@ -20,6 +21,19 @@ impl CapabilityTranslator {
     /// Respects the tool's declared capabilities, only generating
     /// content the tool can actually use.
     pub fn translate(tool: &ToolDefinition, rules: &[RuleDefinition]) -> TranslatedContent {
+        Self::translate_with_mcp(tool, rules, None)
+    }
+
+    /// Translate rules and MCP server config for a specific tool.
+    ///
+    /// This is the full-featured translation entry point. It respects
+    /// tool capabilities and merges MCP server configuration when the
+    /// tool supports it.
+    pub fn translate_with_mcp(
+        tool: &ToolDefinition,
+        rules: &[RuleDefinition],
+        mcp_servers: Option<&Value>,
+    ) -> TranslatedContent {
         let mut content = TranslatedContent::empty();
         content.format = tool.integration.config_type;
 
@@ -29,10 +43,12 @@ impl CapabilityTranslator {
             content.instructions = rule_content.instructions;
         }
 
-        // MCP servers: Future phase (Phase 5)
-        // if tool.capabilities.supports_mcp {
-        //     content.mcp_servers = ...
-        // }
+        // MCP servers (if tool supports MCP and config is provided)
+        if tool.capabilities.supports_mcp {
+            if let Some(servers) = mcp_servers {
+                content.mcp_servers = Some(servers.clone());
+            }
+        }
 
         // Rules directory: Future enhancement
         // if tool.capabilities.supports_rules_directory {
@@ -170,5 +186,48 @@ mod tests {
         let content = CapabilityTranslator::translate(&tool, &rules);
 
         assert_eq!(content.format, ConfigType::Json);
+    }
+
+    #[test]
+    fn test_translate_with_mcp_when_supported() {
+        use serde_json::json;
+
+        let tool = make_tool(false, true, false);
+        let servers = json!({"my-server": {"command": "python", "args": ["serve"]}});
+
+        let content = CapabilityTranslator::translate_with_mcp(&tool, &[], Some(&servers));
+        assert!(content.mcp_servers.is_some());
+        assert_eq!(content.mcp_servers.unwrap()["my-server"]["command"], "python");
+    }
+
+    #[test]
+    fn test_translate_with_mcp_when_not_supported() {
+        use serde_json::json;
+
+        let tool = make_tool(true, false, false);
+        let servers = json!({"my-server": {"command": "python"}});
+
+        let content = CapabilityTranslator::translate_with_mcp(&tool, &[], Some(&servers));
+        assert!(content.mcp_servers.is_none());
+    }
+
+    #[test]
+    fn test_translate_with_mcp_none_servers() {
+        let tool = make_tool(false, true, false);
+        let content = CapabilityTranslator::translate_with_mcp(&tool, &[], None);
+        assert!(content.mcp_servers.is_none());
+    }
+
+    #[test]
+    fn test_translate_with_mcp_and_instructions() {
+        use serde_json::json;
+
+        let tool = make_tool(true, true, false);
+        let rules = vec![make_rule("r1")];
+        let servers = json!({"srv": {"command": "test"}});
+
+        let content = CapabilityTranslator::translate_with_mcp(&tool, &rules, Some(&servers));
+        assert!(content.instructions.is_some());
+        assert!(content.mcp_servers.is_some());
     }
 }
