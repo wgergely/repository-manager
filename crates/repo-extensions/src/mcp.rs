@@ -99,13 +99,15 @@ pub fn resolve_mcp_config(
                 });
             }
         }
-        // If canonicalize fails (e.g. dangling symlink), we already have the content
-        // from read_to_string, so just log and proceed — the file was readable
+        // If canonicalize fails, we cannot verify containment — treat as an error
+        // rather than silently proceeding, since the path may escape the source directory
         _ => {
-            tracing::warn!(
-                "Could not canonicalize paths for containment check: {:?}",
-                full_path
-            );
+            return Err(Error::McpConfigParse {
+                path: full_path,
+                reason: "Could not canonicalize paths for containment check; \
+                         refusing to load potentially unsafe mcp_config"
+                    .to_string(),
+            });
         }
     }
 

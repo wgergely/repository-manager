@@ -191,6 +191,26 @@ pub fn init_repository(
 /// [presets."env:python"]
 /// version = "3.12"
 /// ```
+/// Escape a string for safe inclusion in a TOML quoted value.
+///
+/// Prevents injection of newlines, quotes, or backslashes that could break
+/// the TOML structure or inject arbitrary configuration sections.
+fn escape_toml_value(s: &str) -> String {
+    let mut escaped = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '"' => escaped.push_str("\\\""),
+            '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            c if c.is_control() => {} // Strip other control characters
+            c => escaped.push(c),
+        }
+    }
+    escaped
+}
+
 pub fn generate_config(
     mode: &str,
     tools: &[String],
@@ -202,19 +222,22 @@ pub fn generate_config(
     let mut config = String::new();
 
     // tools array at top level (before [core] section)
-    let tools_arr: Vec<String> = tools.iter().map(|t| format!("\"{}\"", t)).collect();
+    let tools_arr: Vec<String> = tools
+        .iter()
+        .map(|t| format!("\"{}\"", escape_toml_value(t)))
+        .collect();
     config.push_str(&format!("tools = [{}]\n", tools_arr.join(", ")));
 
     // [core] section
     config.push('\n');
     config.push_str("[core]\n");
-    config.push_str(&format!("mode = \"{}\"\n", mode));
+    config.push_str(&format!("mode = \"{}\"\n", escape_toml_value(mode)));
 
     // [presets] section with each preset as a table
     if !presets.is_empty() {
         for preset in presets {
             config.push('\n');
-            config.push_str(&format!("[presets.\"{}\"]\n", preset));
+            config.push_str(&format!("[presets.\"{}\"]\n", escape_toml_value(preset)));
         }
     }
 
@@ -223,15 +246,19 @@ pub fn generate_config(
         let registry = ExtensionRegistry::with_known();
         for ext in extensions {
             config.push('\n');
+            let escaped_ext = escape_toml_value(ext);
             if let Some(entry) = registry.get(ext) {
                 // Known extension: use registry source
-                config.push_str(&format!("[extensions.\"{}\"]\n", ext));
-                config.push_str(&format!("source = \"{}\"\n", entry.source));
+                config.push_str(&format!("[extensions.\"{}\"]\n", escaped_ext));
+                config.push_str(&format!(
+                    "source = \"{}\"\n",
+                    escape_toml_value(&entry.source)
+                ));
                 config.push_str("ref = \"main\"\n");
             } else {
                 // Custom extension: treat the value as a source URL
-                config.push_str(&format!("[extensions.\"{}\"]\n", ext));
-                config.push_str(&format!("source = \"{}\"\n", ext));
+                config.push_str(&format!("[extensions.\"{}\"]\n", escaped_ext));
+                config.push_str(&format!("source = \"{}\"\n", escaped_ext));
                 config.push_str("ref = \"main\"\n");
             }
         }
