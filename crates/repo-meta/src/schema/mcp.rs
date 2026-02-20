@@ -100,6 +100,21 @@ impl McpUserPath {
                 extension_id,
                 filename,
             } => {
+                // Safety: extension_id and filename must not contain path separators
+                // or path traversal sequences. Currently enforced by &'static str
+                // (compile-time constants), but assert defensively.
+                debug_assert!(
+                    !extension_id.contains('/')
+                        && !extension_id.contains('\\')
+                        && !extension_id.contains(".."),
+                    "extension_id must not contain path separators: {extension_id}"
+                );
+                debug_assert!(
+                    !filename.contains('/')
+                        && !filename.contains('\\')
+                        && !filename.contains(".."),
+                    "filename must not contain path separators: {filename}"
+                );
                 let base = if cfg!(target_os = "macos") {
                     "Library/Application Support/Code/User/globalStorage"
                 } else if cfg!(target_os = "windows") {

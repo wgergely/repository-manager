@@ -158,11 +158,9 @@ fn windsurf_mcp_spec() -> McpConfigSpec {
     McpConfigSpec {
         servers_key: "mcpServers",
         project_path: Some(".windsurf/mcp.json"),
-        user_path: Some(McpUserPath::OsSpecific {
-            macos: ".codeium/windsurf/mcp_config.json",
-            linux: ".codeium/windsurf/mcp_config.json",
-            windows: ".codeium/windsurf/mcp_config.json",
-        }),
+        user_path: Some(McpUserPath::HomeRelative(
+            ".codeium/windsurf/mcp_config.json",
+        )),
         embedding: McpConfigEmbedding::Dedicated,
         transports: &[McpTransport::Stdio, McpTransport::Http, McpTransport::Sse],
         field_mappings: McpFieldMappings {
@@ -197,7 +195,7 @@ fn vscode_mcp_spec() -> McpConfigSpec {
             type_values: McpTypeValues {
                 stdio: Some("stdio"),
                 http: Some("http"),
-                sse: Some("sse"),
+                sse: None, // SSE deprecated in VS Code
             },
         },
         env_syntax: Some(McpEnvSyntax::VsCodeInput),
@@ -306,7 +304,7 @@ fn cline_mcp_spec() -> McpConfigSpec {
             requires_type_field: false,
             type_values: McpTypeValues::default(),
         },
-        env_syntax: Some(McpEnvSyntax::DollarEnvColon),
+        env_syntax: Some(McpEnvSyntax::DollarEnvColon), // ${env:VAR} in args array
     }
 }
 
@@ -343,6 +341,10 @@ fn roo_mcp_spec() -> McpConfigSpec {
 // ---------------------------------------------------------------------------
 
 fn amazonq_mcp_spec() -> McpConfigSpec {
+    // NOTE: Amazon Q has separate config files for CLI and IDE variants:
+    //   CLI:  .amazonq/mcp.json       (project), ~/.aws/amazonq/mcp.json     (user)
+    //   IDE:  .amazonq/default.json   (project), ~/.aws/amazonq/default.json (user)
+    // We currently target the CLI variant only. IDE support is a future extension.
     McpConfigSpec {
         servers_key: "mcpServers",
         project_path: Some(".amazonq/mcp.json"),
@@ -464,7 +466,8 @@ mod tests {
 
     #[test]
     fn test_mcp_capable_tools_count() {
-        // 11 tools support MCP + claude_desktop = 13 entries
+        // 12 original tools with MCP support + claude_desktop = 13
+        // (copilot shares VS Code config but is a separate entry)
         assert_eq!(MCP_CAPABLE_TOOLS.len(), 13);
     }
 
