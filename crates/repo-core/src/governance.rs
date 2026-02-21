@@ -80,6 +80,31 @@ pub struct ConfigDrift {
     pub details: String,
 }
 
+/// Validate a rule ID to prevent path traversal and invalid filenames.
+///
+/// Rule IDs must be non-empty, at most 64 characters, and contain only
+/// alphanumeric characters, hyphens, and underscores.
+pub fn validate_rule_id(id: &str) -> std::result::Result<(), String> {
+    if id.is_empty() {
+        return Err("Rule ID cannot be empty".into());
+    }
+    if id.len() > 64 {
+        return Err("Rule ID cannot exceed 64 characters".into());
+    }
+    if id.contains('/') || id.contains('\\') || id.contains("..") {
+        return Err("Rule ID cannot contain path separators or '..'".into());
+    }
+    if !id
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(
+            "Rule ID can only contain alphanumeric characters, hyphens, and underscores".into(),
+        );
+    }
+    Ok(())
+}
+
 /// Lint the manifest for consistency issues
 ///
 /// Checks for:

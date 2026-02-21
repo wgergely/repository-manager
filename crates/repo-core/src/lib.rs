@@ -49,7 +49,7 @@ pub use backend::{BranchInfo, ModeBackend, StandardBackend, WorktreeBackend};
 pub use backup::{BackupManager, BackupMetadata, ToolBackup};
 pub use config::{ConfigResolver, Manifest, ResolvedConfig, RuntimeContext, json_to_toml_value};
 pub use error::{Error, Result};
-pub use governance::{ConfigDrift, DriftType, LintWarning, WarnLevel};
+pub use governance::{ConfigDrift, DriftType, LintWarning, WarnLevel, validate_rule_id};
 pub use hooks::{HookConfig, HookContext, HookEvent, run_hooks};
 pub use ledger::{Intent, Ledger, Projection, ProjectionKind};
 pub use mode::{Mode, detect_mode};

@@ -11,27 +11,7 @@ use crate::error::{CliError, Result};
 
 /// Validate a rule ID to prevent path traversal and invalid filenames
 fn validate_rule_id(id: &str) -> Result<()> {
-    if id.is_empty() {
-        return Err(CliError::user("Rule ID cannot be empty"));
-    }
-    if id.len() > 64 {
-        return Err(CliError::user("Rule ID cannot exceed 64 characters"));
-    }
-    if id.contains('/') || id.contains('\\') || id.contains("..") {
-        return Err(CliError::user(
-            "Rule ID cannot contain path separators or '..'",
-        ));
-    }
-    // Only allow alphanumeric, hyphens, and underscores
-    if !id
-        .chars()
-        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-    {
-        return Err(CliError::user(
-            "Rule ID can only contain alphanumeric characters, hyphens, and underscores",
-        ));
-    }
-    Ok(())
+    repo_core::validate_rule_id(id).map_err(|e| CliError::user(e.to_string()))
 }
 
 /// Path to rules directory within a repository

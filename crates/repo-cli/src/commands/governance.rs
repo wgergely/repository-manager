@@ -151,24 +151,9 @@ pub fn run_rules_import(path: &Path, file: &str) -> Result<()> {
     );
 
     for (id, rule_content) in &rules {
-        // Validate rule ID to prevent path traversal (e.g., "../../etc/cron.d/evil")
-        if id.contains('/') || id.contains('\\') || id.contains("..") || id.contains('\0') {
-            println!(
-                "   {} {} (skipped: unsafe characters in rule ID)",
-                "!".red(),
-                id
-            );
-            continue;
-        }
-        if !id
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-        {
-            println!(
-                "   {} {} (skipped: invalid characters in rule ID)",
-                "!".red(),
-                id
-            );
+        // Validate rule ID to prevent path traversal
+        if let Err(e) = repo_core::validate_rule_id(id) {
+            println!("   {} {} (skipped: {})", "!".red(), id, e);
             continue;
         }
 

@@ -499,17 +499,9 @@ async fn handle_rule_add(root: &Path, arguments: Value) -> Result<Value> {
     let normalized_root = NormalizedPath::new(root);
     let rules_dir = find_rules_dir(&normalized_root)?;
 
-    // Validate rule ID (alphanumeric and hyphens only)
-    if !args
-        .id
-        .chars()
-        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-    {
-        return Err(Error::InvalidArgument(
-            "Rule ID must contain only alphanumeric characters, hyphens, and underscores"
-                .to_string(),
-        ));
-    }
+    // Validate rule ID
+    repo_core::validate_rule_id(&args.id)
+        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
 
     // Create the rule file
     let rule_path = rules_dir.join(&format!("{}.md", args.id));
@@ -547,17 +539,9 @@ async fn handle_rule_remove(root: &Path, arguments: Value) -> Result<Value> {
     let args: RuleRemoveArgs =
         serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
 
-    // Validate rule ID (same validation as rule_add to prevent path traversal)
-    if !args
-        .id
-        .chars()
-        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-    {
-        return Err(Error::InvalidArgument(
-            "Rule ID must contain only alphanumeric characters, hyphens, and underscores"
-                .to_string(),
-        ));
-    }
+    // Validate rule ID
+    repo_core::validate_rule_id(&args.id)
+        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
 
     let normalized_root = NormalizedPath::new(root);
     let rules_dir = find_rules_dir(&normalized_root)?;

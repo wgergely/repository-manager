@@ -181,6 +181,10 @@ pub fn run_add_preset(path: &Path, name: &str, dry_run: bool) -> Result<()> {
     save_manifest(&config_path, &manifest)?;
 
     println!("{} Preset {} added.", "OK".green().bold(), name.cyan());
+
+    // Trigger sync to apply preset configuration
+    trigger_sync_and_report(path)?;
+
     Ok(())
 }
 
@@ -213,6 +217,9 @@ pub fn run_remove_preset(path: &Path, name: &str, dry_run: bool) -> Result<()> {
         manifest.presets.remove(name);
         save_manifest(&config_path, &manifest)?;
         println!("{} Preset {} removed.", "OK".green().bold(), name.cyan());
+
+        // Trigger sync to apply configuration changes
+        trigger_sync_and_report(path)?;
     } else {
         println!(
             "{}{} Preset {} not found in configuration.",
