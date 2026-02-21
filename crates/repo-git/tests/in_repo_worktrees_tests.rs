@@ -17,6 +17,23 @@ fn setup_in_repo_worktrees() -> (TempDir, InRepoWorktreesLayout) {
         .output()
         .expect("Failed to init repo");
 
+    // Configure git for test environment
+    Command::new("git")
+        .current_dir(root)
+        .args(["config", "user.email", "test@example.com"])
+        .output()
+        .unwrap();
+    Command::new("git")
+        .current_dir(root)
+        .args(["config", "user.name", "Test User"])
+        .output()
+        .unwrap();
+    Command::new("git")
+        .current_dir(root)
+        .args(["config", "commit.gpgSign", "false"])
+        .output()
+        .unwrap();
+
     // Create initial commit
     fs::write(root.join("README.md"), "# Test").unwrap();
     Command::new("git")
