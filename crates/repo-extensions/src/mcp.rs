@@ -37,7 +37,7 @@ pub struct ResolveContext {
 ///
 /// # Arguments
 ///
-/// * `manifest`  – The parsed `extension.toml` manifest.
+/// * `manifest`  – The parsed `repo_extension.toml` manifest.
 /// * `source_dir` – Absolute path to the extension's source directory on disk.
 /// * `ctx`        – Template variable values to substitute.
 ///

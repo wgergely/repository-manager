@@ -73,7 +73,7 @@ pub fn handle_extension_init(name: &str) -> Result<()> {
         name.cyan()
     );
 
-    // TODO: Implement actual init logic (create extension.toml, directory structure)
+    // TODO: Implement actual init logic (create repo_extension.toml, directory structure)
     println!(
         "{} Extension {} initialized (stub - not yet implemented)",
         "OK".green().bold(),
