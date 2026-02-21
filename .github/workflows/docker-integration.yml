@@ -9,6 +9,7 @@ on:
       - 'docker/**'
       - 'crates/**'
       - 'test-fixtures/**'
+      - 'tests/**'
       - 'docker-compose*.yml'
       - '.github/workflows/docker-integration.yml'
   pull_request:
@@ -17,6 +18,7 @@ on:
       - 'docker/**'
       - 'crates/**'
       - 'test-fixtures/**'
+      - 'tests/**'
       - 'docker-compose*.yml'
   workflow_dispatch:  # Allow manual trigger
 
@@ -253,12 +255,12 @@ jobs:
       - name: Run config generation tests
         run: |
           chmod +x docker/scripts/test-config-generation.sh
-          ./docker/scripts/test-config-generation.sh || echo "Config gen tests completed"
+          ./docker/scripts/test-config-generation.sh
 
       - name: Run tool config reading tests
         run: |
           chmod +x docker/scripts/test-tool-reads-config.sh
-          ./docker/scripts/test-tool-reads-config.sh || echo "Tool read tests completed"
+          ./docker/scripts/test-tool-reads-config.sh
 
       - name: Test mock API connectivity
         run: |

@@ -202,7 +202,7 @@ pub fn pull(
         )?;
 
         let co_repo = checkout_repo.unwrap_or(repo);
-        co_repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
+        co_repo.checkout_head(Some(git2::build::CheckoutBuilder::default().safe()))?;
         return Ok(());
     }
 
@@ -254,7 +254,7 @@ pub fn merge(
         )?;
 
         let co_repo = merge_repo.unwrap_or(repo);
-        co_repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
+        co_repo.checkout_head(Some(git2::build::CheckoutBuilder::default().safe()))?;
         return Ok(());
     }
 

@@ -73,7 +73,7 @@ pub fn write_atomic(path: &NormalizedPath, content: &[u8], config: RobustnessCon
     let native_path = path.to_native();
 
     // Security: Reject paths containing symlinks to prevent escape attacks
-    if contains_symlink(&native_path).unwrap_or(false) {
+    if contains_symlink(&native_path).unwrap_or(true) {
         return Err(Error::SymlinkInPath {
             path: native_path.clone(),
         });
