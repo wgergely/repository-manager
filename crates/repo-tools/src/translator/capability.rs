@@ -44,11 +44,10 @@ impl CapabilityTranslator {
         }
 
         // MCP servers (if tool supports MCP and config is provided)
-        if tool.capabilities.supports_mcp {
-            if let Some(servers) = mcp_servers {
+        if tool.capabilities.supports_mcp
+            && let Some(servers) = mcp_servers {
                 content.mcp_servers = Some(servers.clone());
             }
-        }
 
         // Rules directory: Future enhancement
         // if tool.capabilities.supports_rules_directory {

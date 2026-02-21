@@ -7,7 +7,7 @@ use std::path::Path;
 use colored::Colorize;
 use serde_json::json;
 
-use repo_core::{CheckStatus, ConfigResolver, Mode, SyncEngine, SyncOptions};
+use repo_core::{CheckStatus, Mode, SyncEngine, SyncOptions};
 use repo_fs::NormalizedPath;
 
 use crate::context::{RepoContext, detect_context};
@@ -34,23 +34,11 @@ pub fn resolve_root(path: &Path) -> Result<NormalizedPath> {
 
 /// Detect the repository mode from config.toml
 ///
-/// Reads the mode from `.repository/config.toml` using ConfigResolver.
-/// Defaults to Standard mode if no config exists.
+/// Delegates to [`repo_core::detect_mode`] which checks filesystem markers
+/// (`.gt`, `.git`) and falls back to `.repository/config.toml` via ConfigResolver.
+/// Defaults to Standard mode when no indicators are found.
 pub fn detect_mode(root: &NormalizedPath) -> Result<Mode> {
-    let resolver = ConfigResolver::new(root.clone());
-
-    if !resolver.has_config() {
-        // No config file, default to worktrees mode (per spec)
-        return Ok(Mode::Worktrees);
-    }
-
-    let config = resolver.resolve()?;
-    let mode: Mode = config
-        .mode
-        .parse()
-        .map_err(|e: repo_meta::Error| CliError::user(format!("Invalid mode in config: {}", e)))?;
-
-    Ok(mode)
+    Ok(repo_core::detect_mode(root)?)
 }
 
 /// Run the check command

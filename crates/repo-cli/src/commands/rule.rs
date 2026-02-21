@@ -103,7 +103,7 @@ pub fn run_list_rules(path: &Path) -> Result<()> {
         let entry = entry?;
         let path = entry.path();
         if path.extension().is_some_and(|e| e == "md") {
-            let id = path.file_stem().unwrap().to_string_lossy();
+            let id = path.file_stem().unwrap_or_default().to_string_lossy();
             println!("   {} {}", "-".cyan(), id);
             found = true;
         }

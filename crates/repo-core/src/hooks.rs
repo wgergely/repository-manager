@@ -195,24 +195,21 @@ fn execute_hook(
 
     // Validate working_dir is within the repository root (default_dir) to prevent
     // hooks from executing in arbitrary directories
-    if let Some(ref custom_dir) = hook.working_dir {
-        if let (Ok(canon_custom), Ok(canon_default)) =
+    if let Some(ref custom_dir) = hook.working_dir
+        && let (Ok(canon_custom), Ok(canon_default)) =
             (custom_dir.canonicalize(), default_dir.canonicalize())
-        {
-            if !canon_custom.starts_with(&canon_default) {
-                return Err(Error::HookFailed {
-                    event: hook.event.to_string(),
-                    command: hook.command.clone(),
-                    message: format!(
-                        "Hook working_dir {:?} is outside the repository root {:?}",
-                        custom_dir, default_dir
-                    ),
-                });
-            }
+        && !canon_custom.starts_with(&canon_default) {
+            return Err(Error::HookFailed {
+                event: hook.event.to_string(),
+                command: hook.command.clone(),
+                message: format!(
+                    "Hook working_dir {:?} is outside the repository root {:?}",
+                    custom_dir, default_dir
+                ),
+            });
         }
         // If canonicalize fails (directory doesn't exist yet), allow it — the
         // Command::new call will fail with a clear OS error.
-    }
 
     // Substitute context variables in args
     let args: Vec<String> = hook

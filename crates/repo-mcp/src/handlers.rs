@@ -839,41 +839,13 @@ impl RepoContext {
     }
 }
 
-/// Detect the repository mode from the filesystem
+/// Detect the repository mode from filesystem markers and configuration.
+///
+/// Delegates to [`repo_core::detect_mode`] which checks filesystem markers
+/// (`.gt`, `.git`) and falls back to `.repository/config.toml` via ConfigResolver.
+/// Defaults to Standard mode when no indicators are found.
 fn detect_mode(root: &NormalizedPath) -> Result<Mode> {
-    // Check for .gt (worktree container)
-    if root.join(".gt").exists() {
-        return Ok(Mode::Worktrees);
-    }
-
-    // Check for .git (standard repo)
-    if root.join(".git").exists() {
-        return Ok(Mode::Standard);
-    }
-
-    // Check if we're inside a worktree (look for .repository in parent)
-    if let Some(parent) = root.as_ref().parent() {
-        let parent_path = NormalizedPath::new(parent);
-        if parent_path.join(".gt").exists() {
-            return Ok(Mode::Worktrees);
-        }
-    }
-
-    // Check for config.toml to determine mode
-    let config_path = find_config_path(root).ok();
-    if let Some(path) = config_path
-        && let Ok(content) = fs::read_to_string(path.as_ref())
-        && let Ok(manifest) = Manifest::parse(&content)
-    {
-        return manifest
-            .core
-            .mode
-            .parse()
-            .map_err(|_| Error::InvalidArgument("Invalid mode in config".to_string()));
-    }
-
-    // Default to standard mode
-    Ok(Mode::Standard)
+    repo_core::detect_mode(root).map_err(Error::Core)
 }
 
 /// Create the appropriate backend for the detected mode

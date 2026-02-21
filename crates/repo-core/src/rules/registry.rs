@@ -76,10 +76,9 @@ impl RuleRegistry {
         // Atomic write: temp file then rename
         let temp_path = self.path.with_extension("toml.tmp");
         std::fs::write(&temp_path, &content)?;
-        std::fs::rename(&temp_path, &self.path).map_err(|e| {
+        std::fs::rename(&temp_path, &self.path).inspect_err(|_e| {
             // Best-effort cleanup of temp file on rename failure
             let _ = std::fs::remove_file(&temp_path);
-            e
         })?;
         Ok(())
     }

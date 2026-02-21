@@ -461,34 +461,37 @@ impl SyncEngine {
         // Check first to identify issues
         let check_report = self.check()?;
 
-        let mut report = SyncReport::success();
-
         if check_report.status == CheckStatus::Healthy {
-            return Ok(report.with_action("No fixes needed".to_string()));
+            let report = SyncReport::success().with_action("No fixes needed".to_string());
+            return Ok(report);
         }
 
         // Re-sync will fix drift and recreate missing files
-        let sync_report = self.sync_with_options(options)?;
+        let mut sync_report = self.sync_with_options(options)?;
 
-        report.actions = sync_report.actions;
-        report.errors = sync_report.errors;
-        report.success = sync_report.success;
+        // Re-check after sync to report actual fix counts instead of stale pre-sync counts
+        let post_check = self.check()?;
 
-        if !check_report.drifted.is_empty() {
-            report = report.with_action(format!(
-                "Fixed {} drifted projections",
-                check_report.drifted.len()
-            ));
+        let fixed_drift = check_report
+            .drifted
+            .len()
+            .saturating_sub(post_check.drifted.len());
+        let fixed_missing = check_report
+            .missing
+            .len()
+            .saturating_sub(post_check.missing.len());
+
+        if fixed_drift > 0 {
+            sync_report = sync_report
+                .with_action(format!("Fixed {} drifted projections", fixed_drift));
         }
 
-        if !check_report.missing.is_empty() {
-            report = report.with_action(format!(
-                "Recreated {} missing projections",
-                check_report.missing.len()
-            ));
+        if fixed_missing > 0 {
+            sync_report = sync_report
+                .with_action(format!("Recreated {} missing projections", fixed_missing));
         }
 
-        Ok(report)
+        Ok(sync_report)
     }
 
     /// Fix synchronization issues
@@ -533,7 +536,7 @@ impl SyncEngine {
         let extensions_dir = self.root.join(".repository/extensions");
         let mut mcp_configs: Vec<Value> = Vec::new();
 
-        for (ext_name, _ext_config) in &manifest.extensions {
+        for ext_name in manifest.extensions.keys() {
             let ext_source_dir = extensions_dir.join(ext_name);
             let manifest_path = ext_source_dir.join(repo_extensions::MANIFEST_FILENAME);
 

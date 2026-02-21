@@ -52,7 +52,7 @@ pub use error::{Error, Result};
 pub use governance::{ConfigDrift, DriftType, LintWarning, WarnLevel};
 pub use hooks::{HookConfig, HookContext, HookEvent, run_hooks};
 pub use ledger::{Intent, Ledger, Projection, ProjectionKind};
-pub use mode::Mode;
+pub use mode::{Mode, detect_mode};
 pub use projection::{ProjectionWriter, compute_checksum};
 pub use rules::{Rule, RuleRegistry};
 pub use sync::{
