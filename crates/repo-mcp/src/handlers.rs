@@ -754,7 +754,7 @@ async fn handle_extension_init(arguments: Value) -> Result<Value> {
     let args: ExtensionInitArgs =
         serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
 
-    // Stub: actual init logic (create extension.toml, directory structure) comes later
+    // Stub: actual init logic (create repo_extension.toml, directory structure) comes later
     Ok(json!({
         "success": true,
         "name": args.name,

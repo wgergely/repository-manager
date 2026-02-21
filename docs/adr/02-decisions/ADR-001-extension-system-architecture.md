@@ -28,7 +28,7 @@ Extensions sit alongside tools, rules, and presets as a peer concept. A new `[ex
 
 **Decision: TOML.**
 
-Extension manifests are `extension.toml` files in the extension's source repository. Consistent with all other repo manager configuration (config.toml, ledger.toml, tool definitions).
+Extension manifests are `repo_extension.toml` files in the extension's source repository. Consistent with all other repo manager configuration (config.toml, ledger.toml, tool definitions) and the `repo` prefix makes it immediately clear which system the file belongs to.
 
 **Rejected alternatives:**
 - JSON: inconsistent with ecosystem

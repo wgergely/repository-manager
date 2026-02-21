@@ -21,8 +21,8 @@ All ADR-006 requirements met. Three flagged issues resolved in follow-up.
 | Bootstrap order (sys.path before import) | PASS | `_paths.py:19-25` structural → `_paths.py:35` import |
 | `--content-dir` CLI flag | PASS | `cli.py:2031-2036`, `subagent.py:219-224` |
 | Fix `requirements.txt` | PASS | All 10 deps match `pyproject.toml`, `mcp>=1.20.0` |
-| Add `extension.toml` | PASS | All 6 sections present |
-| `mcp.json` intact | PASS | `vs-subagent-mcp` matches `extension.toml` provides |
+| Add `repo_extension.toml` | PASS | All 6 sections present |
+| `mcp.json` intact | PASS | `vs-subagent-mcp` matches `repo_extension.toml` provides |
 
 ## Critical Check: Container Mode
 
@@ -51,7 +51,7 @@ Correct two-step: structural `LIB_SRC_DIR` → `sys.path.insert` → import `cor
 - Output dirs (`TOOL_CONFIGS` entries) from `layout.output_root`
 - Backward compatible: accepts both `WorkspaceLayout` and plain `Path`
 
-### `extension.toml`
+### `repo_extension.toml`
 
 ```toml
 [extension]

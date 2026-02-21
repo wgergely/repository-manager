@@ -1,7 +1,9 @@
-//! Extension manifest parsing for `extension.toml` files.
+//! Extension manifest parsing for `repo_extension.toml` files.
 //!
 //! An extension manifest declares metadata, runtime requirements, entry points,
-//! and output directories for a repository-manager extension.
+//! and output directories for a repository-manager extension. The canonical
+//! filename is [`MANIFEST_FILENAME`](crate::MANIFEST_FILENAME)
+//! (`repo_extension.toml`).
 //!
 //! # Example TOML
 //!
@@ -40,7 +42,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 
-/// Complete extension manifest loaded from `extension.toml`.
+/// Complete extension manifest loaded from `repo_extension.toml`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExtensionManifest {
     /// Core extension metadata.
@@ -506,7 +508,7 @@ content_types = []
     #[test]
     fn test_from_path_reads_file() {
         let dir = tempfile::TempDir::new().unwrap();
-        let file_path = dir.path().join("extension.toml");
+        let file_path = dir.path().join(crate::MANIFEST_FILENAME);
         std::fs::write(&file_path, VAULTSPEC_TOML).unwrap();
 
         let manifest = ExtensionManifest::from_path(&file_path).unwrap();
@@ -517,7 +519,7 @@ content_types = []
     #[test]
     fn test_from_path_not_found() {
         let err =
-            ExtensionManifest::from_path(Path::new("/nonexistent/extension.toml")).unwrap_err();
+            ExtensionManifest::from_path(Path::new("/nonexistent/repo_extension.toml")).unwrap_err();
         assert!(matches!(err, Error::ManifestNotFound(_)));
     }
 

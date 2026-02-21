@@ -26,7 +26,7 @@ VaultSpec is not a Python library. It's an embedded framework - a `.vaultspec/` 
 3. Create managed venv at `.repository/extensions/vault-spec/.venv/`
 4. `pip install` dependencies into venv (deps only, not VaultSpec itself)
 
-**Draft extension.toml:**
+**Draft repo_extension.toml:**
 ```toml
 [extension]
 name = "vault-spec"
@@ -64,7 +64,7 @@ vault_dir = ".vault/"
 ```
 repo extension install <vault-spec-url>
   1. Fetch VaultSpec source repo (git clone to cache)
-  2. Read extension.toml from source
+  2. Read repo_extension.toml from source
   3. Check requires.python (>=3.13) against system (via uv or PATH)
   4. Create venv at .repository/extensions/vault-spec/.venv/
   5. pip install dependencies into venv
@@ -113,7 +113,7 @@ Fragile but possible.
 ## 6. RESTRUCTURING RECOMMENDATIONS
 
 ### Minimal (for immediate integration)
-1. Add `extension.toml` to VaultSpec repo root
+1. Add `repo_extension.toml` to VaultSpec repo root
 2. Fix `pyproject.toml` - add `[project.scripts]` entry points, fix `packages.find.where`
 3. Accept `--root` consistently (already exists)
 

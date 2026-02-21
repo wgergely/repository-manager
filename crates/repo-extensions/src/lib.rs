@@ -9,6 +9,12 @@ pub mod manifest;
 pub mod mcp;
 pub mod registry;
 
+/// The canonical filename for extension manifest files.
+///
+/// Client extensions must place a file with this name at the root of their
+/// repository so the repo manager can discover and validate them.
+pub const MANIFEST_FILENAME: &str = "repo_extension.toml";
+
 pub use config::ExtensionConfig;
 pub use error::Error;
 pub use manifest::{EntryPoints, ExtensionManifest, Provides, ResolvedCommand, ResolvedEntryPoints};

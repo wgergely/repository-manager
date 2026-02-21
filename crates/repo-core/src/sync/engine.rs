@@ -515,7 +515,7 @@ impl SyncEngine {
     /// Resolve MCP server configurations from all configured extensions.
     ///
     /// For each extension in the manifest:
-    /// 1. Loads the extension's `extension.toml` from its source directory
+    /// 1. Loads the extension's `repo_extension.toml` from its source directory
     /// 2. If the extension declares `provides.mcp_config`, reads and resolves
     ///    template variables in the referenced `mcp.json`
     /// 3. Merges all resolved configs into a single JSON object
@@ -535,7 +535,7 @@ impl SyncEngine {
 
         for (ext_name, _ext_config) in &manifest.extensions {
             let ext_source_dir = extensions_dir.join(ext_name);
-            let manifest_path = ext_source_dir.join("extension.toml");
+            let manifest_path = ext_source_dir.join(repo_extensions::MANIFEST_FILENAME);
 
             // Read the extension manifest
             let ext_manifest = match fs::read_to_string(manifest_path.as_ref()) {
@@ -543,12 +543,12 @@ impl SyncEngine {
                     Ok(m) => m,
                     Err(e) => {
                         tracing::warn!(
-                            "Failed to parse extension.toml for '{}': {}",
+                            "Failed to parse repo_extension.toml for '{}': {}",
                             ext_name,
                             e
                         );
                         report.errors.push(format!(
-                            "Failed to parse extension.toml for '{}': {}",
+                            "Failed to parse repo_extension.toml for '{}': {}",
                             ext_name, e
                         ));
                         continue;

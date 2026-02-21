@@ -64,7 +64,7 @@ ref = "v0.1.0"
 
 Matches the presets pattern (`[presets."env:python"]`). Each extension is a named table entry with source, ref, and optional config overrides.
 
-**Key principle:** The `[config]` sub-table carries **overrides only**. Default values come from the extension itself (its `extension.toml` or internal defaults). An absent or empty config section means all defaults apply. This only works for extensions that support external configuration (e.g., VaultSpec's `VAULTSPEC_*` env vars).
+**Key principle:** The `[config]` sub-table carries **overrides only**. Default values come from the extension itself (its `repo_extension.toml` or internal defaults). An absent or empty config section means all defaults apply. This only works for extensions that support external configuration (e.g., VaultSpec's `VAULTSPEC_*` env vars).
 
 **Rationale:**
 - Table format allows pinning source + ref alongside the extension name
