@@ -302,7 +302,7 @@ mod tests {
             );
         }
 
-        // Configure git user for commits
+        // Configure git user for commits and disable signing
         Command::new("git")
             .args(["config", "user.email", "test@test.com"])
             .current_dir(dir.path())
@@ -314,6 +314,12 @@ mod tests {
             .current_dir(dir.path())
             .output()
             .expect("Failed to configure git name");
+
+        Command::new("git")
+            .args(["config", "commit.gpgsign", "false"])
+            .current_dir(dir.path())
+            .output()
+            .expect("Failed to disable commit signing");
 
         // Create an initial commit so we have a HEAD
         fs::write(dir.path().join("README.md"), "# Test").unwrap();
@@ -329,6 +335,13 @@ mod tests {
             .current_dir(dir.path())
             .output()
             .expect("Failed to git commit");
+
+        // Ensure default branch is named 'main' for consistency
+        Command::new("git")
+            .args(["branch", "-m", "main"])
+            .current_dir(dir.path())
+            .output()
+            .expect("Failed to rename branch to main");
 
         dir
     }

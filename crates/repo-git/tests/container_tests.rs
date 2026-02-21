@@ -21,6 +21,13 @@ fn setup_container_repo() -> (TempDir, ContainerLayout) {
         .output()
         .expect("Failed to init bare repo");
 
+    // Set HEAD to refs/heads/main (git init --bare defaults to master)
+    Command::new("git")
+        .args(["symbolic-ref", "HEAD", "refs/heads/main"])
+        .current_dir(&gt_dir)
+        .status()
+        .expect("Failed to set HEAD to refs/heads/main");
+
     // Add main as worktree
     Command::new("git")
         .current_dir(&gt_dir)
@@ -28,6 +35,23 @@ fn setup_container_repo() -> (TempDir, ContainerLayout) {
         .arg(&main_dir)
         .output()
         .expect("Failed to add main worktree");
+
+    // Configure git user and disable signing for test commits
+    Command::new("git")
+        .current_dir(&gt_dir)
+        .args(["config", "user.email", "test@test.com"])
+        .status()
+        .expect("Failed to configure git email");
+    Command::new("git")
+        .current_dir(&gt_dir)
+        .args(["config", "user.name", "Test User"])
+        .status()
+        .expect("Failed to configure git name");
+    Command::new("git")
+        .current_dir(&gt_dir)
+        .args(["config", "commit.gpgsign", "false"])
+        .status()
+        .expect("Failed to disable commit signing");
 
     // Create an initial commit in main
     fs::write(main_dir.join("README.md"), "# Test").unwrap();

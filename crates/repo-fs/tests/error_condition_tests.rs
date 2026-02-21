@@ -60,8 +60,19 @@ mod unix_tests {
     use std::fs::{self, Permissions};
     use std::os::unix::fs::PermissionsExt;
 
+    fn is_root() -> bool {
+        match std::process::Command::new("id").arg("-u").output() {
+            Ok(output) => String::from_utf8_lossy(&output.stdout).trim() == "0",
+            Err(_) => false,
+        }
+    }
+
     #[test]
     fn write_atomic_to_readonly_directory_returns_error() {
+        if is_root() {
+            eprintln!("Skipping test: running as root bypasses permission checks");
+            return;
+        }
         let dir = tempdir().unwrap();
         let readonly_dir = dir.path().join("readonly");
         fs::create_dir(&readonly_dir).unwrap();
@@ -83,6 +94,10 @@ mod unix_tests {
 
     #[test]
     fn read_text_permission_denied_returns_error() {
+        if is_root() {
+            eprintln!("Skipping test: running as root bypasses permission checks");
+            return;
+        }
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("secret.txt");
         fs::write(&file_path, "secret content").unwrap();
@@ -101,6 +116,10 @@ mod unix_tests {
 
     #[test]
     fn write_atomic_unwritable_parent_returns_error() {
+        if is_root() {
+            eprintln!("Skipping test: running as root bypasses permission checks");
+            return;
+        }
         let dir = tempdir().unwrap();
         let parent = dir.path().join("parent");
         fs::create_dir(&parent).unwrap();
