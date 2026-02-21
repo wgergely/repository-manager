@@ -296,9 +296,13 @@ mod tests {
     use tempfile::TempDir;
 
     fn create_minimal_repo(dir: &Path, mode: &str) {
-        // Create .git directory to simulate git repo
-        let git_dir = dir.join(".git");
-        fs::create_dir_all(&git_dir).unwrap();
+        // Create filesystem marker matching the mode
+        if mode == "worktrees" {
+            fs::create_dir_all(dir.join(".gt")).unwrap();
+            fs::create_dir_all(dir.join("main")).unwrap();
+        } else {
+            fs::create_dir_all(dir.join(".git")).unwrap();
+        }
 
         // Create .repository directory
         let repo_dir = dir.join(".repository");
@@ -381,10 +385,10 @@ mode = "{}"
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
 
-        // No config file - should default to worktrees (per spec)
+        // No config file and no filesystem markers - defaults to Standard
         let root = NormalizedPath::new(path);
         let mode = detect_mode(&root).unwrap();
-        assert_eq!(mode, Mode::Worktrees);
+        assert_eq!(mode, Mode::Standard);
     }
 
     #[test]

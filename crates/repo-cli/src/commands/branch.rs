@@ -351,11 +351,11 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
 
-        // No config file - should default to worktrees mode (per spec)
+        // No config file and no filesystem markers - defaults to Standard
         let root = NormalizedPath::new(path);
         let mode = detect_mode(&root).unwrap();
 
-        assert_eq!(mode, Mode::Worktrees);
+        assert_eq!(mode, Mode::Standard);
     }
 
     #[test]
