@@ -219,7 +219,7 @@ fn test_check_healthy_when_text_block_marker_present() {
     fs::write(config_dir.join("test.mdc"), &text_content).unwrap();
 
     // Compute real checksum for the text block content
-    let text_checksum = repo_core::sync::compute_content_checksum(&text_content);
+    let text_checksum = repo_fs::checksum::compute_content_checksum(&text_content);
 
     // Create .repository directory and ledger
     let repo_dir = temp.path().join(".repository");

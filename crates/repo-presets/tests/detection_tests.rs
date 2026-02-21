@@ -3,21 +3,13 @@
 //! Tests that providers correctly identify project types based on actual
 //! file structures, not just empty directories.
 
-use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
+mod common;
+
+use common::create_test_context;
 use repo_presets::provider::PresetProvider;
-use repo_presets::{Context, NodeProvider, PresetStatus, RustProvider, UvProvider};
-use std::collections::HashMap;
+use repo_presets::{NodeProvider, PresetStatus, RustProvider, UvProvider};
 use std::fs;
 use tempfile::TempDir;
-
-fn create_test_context(temp: &TempDir) -> Context {
-    let layout = WorkspaceLayout {
-        root: NormalizedPath::new(temp.path()),
-        active_context: NormalizedPath::new(temp.path()),
-        mode: LayoutMode::Classic,
-    };
-    Context::new(layout, HashMap::new())
-}
 
 // ==========================================================================
 // Rust Provider Detection Tests

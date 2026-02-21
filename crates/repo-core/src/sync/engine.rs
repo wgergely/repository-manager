@@ -4,7 +4,6 @@
 //! and the filesystem (actual tool configurations).
 
 use std::fs;
-use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -183,7 +182,7 @@ impl SyncEngine {
                             });
                         } else {
                             // Check checksum
-                            match compute_file_checksum(file_path.as_ref()) {
+                            match repo_fs::checksum::compute_file_checksum(file_path.as_ref()) {
                                 Ok(actual_checksum) => {
                                     if &actual_checksum != checksum {
                                         drifted.push(DriftItem {
@@ -237,7 +236,7 @@ impl SyncEngine {
                                         let block_content =
                                             extract_managed_block(&content, &marker_str);
                                         let actual_checksum =
-                                            compute_content_checksum(&block_content);
+                                            repo_fs::checksum::compute_content_checksum(&block_content);
                                         if actual_checksum != *checksum {
                                             drifted.push(DriftItem {
                                                 intent_id: intent.id.clone(),
@@ -627,21 +626,6 @@ impl SyncEngine {
     }
 }
 
-/// Compute the SHA-256 checksum of a string content
-///
-/// Delegates to [`repo_fs::checksum::compute_content_checksum`] for the
-/// canonical `"sha256:<hex>"` format.
-pub fn compute_content_checksum(content: &str) -> String {
-    repo_fs::checksum::compute_content_checksum(content)
-}
-
-/// Compute the SHA-256 checksum of a file
-///
-/// Delegates to [`repo_fs::checksum::compute_file_checksum`] for the
-/// canonical `"sha256:<hex>"` format.
-pub fn compute_file_checksum(path: &Path) -> Result<String> {
-    Ok(repo_fs::checksum::compute_file_checksum(path)?)
-}
 
 /// Extract managed block content from a file by marker UUID
 ///
@@ -707,7 +691,7 @@ mod tests {
         let mut file = fs::File::create(&file_path).unwrap();
         file.write_all(b"hello world").unwrap();
 
-        let checksum = compute_file_checksum(&file_path).unwrap();
+        let checksum = repo_fs::checksum::compute_file_checksum(&file_path).unwrap();
 
         // Known SHA-256 of "hello world" with canonical prefix
         assert_eq!(

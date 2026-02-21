@@ -171,20 +171,20 @@ pub fn write_atomic(path: &NormalizedPath, content: &[u8], config: RobustnessCon
         let _ = fs::remove_file(&temp_path);
     }
 
+    // Best-effort cleanup of lock file after successful write
+    // Lock files are no longer needed once the atomic rename completes
+    let _ = fs::remove_file(&lock_path);
+
     result
 }
 
 /// Read text content from a file.
-///
-/// TODO: PLACEHOLDER - replace with ManagedBlockEditor
 pub fn read_text(path: &NormalizedPath) -> Result<String> {
     let native_path = path.to_native();
     fs::read_to_string(&native_path).map_err(|e| Error::io(&native_path, e))
 }
 
 /// Write text content to a file atomically.
-///
-/// TODO: PLACEHOLDER - replace with ManagedBlockEditor
 pub fn write_text(path: &NormalizedPath, content: &str) -> Result<()> {
     write_atomic(path, content.as_bytes(), RobustnessConfig::default())
 }

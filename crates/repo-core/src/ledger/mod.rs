@@ -97,6 +97,66 @@ impl Ledger {
         Ok(())
     }
 
+    /// Atomically load, modify, and save the ledger under a single exclusive lock.
+    ///
+    /// This prevents the TOCTOU race condition that exists when using separate
+    /// `load()` and `save()` calls: between releasing the shared lock from `load()`
+    /// and acquiring the exclusive lock in `save()`, another process could modify
+    /// the file, and the second writer's changes would be silently lost.
+    ///
+    /// The callback receives a mutable reference to the loaded ledger and may
+    /// return a value that is passed through to the caller.
+    ///
+    /// If the file does not exist, the callback receives a new empty ledger.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be locked, read, parsed, or written.
+    pub fn modify<F, T>(path: &Path, f: F) -> Result<T>
+    where
+        F: FnOnce(&mut Ledger) -> T,
+    {
+        use std::io::{Read, Seek, Write};
+
+        // Create or open the file for exclusive locking.
+        // We lock the actual file (not a separate lock file) so the lock
+        // stays bound to the same inode across the read-modify-write cycle.
+        let mut lock_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(path)?;
+
+        // Hold exclusive lock for the entire read-modify-write cycle
+        lock_file.lock_exclusive()?;
+
+        // Read current content (may be empty if file was just created)
+        let mut content = String::new();
+        lock_file.read_to_string(&mut content)?;
+
+        let mut ledger: Ledger = if content.trim().is_empty() {
+            Ledger::new()
+        } else {
+            toml::from_str(&content)?
+        };
+
+        // Apply caller's mutation
+        let result = f(&mut ledger);
+
+        // Write back directly to the same file descriptor (preserves lock on same inode).
+        // Truncate + rewrite instead of temp+rename to avoid inode change that would
+        // invalidate the advisory lock for other waiters.
+        let serialized = toml::to_string_pretty(&ledger)?;
+        lock_file.set_len(0)?;
+        lock_file.seek(std::io::SeekFrom::Start(0))?;
+        lock_file.write_all(serialized.as_bytes())?;
+        lock_file.sync_all()?;
+
+        // Lock released when lock_file is dropped
+        Ok(result)
+    }
+
     /// Get all intents in the ledger
     pub fn intents(&self) -> &[Intent] {
         &self.intents
@@ -195,6 +255,56 @@ mod tests {
         let ledger = Ledger::new();
         let serialized = toml::to_string(&ledger).unwrap();
         assert!(serialized.contains("version = \"1.0\""));
+    }
+
+    #[test]
+    fn ledger_modify_creates_new_file_and_applies_mutation() {
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("ledger.toml");
+
+        // File doesn't exist yet — modify should create it
+        let count = Ledger::modify(&path, |ledger| {
+            ledger.add_intent(Intent::new(
+                "rule:from_modify".to_string(),
+                json!({"created_by": "modify"}),
+            ));
+            ledger.intents().len()
+        })
+        .unwrap();
+
+        assert_eq!(count, 1);
+
+        // Verify the file was written correctly
+        let loaded = Ledger::load(&path).unwrap();
+        assert_eq!(loaded.intents().len(), 1);
+        assert_eq!(loaded.intents()[0].id, "rule:from_modify");
+    }
+
+    #[test]
+    fn ledger_modify_preserves_existing_intents() {
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("ledger.toml");
+
+        // Create initial ledger with one intent
+        let mut ledger = Ledger::new();
+        ledger.add_intent(Intent::new("rule:existing".to_string(), json!({})));
+        ledger.save(&path).unwrap();
+
+        // Modify should load the existing intent and add a new one
+        Ledger::modify(&path, |ledger| {
+            ledger.add_intent(Intent::new("rule:added".to_string(), json!({})));
+        })
+        .unwrap();
+
+        let loaded = Ledger::load(&path).unwrap();
+        assert_eq!(loaded.intents().len(), 2);
+        let ids: Vec<&str> = loaded.intents().iter().map(|i| i.id.as_str()).collect();
+        assert!(ids.contains(&"rule:existing"));
+        assert!(ids.contains(&"rule:added"));
     }
 
     #[test]
