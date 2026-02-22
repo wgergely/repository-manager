@@ -1,6 +1,6 @@
 //! Antigravity integration for Repository Manager.
 //!
-//! Manages `.agent/rules.md` file using managed blocks for rule content.
+//! Manages `.agent/rules/` directory with per-rule files for rule content.
 
 use crate::generic::GenericToolIntegration;
 use repo_meta::schema::{
@@ -9,7 +9,7 @@ use repo_meta::schema::{
 
 /// Creates an Antigravity integration.
 ///
-/// Returns a GenericToolIntegration configured for Antigravity's `.agent/rules.md` file.
+/// Returns a GenericToolIntegration configured for Antigravity's `.agent/rules/` directory.
 /// Supports custom instructions and rules directory.
 pub fn antigravity_integration() -> GenericToolIntegration {
     GenericToolIntegration::new(ToolDefinition {
@@ -19,7 +19,7 @@ pub fn antigravity_integration() -> GenericToolIntegration {
             description: Some("Antigravity AI assistant".into()),
         },
         integration: ToolIntegrationConfig {
-            config_path: ".agent/rules.md".into(),
+            config_path: ".agent/rules/".into(),
             config_type: ConfigType::Text,
             additional_paths: vec![],
         },
@@ -65,11 +65,12 @@ mod tests {
         let integration = antigravity_integration();
         let locations = integration.config_locations();
         assert_eq!(locations.len(), 1);
-        assert_eq!(locations[0].path, ".agent/rules.md");
+        assert_eq!(locations[0].path, ".agent/rules/");
+        assert!(locations[0].is_directory);
     }
 
     #[test]
-    fn test_sync_creates_rules_md() {
+    fn test_sync_creates_rules_directory() {
         let temp_dir = TempDir::new().unwrap();
         let root = NormalizedPath::new(temp_dir.path());
 
@@ -88,24 +89,28 @@ mod tests {
         let integration = antigravity_integration();
         integration.sync(&context, &rules).unwrap();
 
-        let rules_path = temp_dir.path().join(".agent/rules.md");
-        assert!(rules_path.exists());
+        // Should create a directory, not a single file
+        let rules_dir = temp_dir.path().join(".agent/rules");
+        assert!(rules_dir.is_dir(), ".agent/rules/ should be a directory");
 
-        let content = fs::read_to_string(&rules_path).unwrap();
-        assert!(content.contains("<!-- repo:block:rule-1 -->"));
-        assert!(content.contains("First rule content"));
-        assert!(content.contains("<!-- /repo:block:rule-1 -->"));
-        assert!(content.contains("<!-- repo:block:rule-2 -->"));
-        assert!(content.contains("Second rule content"));
-        assert!(content.contains("<!-- /repo:block:rule-2 -->"));
+        // Should have individual rule files
+        let rule1_path = rules_dir.join("01-rule-1.md");
+        let rule2_path = rules_dir.join("02-rule-2.md");
+        assert!(rule1_path.exists(), "Per-rule file for rule-1 should exist");
+        assert!(rule2_path.exists(), "Per-rule file for rule-2 should exist");
+
+        let content1 = fs::read_to_string(&rule1_path).unwrap();
+        assert!(content1.contains("First rule content"));
+
+        let content2 = fs::read_to_string(&rule2_path).unwrap();
+        assert!(content2.contains("Second rule content"));
     }
 
     #[test]
-    fn test_sync_uses_managed_blocks() {
+    fn test_sync_overwrites_rule_files() {
         let temp_dir = TempDir::new().unwrap();
         let root = NormalizedPath::new(temp_dir.path());
 
-        // Create with initial rule
         let context = SyncContext::new(root.clone());
         let rules = vec![Rule {
             id: "my-rule".to_string(),
@@ -122,43 +127,11 @@ mod tests {
         }];
         integration.sync(&context, &rules).unwrap();
 
-        let content = fs::read_to_string(temp_dir.path().join(".agent/rules.md")).unwrap();
+        let rule_path = temp_dir.path().join(".agent/rules/01-my-rule.md");
+        let content = fs::read_to_string(rule_path).unwrap();
 
-        // Should have updated content, not duplicated blocks
+        // Should have updated content
         assert!(content.contains("Updated content"));
         assert!(!content.contains("Original content"));
-
-        // Should only have one block marker pair
-        assert_eq!(content.matches("<!-- repo:block:my-rule -->").count(), 1);
-    }
-
-    #[test]
-    fn test_sync_preserves_manual_content() {
-        let temp_dir = TempDir::new().unwrap();
-        let root = NormalizedPath::new(temp_dir.path());
-
-        // Create .agent directory and rules.md with manual content
-        fs::create_dir_all(temp_dir.path().join(".agent")).unwrap();
-        let manual_content = "# Manual rules\n\nDo not modify managed blocks below.\n";
-        fs::write(temp_dir.path().join(".agent/rules.md"), manual_content).unwrap();
-
-        let context = SyncContext::new(root);
-        let rules = vec![Rule {
-            id: "auto-rule".to_string(),
-            content: "Automated rule".to_string(),
-        }];
-
-        let integration = antigravity_integration();
-        integration.sync(&context, &rules).unwrap();
-
-        let content = fs::read_to_string(temp_dir.path().join(".agent/rules.md")).unwrap();
-
-        // Manual content should be preserved
-        assert!(content.contains("# Manual rules"));
-        assert!(content.contains("Do not modify"));
-
-        // Managed block should be added
-        assert!(content.contains("<!-- repo:block:auto-rule -->"));
-        assert!(content.contains("Automated rule"));
     }
 }

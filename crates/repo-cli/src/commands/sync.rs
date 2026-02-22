@@ -7,6 +7,8 @@ use std::path::Path;
 use colored::Colorize;
 use serde_json::json;
 
+use repo_core::config::Manifest;
+use repo_core::hooks::{HookContext, HookEvent, run_hooks};
 use repo_core::{CheckStatus, Mode, SyncEngine, SyncOptions};
 use repo_fs::NormalizedPath;
 
@@ -39,6 +41,22 @@ pub fn resolve_root(path: &Path) -> Result<NormalizedPath> {
 /// Defaults to Standard mode when no indicators are found.
 pub fn detect_mode(root: &NormalizedPath) -> Result<Mode> {
     Ok(repo_core::detect_mode(root)?)
+}
+
+/// Load hooks from config.toml if it exists
+fn load_hooks(path: &Path) -> Vec<repo_core::hooks::HookConfig> {
+    let config_path = path.join(".repository").join("config.toml");
+    if !config_path.exists() {
+        return Vec::new();
+    }
+    let content = match std::fs::read_to_string(&config_path) {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+    match Manifest::parse(&content) {
+        Ok(m) => m.hooks,
+        Err(_) => Vec::new(),
+    }
 }
 
 /// Run the check command
@@ -123,7 +141,14 @@ pub fn run_check(path: &Path) -> Result<()> {
 pub fn run_sync(path: &Path, dry_run: bool, json_output: bool) -> Result<()> {
     let root = resolve_root(path)?;
     let mode = detect_mode(&root)?;
+    let hooks = load_hooks(root.as_ref());
     let engine = SyncEngine::new(root.clone(), mode)?;
+
+    // Pre-sync hooks
+    let hook_context = HookContext::for_sync();
+    if let Err(e) = run_hooks(&hooks, HookEvent::PreSync, &hook_context, root.as_ref()) {
+        println!("{} Pre-sync hook failed: {}", "warn:".yellow().bold(), e);
+    }
 
     let options = SyncOptions { dry_run };
     let report = engine.sync_with_options(options)?;
@@ -185,6 +210,13 @@ pub fn run_sync(path: &Path, dry_run: bool, json_output: bool) -> Result<()> {
             }
             return Err(CliError::user("Synchronization failed"));
         }
+    }
+
+    // Post-sync hooks (only after successful sync)
+    if report.success
+        && let Err(e) = run_hooks(&hooks, HookEvent::PostSync, &hook_context, root.as_ref())
+    {
+        println!("{} Post-sync hook failed: {}", "warn:".yellow().bold(), e);
     }
 
     Ok(())

@@ -49,11 +49,6 @@ impl CapabilityTranslator {
                 content.mcp_servers = Some(servers.clone());
             }
 
-        // Rules directory: Future enhancement
-        // if tool.capabilities.supports_rules_directory {
-        //     // Different handling for directory-based tools
-        // }
-
         content
     }
 

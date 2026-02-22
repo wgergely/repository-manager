@@ -84,10 +84,14 @@ impl GenericToolIntegration {
         }
 
         let path = self.config_path(&context.root);
+        self.sync_text_to_path(&path, rules)
+    }
 
+    /// Write rules as text with managed blocks to an explicit path.
+    fn sync_text_to_path(&self, path: &NormalizedPath, rules: &[Rule]) -> Result<()> {
         // Load existing content or start empty
         let mut content = if path.exists() {
-            io::read_text(&path).map_err(|e| {
+            io::read_text(path).map_err(|e| {
                 tracing::warn!("Failed to read existing config at {}: {}", path.as_str(), e);
                 e
             })?
@@ -105,7 +109,7 @@ impl GenericToolIntegration {
             content = upsert_block(&content, &rule.id, &block_content)?;
         }
 
-        io::write_text(&path, &content)?;
+        io::write_text(path, &content)?;
 
         Ok(())
     }
@@ -113,6 +117,29 @@ impl GenericToolIntegration {
     /// Sync rules to a directory, creating one file per rule.
     fn sync_to_directory(&self, context: &SyncContext, rules: &[Rule]) -> Result<()> {
         let dir_path = self.config_path(&context.root);
+        self.sync_to_directory_at_path(&dir_path, rules)
+    }
+
+    /// Write rules as individual files to an explicit directory path.
+    fn sync_to_directory_at_path(
+        &self,
+        dir_path: &NormalizedPath,
+        rules: &[Rule],
+    ) -> Result<()> {
+        let native = dir_path.to_native();
+
+        // If a regular file exists at this path, remove it first so we can
+        // create a directory (e.g., `.clinerules` file -> `.clinerules/` dir).
+        if native.is_file() {
+            std::fs::remove_file(&native).map_err(|e| crate::Error::SyncFailed {
+                tool: self.definition.meta.slug.clone(),
+                message: format!(
+                    "Failed to remove existing file at {} to create directory: {}",
+                    dir_path.as_str(),
+                    e
+                ),
+            })?;
+        }
 
         // Create directory if it doesn't exist
         if !dir_path.exists() {
@@ -147,7 +174,11 @@ impl GenericToolIntegration {
         }
 
         let path = self.config_path(&context.root);
+        self.sync_yaml_to_path(&path, rules)
+    }
 
+    /// Write rules as YAML comments to an explicit path.
+    fn sync_yaml_to_path(&self, path: &NormalizedPath, rules: &[Rule]) -> Result<()> {
         // For YAML, we use # comments instead of HTML-style managed blocks
         let mut content = String::new();
 
@@ -170,7 +201,7 @@ impl GenericToolIntegration {
             content.push_str(&format!("# /repo:block:{}\n\n", rule.id));
         }
 
-        io::write_text(&path, &content)?;
+        io::write_text(path, &content)?;
 
         Ok(())
     }
@@ -178,10 +209,19 @@ impl GenericToolIntegration {
     /// Sync rules to a JSON config file using schema keys.
     fn sync_json(&self, context: &SyncContext, rules: &[Rule]) -> Result<()> {
         let path = self.config_path(&context.root);
+        self.sync_json_to_path(&path, context, rules)
+    }
 
+    /// Write rules as JSON to an explicit path using schema keys.
+    fn sync_json_to_path(
+        &self,
+        path: &NormalizedPath,
+        context: &SyncContext,
+        rules: &[Rule],
+    ) -> Result<()> {
         // Load existing or create new
         let mut settings: Value = if path.exists() {
-            let content = io::read_text(&path)?;
+            let content = io::read_text(path)?;
             serde_json::from_str(&content)?
         } else {
             json!({})
@@ -230,7 +270,7 @@ impl GenericToolIntegration {
         }
 
         let content = serde_json::to_string_pretty(&settings)?;
-        io::write_text(&path, &content)?;
+        io::write_text(path, &content)?;
 
         Ok(())
     }
@@ -239,6 +279,39 @@ impl GenericToolIntegration {
     fn sync_markdown(&self, context: &SyncContext, rules: &[Rule]) -> Result<()> {
         // Markdown uses the same approach as text with managed blocks
         self.sync_text(context, rules)
+    }
+
+    /// Sync rules to all additional paths declared in the tool definition.
+    ///
+    /// For each additional path, infers the config type from the path extension:
+    /// - Paths ending in `/` -> directory sync (one file per rule)
+    /// - Paths ending in `.json` -> JSON sync
+    /// - Paths ending in `.md` -> Markdown sync
+    /// - Paths ending in `.yml` or `.yaml` -> YAML sync
+    /// - Everything else -> Text sync
+    fn sync_additional_paths(&self, context: &SyncContext, rules: &[Rule]) -> Result<()> {
+        for additional_path in &self.definition.integration.additional_paths {
+            let resolved = context.root.join(additional_path);
+
+            if additional_path.ends_with('/') {
+                // Directory sync: create directory, write one file per rule
+                self.sync_to_directory_at_path(&resolved, rules)?;
+            } else if additional_path.ends_with(".json") {
+                // JSON sync
+                self.sync_json_to_path(&resolved, context, rules)?;
+            } else if additional_path.ends_with(".md") {
+                // Markdown sync (same as text with managed blocks)
+                self.sync_text_to_path(&resolved, rules)?;
+            } else if additional_path.ends_with(".yml") || additional_path.ends_with(".yaml") {
+                // YAML sync
+                self.sync_yaml_to_path(&resolved, rules)?;
+            } else {
+                // Default: text sync with managed blocks
+                self.sync_text_to_path(&resolved, rules)?;
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -277,15 +350,20 @@ impl ToolIntegration for GenericToolIntegration {
 
     fn sync(&self, context: &SyncContext, rules: &[Rule]) -> Result<()> {
         match self.definition.integration.config_type {
-            ConfigType::Text => self.sync_text(context, rules),
-            ConfigType::Json => self.sync_json(context, rules),
-            ConfigType::Markdown => self.sync_markdown(context, rules),
-            ConfigType::Yaml => self.sync_yaml(context, rules),
+            ConfigType::Text => self.sync_text(context, rules)?,
+            ConfigType::Json => self.sync_json(context, rules)?,
+            ConfigType::Markdown => self.sync_markdown(context, rules)?,
+            ConfigType::Yaml => self.sync_yaml(context, rules)?,
             ConfigType::Toml => {
                 // TOML uses # comments like YAML
-                self.sync_yaml(context, rules)
+                self.sync_yaml(context, rules)?;
             }
         }
+
+        // Sync additional paths (if any)
+        self.sync_additional_paths(context, rules)?;
+
+        Ok(())
     }
 }
 
@@ -538,5 +616,385 @@ mod tests {
         assert_eq!(json["existingSetting"], true);
         // MCP servers are replaced (not merged) — the whole key is overwritten
         assert_eq!(json["mcpServers"]["new-server"]["command"], "new");
+    }
+
+    // ---------------------------------------------------------------
+    // Tests for additional_paths syncing (sync_additional_paths)
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn test_sync_writes_additional_text_path() {
+        let temp = TempDir::new().unwrap();
+
+        let definition = ToolDefinition {
+            meta: ToolMeta {
+                name: "Text Extra".to_string(),
+                slug: "text-extra".to_string(),
+                description: None,
+            },
+            integration: ToolIntegrationConfig {
+                config_path: ".primary-rules".to_string(),
+                config_type: ConfigType::Text,
+                additional_paths: vec![".secondary-rules".to_string()],
+            },
+            capabilities: ToolCapabilities::default(),
+            schema_keys: None,
+        };
+
+        let integration = GenericToolIntegration::new(definition);
+        let context = SyncContext::new(NormalizedPath::new(temp.path()));
+        let rules = vec![Rule {
+            id: "my-rule".to_string(),
+            content: "Do the thing.".to_string(),
+        }];
+
+        integration.sync(&context, &rules).unwrap();
+
+        // Primary file must exist with managed block content
+        let primary = temp.path().join(".primary-rules");
+        assert!(primary.exists(), "Primary path must exist");
+        let primary_content = fs::read_to_string(&primary).unwrap();
+        assert!(
+            primary_content.contains("<!-- repo:block:my-rule -->"),
+            "Primary must have managed block"
+        );
+        assert!(
+            primary_content.contains("Do the thing."),
+            "Primary must contain rule content"
+        );
+
+        // Additional text path must also exist with managed block content
+        let secondary = temp.path().join(".secondary-rules");
+        assert!(secondary.exists(), "Additional text path must exist");
+        let secondary_content = fs::read_to_string(&secondary).unwrap();
+        assert!(
+            secondary_content.contains("<!-- repo:block:my-rule -->"),
+            "Secondary must have managed block"
+        );
+        assert!(
+            secondary_content.contains("Do the thing."),
+            "Secondary must contain rule content"
+        );
+    }
+
+    #[test]
+    fn test_sync_writes_additional_markdown_path() {
+        let temp = TempDir::new().unwrap();
+
+        let definition = ToolDefinition {
+            meta: ToolMeta {
+                name: "Md Extra".to_string(),
+                slug: "md-extra".to_string(),
+                description: None,
+            },
+            integration: ToolIntegrationConfig {
+                config_path: ".primary.md".to_string(),
+                config_type: ConfigType::Markdown,
+                additional_paths: vec!["CONVENTIONS.md".to_string()],
+            },
+            capabilities: ToolCapabilities::default(),
+            schema_keys: None,
+        };
+
+        let integration = GenericToolIntegration::new(definition);
+        let context = SyncContext::new(NormalizedPath::new(temp.path()));
+        let rules = vec![Rule {
+            id: "conv-rule".to_string(),
+            content: "Follow conventions.".to_string(),
+        }];
+
+        integration.sync(&context, &rules).unwrap();
+
+        // Primary markdown file
+        let primary = temp.path().join(".primary.md");
+        assert!(primary.exists(), "Primary .md path must exist");
+        let primary_content = fs::read_to_string(&primary).unwrap();
+        assert!(
+            primary_content.contains("<!-- repo:block:conv-rule -->"),
+            "Primary .md must have managed block"
+        );
+
+        // Additional markdown file
+        let secondary = temp.path().join("CONVENTIONS.md");
+        assert!(secondary.exists(), "Additional .md path must exist");
+        let secondary_content = fs::read_to_string(&secondary).unwrap();
+        assert!(
+            secondary_content.contains("<!-- repo:block:conv-rule -->"),
+            "Secondary .md must have managed block"
+        );
+        assert!(
+            secondary_content.contains("Follow conventions."),
+            "Secondary .md must contain rule content"
+        );
+    }
+
+    #[test]
+    fn test_sync_writes_additional_json_path() {
+        let temp = TempDir::new().unwrap();
+
+        let definition = ToolDefinition {
+            meta: ToolMeta {
+                name: "Json Extra".to_string(),
+                slug: "json-extra".to_string(),
+                description: None,
+            },
+            integration: ToolIntegrationConfig {
+                config_path: ".primary-rules".to_string(),
+                config_type: ConfigType::Text,
+                additional_paths: vec![".tool/settings.json".to_string()],
+            },
+            capabilities: ToolCapabilities::default(),
+            schema_keys: Some(ToolSchemaKeys {
+                instruction_key: Some("instructions".to_string()),
+                mcp_key: None,
+                python_path_key: None,
+            }),
+        };
+
+        let integration = GenericToolIntegration::new(definition);
+        let context = SyncContext::new(NormalizedPath::new(temp.path()));
+        let rules = vec![Rule {
+            id: "json-rule".to_string(),
+            content: "JSON rule content.".to_string(),
+        }];
+
+        integration.sync(&context, &rules).unwrap();
+
+        // Primary text file must exist
+        let primary = temp.path().join(".primary-rules");
+        assert!(primary.exists(), "Primary text path must exist");
+
+        // Additional JSON file must exist and be valid JSON
+        let json_path = temp.path().join(".tool/settings.json");
+        assert!(json_path.exists(), "Additional .json path must exist");
+        let json_content = fs::read_to_string(&json_path).unwrap();
+        let json: serde_json::Value =
+            serde_json::from_str(&json_content).expect("Additional .json must be valid JSON");
+        assert!(json.is_object(), "JSON file must contain an object");
+
+        // The JSON sync should use schema_keys to populate instruction_key
+        assert!(
+            json.get("instructions").is_some(),
+            "JSON file must contain instructions key from schema_keys"
+        );
+        let instructions = json["instructions"].as_str().unwrap();
+        assert!(
+            instructions.contains("JSON rule content."),
+            "JSON instructions must contain rule content"
+        );
+    }
+
+    #[test]
+    fn test_sync_writes_additional_directory_path() {
+        let temp = TempDir::new().unwrap();
+
+        let definition = ToolDefinition {
+            meta: ToolMeta {
+                name: "Dir Extra".to_string(),
+                slug: "dir-extra".to_string(),
+                description: None,
+            },
+            integration: ToolIntegrationConfig {
+                config_path: "PRIMARY.md".to_string(),
+                config_type: ConfigType::Markdown,
+                additional_paths: vec![".tool/rules/".to_string()],
+            },
+            capabilities: ToolCapabilities::default(),
+            schema_keys: None,
+        };
+
+        let integration = GenericToolIntegration::new(definition);
+        let context = SyncContext::new(NormalizedPath::new(temp.path()));
+        let rules = vec![
+            Rule {
+                id: "rule-alpha".to_string(),
+                content: "Alpha content.".to_string(),
+            },
+            Rule {
+                id: "rule-beta".to_string(),
+                content: "Beta content.".to_string(),
+            },
+        ];
+
+        integration.sync(&context, &rules).unwrap();
+
+        // Primary markdown file
+        let primary = temp.path().join("PRIMARY.md");
+        assert!(primary.exists(), "Primary path must exist");
+
+        // Additional directory must be created
+        let dir = temp.path().join(".tool/rules");
+        assert!(dir.is_dir(), "Additional directory path must be a directory");
+
+        // Per-rule files must exist
+        let rule1 = dir.join("01-rule-alpha.md");
+        let rule2 = dir.join("02-rule-beta.md");
+        assert!(rule1.exists(), "Per-rule file for rule-alpha must exist");
+        assert!(rule2.exists(), "Per-rule file for rule-beta must exist");
+
+        let content1 = fs::read_to_string(&rule1).unwrap();
+        assert!(
+            content1.contains("Alpha content."),
+            "Per-rule file must contain rule content"
+        );
+        assert!(
+            content1.contains("# rule-alpha"),
+            "Per-rule file must contain rule header"
+        );
+
+        let content2 = fs::read_to_string(&rule2).unwrap();
+        assert!(
+            content2.contains("Beta content."),
+            "Second per-rule file must contain rule content"
+        );
+    }
+
+    #[test]
+    fn test_sync_additional_path_content_has_managed_blocks() {
+        let temp = TempDir::new().unwrap();
+
+        let definition = ToolDefinition {
+            meta: ToolMeta {
+                name: "Block Check".to_string(),
+                slug: "block-check".to_string(),
+                description: None,
+            },
+            integration: ToolIntegrationConfig {
+                config_path: ".primary".to_string(),
+                config_type: ConfigType::Text,
+                additional_paths: vec![".secondary".to_string()],
+            },
+            capabilities: ToolCapabilities::default(),
+            schema_keys: None,
+        };
+
+        let integration = GenericToolIntegration::new(definition);
+        let context = SyncContext::new(NormalizedPath::new(temp.path()));
+        let rules = vec![
+            Rule {
+                id: "block-a".to_string(),
+                content: "Content for block A.".to_string(),
+            },
+            Rule {
+                id: "block-b".to_string(),
+                content: "Content for block B.".to_string(),
+            },
+        ];
+
+        integration.sync(&context, &rules).unwrap();
+
+        // Verify secondary file has actual managed block structure, not empty
+        let secondary_content =
+            fs::read_to_string(temp.path().join(".secondary")).unwrap();
+
+        // Must have opening and closing markers for both blocks
+        assert!(
+            secondary_content.contains("<!-- repo:block:block-a -->"),
+            "Secondary must have block-a opening marker"
+        );
+        assert!(
+            secondary_content.contains("<!-- /repo:block:block-a -->"),
+            "Secondary must have block-a closing marker"
+        );
+        assert!(
+            secondary_content.contains("Content for block A."),
+            "Secondary must have block-a content"
+        );
+        assert!(
+            secondary_content.contains("<!-- repo:block:block-b -->"),
+            "Secondary must have block-b opening marker"
+        );
+        assert!(
+            secondary_content.contains("<!-- /repo:block:block-b -->"),
+            "Secondary must have block-b closing marker"
+        );
+        assert!(
+            secondary_content.contains("Content for block B."),
+            "Secondary must have block-b content"
+        );
+
+        // Verify it's not an empty file
+        assert!(
+            secondary_content.len() > 50,
+            "Secondary file must not be empty (got {} bytes)",
+            secondary_content.len()
+        );
+    }
+
+    #[test]
+    fn test_empty_additional_paths_no_extra_files() {
+        let temp = TempDir::new().unwrap();
+
+        // Tool with empty additional_paths
+        let definition = ToolDefinition {
+            meta: ToolMeta {
+                name: "No Extra".to_string(),
+                slug: "no-extra".to_string(),
+                description: None,
+            },
+            integration: ToolIntegrationConfig {
+                config_path: ".only-file".to_string(),
+                config_type: ConfigType::Text,
+                additional_paths: vec![],
+            },
+            capabilities: ToolCapabilities::default(),
+            schema_keys: None,
+        };
+
+        let integration = GenericToolIntegration::new(definition);
+        let context = SyncContext::new(NormalizedPath::new(temp.path()));
+        let rules = vec![Rule {
+            id: "solo-rule".to_string(),
+            content: "Solo content.".to_string(),
+        }];
+
+        integration.sync(&context, &rules).unwrap();
+
+        // Primary must exist
+        let primary = temp.path().join(".only-file");
+        assert!(primary.exists(), "Primary path must exist");
+
+        // Count files in temp dir - should be exactly 1 real file
+        // (plus potential .lock files from atomic writes)
+        let entries: Vec<_> = fs::read_dir(temp.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| !e.file_name().to_string_lossy().ends_with(".lock"))
+            .collect();
+        assert_eq!(
+            entries.len(),
+            1,
+            "Only primary file should exist, found: {:?}",
+            entries
+                .iter()
+                .map(|e| e.file_name())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_antigravity_path_is_directory() {
+        // Import the antigravity integration to verify its config_path
+        let integration = crate::antigravity::antigravity_integration();
+        let def = integration.definition();
+
+        assert!(
+            def.integration.config_path.ends_with('/'),
+            "Antigravity config_path must end with '/' for directory mode, got: {}",
+            def.integration.config_path
+        );
+
+        // Verify is_directory_config() returns true
+        assert!(
+            integration.is_directory_config(),
+            "Antigravity is_directory_config() must return true"
+        );
+
+        // Verify config_locations reports it as a directory
+        let locations = integration.config_locations();
+        assert!(
+            locations[0].is_directory,
+            "Antigravity primary config location must be a directory"
+        );
     }
 }

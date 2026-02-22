@@ -377,8 +377,7 @@ pub enum HooksAction {
     /// Add a new hook
     ///
     /// The event must be one of: pre-branch-create, post-branch-create,
-    /// pre-branch-delete, post-branch-delete, pre-agent-complete,
-    /// post-agent-complete, pre-sync, post-sync
+    /// pre-branch-delete, post-branch-delete, pre-sync, post-sync
     Add {
         /// Event that triggers the hook
         event: String,

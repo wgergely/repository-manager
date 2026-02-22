@@ -785,7 +785,7 @@ mod sync_integration {
     }
 
     /// Antigravity tool integration test (was GAP-006, now implemented)
-    /// Config location: .agent/rules.md
+    /// Config location: .agent/rules/ (directory, one file per rule)
     #[test]
     fn test_antigravity_tool_integration() {
         let mut repo = TestRepo::new();
@@ -801,11 +801,15 @@ mod sync_integration {
 
         antigravity_integration().sync(&context, &rules).unwrap();
 
-        // Verify config file created at .agent/rules.md
-        let config_path = repo.root().join(".agent/rules.md");
-        assert!(config_path.exists(), "Antigravity config should be created");
+        // Verify rules directory created at .agent/rules/
+        let rules_dir = repo.root().join(".agent/rules");
+        assert!(rules_dir.is_dir(), "Antigravity rules directory should be created");
 
-        let content = fs::read_to_string(&config_path).unwrap();
+        // Verify per-rule file exists inside the directory (format: 01-<id>.md)
+        let rule_file = rules_dir.join("01-test-rule.md");
+        assert!(rule_file.exists(), "Per-rule file should be created in .agent/rules/");
+
+        let content = fs::read_to_string(&rule_file).unwrap();
         assert!(content.contains("Test content for Antigravity"));
     }
 
