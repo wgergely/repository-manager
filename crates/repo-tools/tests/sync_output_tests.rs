@@ -1,6 +1,7 @@
-//! Integration tests for tool sync operations
+//! Sync output tests for tool integrations
 //!
-//! Tests that sync produces correct output files for each tool.
+//! Category: component
+//! Tests that tool sync operations produce expected file output.
 
 use repo_fs::NormalizedPath;
 use repo_tools::{
@@ -49,32 +50,6 @@ mod cursor_tests {
         assert!(
             content.contains("<!-- /repo:block:python-style -->"),
             "Must have block end marker"
-        );
-    }
-
-    #[test]
-    fn test_cursor_uses_managed_blocks() {
-        let temp = TempDir::new().unwrap();
-
-        let dispatcher = ToolDispatcher::new();
-        let integration = dispatcher.get_integration("cursor").unwrap();
-
-        let context = SyncContext::new(NormalizedPath::new(temp.path()));
-        let rules = vec![create_rule(
-            "typescript-style",
-            "Use strict TypeScript mode.",
-        )];
-
-        integration.sync(&context, &rules).unwrap();
-
-        let content = fs::read_to_string(temp.path().join(".cursorrules")).unwrap();
-        assert!(
-            content.contains("<!-- repo:block:typescript-style -->"),
-            "Should contain block marker"
-        );
-        assert!(
-            content.contains("TypeScript"),
-            "Should contain rule content"
         );
     }
 
@@ -178,35 +153,6 @@ mod claude_tests {
     }
 
     #[test]
-    fn test_claude_md_has_managed_blocks() {
-        let temp = TempDir::new().unwrap();
-
-        let dispatcher = ToolDispatcher::new();
-        let integration = dispatcher.get_integration("claude").unwrap();
-
-        let context = SyncContext::new(NormalizedPath::new(temp.path()));
-        let rules = vec![create_rule("coding-style", "Follow project conventions.")];
-
-        integration.sync(&context, &rules).unwrap();
-
-        let content = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
-
-        // Should have block markers
-        assert!(
-            content.contains("<!-- repo:block:coding-style -->"),
-            "Should contain block start marker"
-        );
-        assert!(
-            content.contains("<!-- /repo:block:coding-style -->"),
-            "Should contain block end marker"
-        );
-        assert!(
-            content.contains("Follow project conventions"),
-            "Should contain rule content"
-        );
-    }
-
-    #[test]
     fn test_claude_preserves_user_content() {
         let temp = TempDir::new().unwrap();
 
@@ -288,45 +234,18 @@ mod copilot_tests {
             content.contains("Follow conventions."),
             "Rule content must be written to copilot instructions"
         );
+        // Format: managed block structure
         assert!(
-            content.contains("style"),
-            "Rule id must appear in copilot instructions"
-        );
-    }
-
-    #[test]
-    fn test_copilot_instructions_file_has_managed_blocks() {
-        let temp = TempDir::new().unwrap();
-
-        // Create .github directory
-        fs::create_dir_all(temp.path().join(".github")).unwrap();
-
-        let dispatcher = ToolDispatcher::new();
-        let integration = dispatcher.get_integration("copilot").unwrap();
-
-        let context = SyncContext::new(NormalizedPath::new(temp.path()));
-        let rules = vec![create_rule("coding", "Use TypeScript strict mode.")];
-
-        integration.sync(&context, &rules).unwrap();
-
-        let content =
-            fs::read_to_string(temp.path().join(".github/copilot-instructions.md")).unwrap();
-
-        // Copilot uses non-raw mode so content includes headers
-        assert!(
-            content.contains("Use TypeScript strict mode."),
-            "Rule content must be present"
-        );
-        assert!(content.contains("coding"), "Rule id must appear in content");
-        // Copilot uses managed blocks (markdown type uses same as text)
-        assert!(
-            content.contains("<!-- repo:block:coding -->"),
+            content.contains("<!-- repo:block:style -->"),
             "Must have block start marker"
         );
         assert!(
-            content.contains("<!-- /repo:block:coding -->"),
+            content.contains("<!-- /repo:block:style -->"),
             "Must have block end marker"
         );
+        let opens = content.matches("<!-- repo:block:").count();
+        let closes = content.matches("<!-- /repo:block:").count();
+        assert_eq!(opens, closes, "Block markers must be balanced");
     }
 
     #[test]
@@ -463,50 +382,6 @@ mod windsurf_tests {
         assert!(
             content.contains("<!-- /repo:block:style -->"),
             "Must have block end marker"
-        );
-    }
-
-    #[test]
-    fn test_windsurf_rule_content() {
-        let temp = TempDir::new().unwrap();
-
-        let dispatcher = ToolDispatcher::new();
-        let integration = dispatcher.get_integration("windsurf").unwrap();
-
-        let context = SyncContext::new(NormalizedPath::new(temp.path()));
-        let rules = vec![create_rule("python-practices", "Always use type hints.")];
-
-        integration.sync(&context, &rules).unwrap();
-
-        let content = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
-        assert!(
-            content.contains("type hints"),
-            "Should contain rule content"
-        );
-    }
-
-    #[test]
-    fn test_windsurf_uses_managed_blocks() {
-        let temp = TempDir::new().unwrap();
-
-        let dispatcher = ToolDispatcher::new();
-        let integration = dispatcher.get_integration("windsurf").unwrap();
-
-        let context = SyncContext::new(NormalizedPath::new(temp.path()));
-        let rules = vec![create_rule("test-block", "Block content here.")];
-
-        integration.sync(&context, &rules).unwrap();
-
-        let content = fs::read_to_string(temp.path().join(".windsurfrules")).unwrap();
-
-        // Should use managed blocks
-        assert!(
-            content.contains("<!-- repo:block:test-block -->"),
-            "Should have block start marker"
-        );
-        assert!(
-            content.contains("<!-- /repo:block:test-block -->"),
-            "Should have block end marker"
         );
     }
 
@@ -658,6 +533,14 @@ mod dispatcher_tests {
             windsurf_content.contains("Shared rule content"),
             "Windsurf must have shared rule"
         );
+
+        // Format: all files must have balanced block markers
+        for (name, content) in [("cursor", &cursor_content), ("claude", &claude_content), ("windsurf", &windsurf_content)] {
+            let opens = content.matches("<!-- repo:block:").count();
+            let closes = content.matches("<!-- /repo:block:").count();
+            assert_eq!(opens, closes, "{name} must have balanced block markers");
+            assert!(opens > 0, "{name} must have at least one block marker pair");
+        }
     }
 
     #[test]
@@ -722,6 +605,13 @@ mod cross_tool_tests {
 
         assert!(windsurf_content.contains("Use consistent formatting"));
         assert!(windsurf_content.contains("Write tests"));
+
+        // Format: all tools must produce balanced managed blocks
+        for (name, content) in [("cursor", &cursor_content), ("claude", &claude_content), ("windsurf", &windsurf_content)] {
+            let opens = content.matches("<!-- repo:block:").count();
+            let closes = content.matches("<!-- /repo:block:").count();
+            assert_eq!(opens, closes, "{name} must have balanced block markers");
+        }
     }
 
     #[test]
@@ -882,6 +772,10 @@ mod cross_tool_tests {
 
         let claude_content = fs::read_to_string(temp.path().join("CLAUDE.md")).unwrap();
         assert!(claude_content.contains("Test content for partial sync"));
+
+        // Format: synced tools must have managed block structure
+        assert!(cursor_content.contains("<!-- repo:block:test-rule -->"), "Cursor must have block marker");
+        assert!(claude_content.contains("<!-- repo:block:test-rule -->"), "Claude must have block marker");
     }
 
     #[test]

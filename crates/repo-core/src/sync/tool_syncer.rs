@@ -633,9 +633,16 @@ mod tests {
         let root = NormalizedPath::new(dir.path());
         let syncer = ToolSyncer::new(root, false);
 
+        // Antigravity uses a directory config (.agent/rules/), so
+        // get_tool_config_files (which filters out directories) returns 0.
         let files = syncer.get_tool_config_files("antigravity");
-        assert_eq!(files.len(), 1);
-        // Read-only: only verify path, not content
+        assert_eq!(files.len(), 0);
+
+        // But config_locations should still report the directory location
+        let integration = syncer.dispatcher.get_integration("antigravity").unwrap();
+        let locations = integration.config_locations();
+        assert_eq!(locations.len(), 1);
+        assert!(locations[0].is_directory);
     }
 
     #[test]

@@ -5,6 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+repo-test-utils = { path = "../../crates/repo-test-utils" }
 repo-fs = { path = "../../crates/repo-fs" }
 repo-git = { path = "../../crates/repo-git" }
 repo-core = { path = "../../crates/repo-core" }

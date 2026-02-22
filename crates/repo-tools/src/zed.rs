@@ -83,5 +83,15 @@ mod tests {
 
         let content = fs::read_to_string(&path).unwrap();
         assert!(content.contains("Use Rust best practices"));
+
+        // Format: must use managed block markers
+        assert!(
+            content.contains("<!-- repo:block:code-style -->"),
+            "Must have block start marker"
+        );
+        assert!(
+            content.contains("<!-- /repo:block:code-style -->"),
+            "Must have block end marker"
+        );
     }
 }

@@ -48,6 +48,14 @@ pub enum Error {
     #[error("TOML serialize error: {0}")]
     TomlSerialize(#[from] toml::ser::Error),
 
+    /// Invalid repository structure
+    #[error("{0}")]
+    InvalidRepository(String),
+
+    /// Git operation error
+    #[error("git error: {0}")]
+    Git(#[from] repo_git::Error),
+
     /// Tool not implemented
     #[error("tool not implemented: {0}")]
     NotImplemented(String),

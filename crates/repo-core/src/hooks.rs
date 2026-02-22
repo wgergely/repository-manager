@@ -1,7 +1,7 @@
 //! Lifecycle hooks for repository events
 //!
-//! Provides pre/post hooks for branch creation, deletion, sync, and agent
-//! completion events. Hooks are configured in config.toml as `[[hooks]]`
+//! Provides pre/post hooks for branch creation, deletion, and sync
+//! events. Hooks are configured in config.toml as `[[hooks]]`
 //! entries and executed as subprocesses.
 
 use std::collections::HashMap;
@@ -25,10 +25,6 @@ pub enum HookEvent {
     PreBranchDelete,
     /// After a branch/worktree is deleted
     PostBranchDelete,
-    /// Before an agent task completes
-    PreAgentComplete,
-    /// After an agent task completes
-    PostAgentComplete,
     /// Before sync runs
     PreSync,
     /// After sync runs
@@ -42,8 +38,6 @@ impl fmt::Display for HookEvent {
             Self::PostBranchCreate => write!(f, "post-branch-create"),
             Self::PreBranchDelete => write!(f, "pre-branch-delete"),
             Self::PostBranchDelete => write!(f, "post-branch-delete"),
-            Self::PreAgentComplete => write!(f, "pre-agent-complete"),
-            Self::PostAgentComplete => write!(f, "post-agent-complete"),
             Self::PreSync => write!(f, "pre-sync"),
             Self::PostSync => write!(f, "post-sync"),
         }
@@ -58,8 +52,6 @@ impl HookEvent {
             "post-branch-create" => Some(Self::PostBranchCreate),
             "pre-branch-delete" => Some(Self::PreBranchDelete),
             "post-branch-delete" => Some(Self::PostBranchDelete),
-            "pre-agent-complete" => Some(Self::PreAgentComplete),
-            "post-agent-complete" => Some(Self::PostAgentComplete),
             "pre-sync" => Some(Self::PreSync),
             "post-sync" => Some(Self::PostSync),
             _ => None,
@@ -73,8 +65,6 @@ impl HookEvent {
             "post-branch-create",
             "pre-branch-delete",
             "post-branch-delete",
-            "pre-agent-complete",
-            "post-agent-complete",
             "pre-sync",
             "post-sync",
         ]
@@ -113,11 +103,10 @@ impl HookContext {
         Self { vars }
     }
 
-    /// Create context for an agent event
-    pub fn for_agent(agent_name: &str, task_id: &str) -> Self {
+    /// Create context for a sync event
+    pub fn for_sync() -> Self {
         let mut vars = HashMap::new();
-        vars.insert("AGENT_NAME".to_string(), agent_name.to_string());
-        vars.insert("TASK_ID".to_string(), task_id.to_string());
+        vars.insert("HOOK_EVENT_TYPE".to_string(), "sync".to_string());
         Self { vars }
     }
 }
@@ -195,24 +184,21 @@ fn execute_hook(
 
     // Validate working_dir is within the repository root (default_dir) to prevent
     // hooks from executing in arbitrary directories
-    if let Some(ref custom_dir) = hook.working_dir {
-        if let (Ok(canon_custom), Ok(canon_default)) =
+    if let Some(ref custom_dir) = hook.working_dir
+        && let (Ok(canon_custom), Ok(canon_default)) =
             (custom_dir.canonicalize(), default_dir.canonicalize())
-        {
-            if !canon_custom.starts_with(&canon_default) {
-                return Err(Error::HookFailed {
-                    event: hook.event.to_string(),
-                    command: hook.command.clone(),
-                    message: format!(
-                        "Hook working_dir {:?} is outside the repository root {:?}",
-                        custom_dir, default_dir
-                    ),
-                });
-            }
+        && !canon_custom.starts_with(&canon_default) {
+            return Err(Error::HookFailed {
+                event: hook.event.to_string(),
+                command: hook.command.clone(),
+                message: format!(
+                    "Hook working_dir {:?} is outside the repository root {:?}",
+                    custom_dir, default_dir
+                ),
+            });
         }
         // If canonicalize fails (directory doesn't exist yet), allow it — the
         // Command::new call will fail with a clear OS error.
-    }
 
     // Substitute context variables in args
     let args: Vec<String> = hook
@@ -268,10 +254,13 @@ mod tests {
             Some(HookEvent::PreBranchCreate)
         );
         assert_eq!(
-            HookEvent::parse("post-agent-complete"),
-            Some(HookEvent::PostAgentComplete)
+            HookEvent::parse("post-sync"),
+            Some(HookEvent::PostSync)
         );
         assert_eq!(HookEvent::parse("invalid"), None);
+        // Agent events should no longer parse
+        assert_eq!(HookEvent::parse("pre-agent-complete"), None);
+        assert_eq!(HookEvent::parse("post-agent-complete"), None);
     }
 
     #[test]
@@ -306,10 +295,9 @@ mod tests {
     }
 
     #[test]
-    fn test_hook_context_for_agent() {
-        let ctx = HookContext::for_agent("coder", "task-123");
-        assert_eq!(ctx.vars["AGENT_NAME"], "coder");
-        assert_eq!(ctx.vars["TASK_ID"], "task-123");
+    fn test_hook_context_for_sync() {
+        let ctx = HookContext::for_sync();
+        assert_eq!(ctx.vars["HOOK_EVENT_TYPE"], "sync");
     }
 
     #[test]
@@ -408,5 +396,169 @@ args = ["install"]
         assert_eq!(hook.event, HookEvent::PostBranchCreate);
         assert_eq!(hook.command, "npm");
         assert_eq!(hook.args, vec!["install"]);
+    }
+
+    /// Verify HookEvent has exactly 6 variants (pre/post for branch-create,
+    /// branch-delete, sync). This catches unwired events being added without
+    /// updating all_names() and the rest of the matching infrastructure.
+    #[test]
+    fn test_hook_event_enum_has_no_agent_events() {
+        let names = HookEvent::all_names();
+        assert_eq!(
+            names.len(),
+            6,
+            "Expected exactly 6 hook events (pre/post for branch-create, branch-delete, sync), \
+             found {}. If you added a new event, make sure it is wired to a call site.",
+            names.len()
+        );
+
+        // Verify the exact set of expected events
+        let expected = [
+            "pre-branch-create",
+            "post-branch-create",
+            "pre-branch-delete",
+            "post-branch-delete",
+            "pre-sync",
+            "post-sync",
+        ];
+        for name in &expected {
+            assert!(
+                names.contains(name),
+                "Expected event '{}' not found in all_names()",
+                name
+            );
+        }
+    }
+
+    /// Verify PreSync serializes to "pre-sync" in kebab-case via serde
+    #[test]
+    fn test_pre_sync_event_serializes_correctly() {
+        let json = serde_json::to_string(&HookEvent::PreSync).unwrap();
+        assert_eq!(json, "\"pre-sync\"");
+        // Also verify Display
+        assert_eq!(HookEvent::PreSync.to_string(), "pre-sync");
+        // And round-trip parse
+        assert_eq!(HookEvent::parse("pre-sync"), Some(HookEvent::PreSync));
+    }
+
+    /// Verify PostSync serializes to "post-sync" in kebab-case via serde
+    #[test]
+    fn test_post_sync_event_serializes_correctly() {
+        let json = serde_json::to_string(&HookEvent::PostSync).unwrap();
+        assert_eq!(json, "\"post-sync\"");
+        // Also verify Display
+        assert_eq!(HookEvent::PostSync.to_string(), "post-sync");
+        // And round-trip parse
+        assert_eq!(HookEvent::parse("post-sync"), Some(HookEvent::PostSync));
+    }
+
+    /// Verify that run_hooks executes a matching hook by checking for a
+    /// marker file side effect. This is NOT a return-value-only test.
+    #[test]
+    fn test_run_hooks_executes_matching_event() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let marker_path = temp.path().join("pre-sync-marker.txt");
+
+        // Create a hook that touches a marker file when PreSync fires
+        let hooks = vec![HookConfig {
+            event: HookEvent::PreSync,
+            command: "sh".to_string(),
+            args: vec![
+                "-c".to_string(),
+                format!("echo 'hook ran' > '{}'", marker_path.display()),
+            ],
+            working_dir: None,
+        }];
+
+        let ctx = HookContext::for_sync();
+        let results = run_hooks(&hooks, HookEvent::PreSync, &ctx, temp.path()).unwrap();
+
+        // Verify the hook actually executed via side effect
+        assert!(
+            marker_path.exists(),
+            "Marker file should exist — the pre-sync hook must have actually executed"
+        );
+        let content = std::fs::read_to_string(&marker_path).unwrap();
+        assert!(
+            content.contains("hook ran"),
+            "Marker file should contain 'hook ran', got: {:?}",
+            content
+        );
+
+        // Also verify the result metadata
+        assert_eq!(results.len(), 1);
+        assert!(results[0].success);
+        assert_eq!(results[0].event, HookEvent::PreSync);
+    }
+
+    /// Verify that run_hooks does NOT execute a hook when the event does not
+    /// match. This is the required negative test.
+    #[test]
+    fn test_run_hooks_skips_non_matching_event() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let marker_path = temp.path().join("should-not-exist.txt");
+
+        // Configure a hook for PreSync only
+        let hooks = vec![HookConfig {
+            event: HookEvent::PreSync,
+            command: "sh".to_string(),
+            args: vec![
+                "-c".to_string(),
+                format!("echo 'oops' > '{}'", marker_path.display()),
+            ],
+            working_dir: None,
+        }];
+
+        let ctx = HookContext::for_sync();
+        // Fire PostSync — the PreSync hook should NOT run
+        let results = run_hooks(&hooks, HookEvent::PostSync, &ctx, temp.path()).unwrap();
+
+        assert!(
+            results.is_empty(),
+            "No hooks should have matched PostSync event"
+        );
+        assert!(
+            !marker_path.exists(),
+            "Marker file should NOT exist — the hook must not fire for a non-matching event"
+        );
+    }
+
+    /// Verify that run_hooks returns an error when a hook script exits with
+    /// a non-zero exit code.
+    #[test]
+    fn test_run_hooks_returns_error_on_hook_failure() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // Create a hook that deliberately fails with exit code 1
+        let hooks = vec![HookConfig {
+            event: HookEvent::PreSync,
+            command: "sh".to_string(),
+            args: vec![
+                "-c".to_string(),
+                "echo 'failing on purpose' >&2; exit 1".to_string(),
+            ],
+            working_dir: None,
+        }];
+
+        let ctx = HookContext::for_sync();
+        let result = run_hooks(&hooks, HookEvent::PreSync, &ctx, temp.path());
+
+        assert!(
+            result.is_err(),
+            "run_hooks should return Err when a hook exits with non-zero status"
+        );
+
+        // Verify the error message contains actionable information
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("pre-sync"),
+            "Error should mention the event name, got: {:?}",
+            err_msg
+        );
+        assert!(
+            err_msg.contains("failing on purpose"),
+            "Error should include stderr from the hook, got: {:?}",
+            err_msg
+        );
     }
 }

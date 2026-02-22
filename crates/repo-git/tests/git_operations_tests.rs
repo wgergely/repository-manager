@@ -36,6 +36,11 @@ fn setup_classic_repo_with_git() -> (TempDir, ClassicLayout) {
         .args(["config", "user.name", "Test User"])
         .output()
         .unwrap();
+    Command::new("git")
+        .current_dir(root)
+        .args(["config", "commit.gpgSign", "false"])
+        .output()
+        .unwrap();
 
     // Create initial commit
     fs::write(root.join("README.md"), "# Test").unwrap();
@@ -201,6 +206,13 @@ fn setup_container_repo_with_git() -> (TempDir, ContainerLayout) {
         .output()
         .expect("Failed to init bare repo");
 
+    // Set HEAD to main (git init --bare defaults to master)
+    Command::new("git")
+        .current_dir(&gt_dir)
+        .args(["symbolic-ref", "HEAD", "refs/heads/main"])
+        .output()
+        .unwrap();
+
     // Add main as worktree
     Command::new("git")
         .current_dir(&gt_dir)
@@ -218,6 +230,11 @@ fn setup_container_repo_with_git() -> (TempDir, ContainerLayout) {
     Command::new("git")
         .current_dir(&main_dir)
         .args(["config", "user.name", "Test User"])
+        .output()
+        .unwrap();
+    Command::new("git")
+        .current_dir(&main_dir)
+        .args(["config", "commit.gpgSign", "false"])
         .output()
         .unwrap();
 
@@ -353,6 +370,11 @@ fn setup_in_repo_worktrees_with_git() -> (TempDir, InRepoWorktreesLayout) {
     Command::new("git")
         .current_dir(root)
         .args(["config", "user.name", "Test User"])
+        .output()
+        .unwrap();
+    Command::new("git")
+        .current_dir(root)
+        .args(["config", "commit.gpgSign", "false"])
         .output()
         .unwrap();
 

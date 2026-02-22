@@ -1,7 +1,6 @@
 //! Mission-based Integration Tests
 //!
 //! These tests validate production scenarios against spec claims.
-//! Tests marked with `#[ignore]` are expected to fail due to known gaps.
 //!
 //! Each test documents:
 //! - Which spec it validates
@@ -24,104 +23,7 @@ use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
 
-// =============================================================================
-// Test Infrastructure
-// =============================================================================
-
-/// Test repository builder for standardized setup
-pub struct TestRepo {
-    temp_dir: TempDir,
-    initialized: bool,
-}
-
-impl Default for TestRepo {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl TestRepo {
-    /// Create an empty test directory
-    pub fn new() -> Self {
-        Self {
-            temp_dir: TempDir::new().unwrap(),
-            initialized: false,
-        }
-    }
-
-    /// Get the root path
-    pub fn root(&self) -> &Path {
-        self.temp_dir.path()
-    }
-
-    /// Initialize as a git repository
-    pub fn init_git(&self) {
-        git2::Repository::init(self.root()).expect("Failed to init git repository");
-    }
-
-    /// Initialize with repository manager config
-    ///
-    /// Writes config.toml in the correct Manifest format:
-    /// - Top-level `tools = [...]`
-    /// - `[core]` section with `mode`
-    /// - `[presets]` section as a table with each preset as a key
-    pub fn init_repo_manager(&mut self, mode: &str, tools: &[&str], presets: &[&str]) {
-        let repo_dir = self.root().join(".repository");
-        fs::create_dir_all(&repo_dir).unwrap();
-
-        let tools_str = tools
-            .iter()
-            .map(|t| format!("\"{}\"", t))
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        let mut config = format!("tools = [{tools_str}]\n\n[core]\nmode = \"{mode}\"\n");
-
-        if !presets.is_empty() {
-            config.push_str("\n[presets]\n");
-            for preset in presets {
-                config.push_str(&format!("\"{}\" = {{}}\n", preset));
-            }
-        }
-
-        fs::write(repo_dir.join("config.toml"), config).unwrap();
-        self.initialized = true;
-    }
-
-    /// Assert a file exists
-    pub fn assert_file_exists(&self, path: &str) {
-        let full_path = self.root().join(path);
-        assert!(
-            full_path.exists(),
-            "Expected file to exist: {}",
-            full_path.display()
-        );
-    }
-
-    /// Assert a file does not exist
-    pub fn assert_file_not_exists(&self, path: &str) {
-        let full_path = self.root().join(path);
-        assert!(
-            !full_path.exists(),
-            "Expected file NOT to exist: {}",
-            full_path.display()
-        );
-    }
-
-    /// Assert file contains content
-    pub fn assert_file_contains(&self, path: &str, content: &str) {
-        let full_path = self.root().join(path);
-        let file_content = fs::read_to_string(&full_path)
-            .unwrap_or_else(|_| panic!("Could not read file: {}", full_path.display()));
-        assert!(
-            file_content.contains(content),
-            "File {} does not contain expected content.\nExpected: {}\nActual: {}",
-            full_path.display(),
-            content,
-            file_content
-        );
-    }
-}
+use repo_test_utils::repo::TestRepo;
 
 // =============================================================================
 // Mission 1: Repository Initialization
@@ -785,7 +687,7 @@ mod sync_integration {
     }
 
     /// Antigravity tool integration test (was GAP-006, now implemented)
-    /// Config location: .agent/rules.md
+    /// Config location: .agent/rules/ (directory, one file per rule)
     #[test]
     fn test_antigravity_tool_integration() {
         let mut repo = TestRepo::new();
@@ -801,11 +703,15 @@ mod sync_integration {
 
         antigravity_integration().sync(&context, &rules).unwrap();
 
-        // Verify config file created at .agent/rules.md
-        let config_path = repo.root().join(".agent/rules.md");
-        assert!(config_path.exists(), "Antigravity config should be created");
+        // Verify rules directory created at .agent/rules/
+        let rules_dir = repo.root().join(".agent/rules");
+        assert!(rules_dir.is_dir(), "Antigravity rules directory should be created");
 
-        let content = fs::read_to_string(&config_path).unwrap();
+        // Verify per-rule file exists inside the directory (format: 01-<id>.md)
+        let rule_file = rules_dir.join("01-test-rule.md");
+        assert!(rule_file.exists(), "Per-rule file should be created in .agent/rules/");
+
+        let content = fs::read_to_string(&rule_file).unwrap();
         assert!(content.contains("Test content for Antigravity"));
     }
 
@@ -924,12 +830,16 @@ mod sync_integration {
     #[tokio::test]
     async fn gap_018_mcp_server() {
         use repo_mcp::RepoMcpServer;
-        use std::path::PathBuf;
 
-        // Create and initialize server
-        let mut server = RepoMcpServer::new(PathBuf::from("."));
+        // Create a valid repo structure for MCP server initialization
+        let mut repo = TestRepo::new();
+        repo.init_git();
+        repo.init_repo_manager("standard", &["vscode"], &[]);
+
+        // Create and initialize server pointing to the valid repo
+        let mut server = RepoMcpServer::new(repo.root().to_path_buf());
         let init_result = server.initialize().await;
-        assert!(init_result.is_ok(), "Server should initialize");
+        assert!(init_result.is_ok(), "Server should initialize in valid repo");
         assert!(server.is_initialized());
 
         // Verify tools are loaded
@@ -956,26 +866,67 @@ mod sync_integration {
         assert!(resource_uris.contains(&"repo://rules"));
     }
 
-    /// GAP-019: add-tool should trigger sync automatically
-    /// TODO: Enable when add-tool triggers an automatic sync
+    /// GAP-019: add-tool followed by sync creates tool config files
+    ///
+    /// Rewrites the original GAP-019 test which was stale: it manually edited
+    /// config.toml and expected files to appear without running any command.
+    /// The actual `add-tool` CLI triggers `trigger_sync_and_report()`, which
+    /// is tested in `repo-cli/tests/integration_tests.rs`.
+    ///
+    /// This test validates the underlying mechanism: updating config.toml to
+    /// include a tool, then running SyncEngine::sync(), produces the expected
+    /// config files on disk.
     #[test]
-    #[ignore = "GAP-019: add-tool does not yet trigger automatic sync"]
     fn gap_019_add_tool_triggers_sync() {
-        let mut repo = TestRepo::new();
+        let repo = TestRepo::new();
         repo.init_git();
-        repo.init_repo_manager("standard", &[], &[]);
 
-        // Manually update config to add vscode (simulating add-tool)
-        let config_path = repo.root().join(".repository/config.toml");
-        let mut config = fs::read_to_string(&config_path).unwrap();
-        config = config.replace("tools = []", "tools = [\"vscode\"]");
-        fs::write(&config_path, config).unwrap();
+        // Start with no tools, like a fresh init
+        let repo_dir = repo.root().join(".repository");
+        fs::create_dir_all(&repo_dir).unwrap();
+        fs::write(
+            repo_dir.join("config.toml"),
+            "tools = []\n\n[core]\nmode = \"standard\"\n",
+        )
+        .unwrap();
 
-        // Correct behavior: after add-tool, .vscode/settings.json should be created
-        let vscode_exists = repo.root().join(".vscode/settings.json").exists();
+        // Simulate what add-tool does: update config to include vscode
+        fs::write(
+            repo_dir.join("config.toml"),
+            "tools = [\"vscode\"]\n\n[core]\nmode = \"standard\"\n",
+        )
+        .unwrap();
+
+        // Then trigger sync (this is what trigger_sync_and_report does)
+        let root = NormalizedPath::new(repo.root());
+        let engine = SyncEngine::new(root, Mode::Standard).unwrap();
+        let report = engine.sync().unwrap();
+
+        assert!(report.success, "Sync after add-tool should succeed: {:?}", report.errors);
         assert!(
-            vscode_exists,
-            "add-tool should automatically trigger sync and create .vscode/settings.json"
+            !report.actions.is_empty(),
+            "Sync should report actions taken"
+        );
+
+        // Verify the tool config file was actually created
+        let vscode_settings = repo.root().join(".vscode/settings.json");
+        assert!(
+            vscode_settings.exists(),
+            "add-tool + sync should create .vscode/settings.json"
+        );
+
+        // Verify the file has real content (not empty)
+        let content = fs::read_to_string(&vscode_settings).unwrap();
+        assert!(
+            !content.is_empty(),
+            ".vscode/settings.json should have content after sync"
+        );
+
+        // Verify ledger recorded the sync
+        let ledger_path = repo.root().join(".repository/ledger.toml");
+        assert!(
+            ledger_path.exists(),
+            "Ledger should be created after sync"
         );
     }
 }
@@ -1014,7 +965,7 @@ mod robustness {
         }
     }
 
-    /// Empty rules list should not cause errors
+    /// Empty rules list should not cause errors and should still create config
     #[test]
     fn empty_rules_sync() {
         let mut repo = TestRepo::new();
@@ -1026,11 +977,23 @@ mod robustness {
         let context = SyncContext::new(root);
 
         // Should not panic with empty rules
-        let result = VSCodeIntegration::new().sync(&context, &rules);
-        assert!(result.is_ok());
+        VSCodeIntegration::new().sync(&context, &rules).unwrap();
+
+        // Verify the config file was actually created on disk
+        repo.assert_file_exists(".vscode/settings.json");
+
+        // Verify it contains valid JSON (not empty or garbage)
+        let content =
+            fs::read_to_string(repo.root().join(".vscode/settings.json")).unwrap();
+        let parsed: Result<serde_json::Value, _> = serde_json::from_str(&content);
+        assert!(
+            parsed.is_ok(),
+            "settings.json should be valid JSON even with empty rules, got: {}",
+            content
+        );
     }
 
-    /// Very long rule content should be handled
+    /// Very long rule content should be handled and written to disk
     #[test]
     fn long_rule_content() {
         let mut repo = TestRepo::new();
@@ -1045,13 +1008,21 @@ mod robustness {
         }];
         let context = SyncContext::new(root);
 
-        let result = cursor_integration().sync(&context, &rules);
-        assert!(result.is_ok());
+        cursor_integration().sync(&context, &rules).unwrap();
 
+        // Verify file was created
         repo.assert_file_exists(".cursorrules");
+
+        // Verify the long content actually made it to disk (not truncated)
+        let written = fs::read_to_string(repo.root().join(".cursorrules")).unwrap();
+        assert!(
+            written.len() >= 100_000,
+            "Written file should contain the full 100KB content, got {} bytes",
+            written.len()
+        );
     }
 
-    /// Special characters in rule IDs
+    /// Special characters in rule IDs should produce valid managed blocks
     #[test]
     fn special_chars_in_rule_id() {
         let mut repo = TestRepo::new();
@@ -1059,14 +1030,27 @@ mod robustness {
         repo.init_repo_manager("standard", &["cursor"], &[]);
 
         let root = NormalizedPath::new(repo.root());
+        let rule_id = "rule-with-dashes_and_underscores.and.dots";
         let rules = vec![Rule {
-            id: "rule-with-dashes_and_underscores.and.dots".to_string(),
-            content: "Content".to_string(),
+            id: rule_id.to_string(),
+            content: "Content with special ID".to_string(),
         }];
         let context = SyncContext::new(root);
 
-        let result = cursor_integration().sync(&context, &rules);
-        assert!(result.is_ok());
+        cursor_integration().sync(&context, &rules).unwrap();
+
+        // Verify file was created and contains the rule content
+        repo.assert_file_exists(".cursorrules");
+        let content = fs::read_to_string(repo.root().join(".cursorrules")).unwrap();
+        assert!(
+            content.contains("Content with special ID"),
+            "Rule content should appear in .cursorrules"
+        );
+        // Verify managed block markers reference the rule ID
+        assert!(
+            content.contains(rule_id),
+            "Managed block should reference the rule ID with special chars"
+        );
     }
 }
 
@@ -1449,5 +1433,509 @@ mod consumer_verification {
     }
 }
 
-// Note: test_summary was removed because it contained zero assertions.
+// =============================================================================
+// P3: End-to-End CLI Pipeline Test
+// =============================================================================
+
+mod p3_end_to_end_pipeline {
+    use super::*;
+
+    /// Helper: write a config.toml in the Manifest format that SyncEngine expects.
+    fn write_manifest_config(root: &Path, mode: &str, tools: &[&str]) {
+        let repo_dir = root.join(".repository");
+        fs::create_dir_all(&repo_dir).unwrap();
+
+        let tools_str = tools
+            .iter()
+            .map(|t| format!("\"{}\"", t))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let config = format!("tools = [{tools_str}]\n\n[core]\nmode = \"{mode}\"\n");
+
+        fs::write(repo_dir.join("config.toml"), config).unwrap();
+    }
+
+    /// End-to-end smoke test: init -> sync -> verify files -> check -> delete -> check
+    ///
+    /// This is the "smoke test" for the entire product. It exercises the complete
+    /// user journey and catches category-level regressions.
+    ///
+    /// Guards against: silent failures where sync appears to succeed but files
+    /// are not actually created or recorded in the ledger.
+    #[test]
+    fn e2e_init_sync_verify_check_delete_recheck() {
+        // Step 1: Create repo, init git, write config with multiple tools
+        let repo = TestRepo::new();
+        repo.init_git();
+        write_manifest_config(repo.root(), "standard", &["vscode", "cursor", "claude"]);
+
+        // Step 2: Run sync
+        let root = NormalizedPath::new(repo.root());
+        let engine = SyncEngine::new(root.clone(), Mode::Standard).unwrap();
+        let sync_report = engine.sync().unwrap();
+        assert!(
+            sync_report.success,
+            "Sync should succeed: {:?}",
+            sync_report.errors
+        );
+        assert!(
+            !sync_report.actions.is_empty(),
+            "Sync should report actions taken, not be a no-op"
+        );
+
+        // Step 3: Verify ALL expected files exist
+        // Primary paths
+        repo.assert_file_exists(".vscode/settings.json");
+        repo.assert_file_exists(".cursorrules");
+        repo.assert_file_exists("CLAUDE.md");
+
+        // Secondary path for claude: .claude/rules/ directory
+        let claude_rules_dir = repo.root().join(".claude/rules");
+        assert!(
+            claude_rules_dir.is_dir(),
+            ".claude/rules/ directory should exist as Claude's secondary path"
+        );
+
+        // Verify ledger was created and has content
+        repo.assert_file_exists(".repository/ledger.toml");
+        let ledger_content =
+            fs::read_to_string(repo.root().join(".repository/ledger.toml")).unwrap();
+        assert!(
+            !ledger_content.is_empty(),
+            "Ledger should not be empty after sync"
+        );
+
+        // Verify files have real content (not empty stubs)
+        let cursorrules_content =
+            fs::read_to_string(repo.root().join(".cursorrules")).unwrap();
+        assert!(
+            !cursorrules_content.is_empty(),
+            ".cursorrules should have content after sync"
+        );
+
+        let claude_content = fs::read_to_string(repo.root().join("CLAUDE.md")).unwrap();
+        assert!(
+            !claude_content.is_empty(),
+            "CLAUDE.md should have content after sync"
+        );
+
+        let vscode_content =
+            fs::read_to_string(repo.root().join(".vscode/settings.json")).unwrap();
+        let parsed: Result<serde_json::Value, _> = serde_json::from_str(&vscode_content);
+        assert!(
+            parsed.is_ok(),
+            ".vscode/settings.json should be valid JSON"
+        );
+
+        // Step 4: Check should report healthy (no rules added, so tool checksums
+        // in the ledger should match what is on disk)
+        let check_report = engine.check().unwrap();
+        assert_eq!(
+            check_report.status,
+            CheckStatus::Healthy,
+            "Check after sync should be Healthy, but got {:?} with missing: {:?}, drifted: {:?}",
+            check_report.status,
+            check_report.missing,
+            check_report.drifted
+        );
+
+        // Step 5: Delete a managed file to simulate drift
+        let cursorrules_path = repo.root().join(".cursorrules");
+        assert!(cursorrules_path.exists(), "Pre-condition: .cursorrules exists");
+        fs::remove_file(&cursorrules_path).unwrap();
+        assert!(!cursorrules_path.exists(), ".cursorrules should be deleted");
+
+        // Step 6: Check should detect the missing file
+        let check_report_after_delete = engine.check().unwrap();
+        assert_ne!(
+            check_report_after_delete.status,
+            CheckStatus::Healthy,
+            "Check should detect missing file after deletion"
+        );
+        assert!(
+            !check_report_after_delete.missing.is_empty(),
+            "Check should report at least one missing item after .cursorrules deletion"
+        );
+
+        // Verify the missing item references the correct file
+        let missing_files: Vec<&str> = check_report_after_delete
+            .missing
+            .iter()
+            .map(|d| d.file.as_str())
+            .collect();
+        assert!(
+            missing_files.iter().any(|f| f.contains("cursorrules")),
+            "Missing items should reference .cursorrules, got: {:?}",
+            missing_files
+        );
+    }
+
+    /// End-to-end test with rules: init -> add rules -> sync -> verify rule content
+    ///
+    /// Tests that rules defined in .repository/rules/ are propagated to all
+    /// tool config files during sync. Complements the tool-only e2e test above.
+    ///
+    /// Guards against: rules being silently dropped during sync, or sync
+    /// appearing to succeed without writing rule content to tool config files.
+    #[test]
+    fn e2e_rules_propagate_to_tool_configs() {
+        let repo = TestRepo::new();
+        repo.init_git();
+        write_manifest_config(repo.root(), "standard", &["cursor", "claude"]);
+
+        // Add rules
+        let rules_dir = repo.root().join(".repository/rules");
+        fs::create_dir_all(&rules_dir).unwrap();
+        {
+            use repo_core::rules::RuleRegistry;
+            let registry_path = rules_dir.join("registry.toml");
+            let mut registry = RuleRegistry::new(registry_path);
+            registry
+                .add_rule(
+                    "coding-standards",
+                    "Use descriptive variable names and write tests",
+                    vec![],
+                )
+                .unwrap();
+        }
+
+        // Sync
+        let root = NormalizedPath::new(repo.root());
+        let engine = SyncEngine::new(root.clone(), Mode::Standard).unwrap();
+        let sync_report = engine.sync().unwrap();
+        assert!(
+            sync_report.success,
+            "Sync should succeed: {:?}",
+            sync_report.errors
+        );
+
+        // Verify rule content appears in tool config files
+        let cursorrules_content =
+            fs::read_to_string(repo.root().join(".cursorrules")).unwrap();
+        assert!(
+            cursorrules_content.contains("coding-standards"),
+            ".cursorrules should contain rule ID, got: {}",
+            cursorrules_content
+        );
+        assert!(
+            cursorrules_content.contains("descriptive variable names"),
+            ".cursorrules should contain rule body"
+        );
+
+        let claude_content = fs::read_to_string(repo.root().join("CLAUDE.md")).unwrap();
+        assert!(
+            claude_content.contains("coding-standards"),
+            "CLAUDE.md should contain rule ID"
+        );
+        assert!(
+            claude_content.contains("descriptive variable names"),
+            "CLAUDE.md should contain rule body"
+        );
+
+        // Verify managed blocks are present (not just raw text)
+        assert!(
+            cursorrules_content.contains("<!-- repo:block:"),
+            ".cursorrules should use managed blocks"
+        );
+        assert!(
+            claude_content.contains("<!-- repo:block:"),
+            "CLAUDE.md should use managed blocks"
+        );
+    }
+}
+
+// =============================================================================
+// P3: Drift Detection and Fix Tests
+// =============================================================================
+
+mod p3_drift_detection {
+    use super::*;
+
+    /// Helper: write a config.toml in the Manifest format that SyncEngine expects.
+    fn write_manifest_config(root: &Path, mode: &str, tools: &[&str]) {
+        let repo_dir = root.join(".repository");
+        fs::create_dir_all(&repo_dir).unwrap();
+
+        let tools_str = tools
+            .iter()
+            .map(|t| format!("\"{}\"", t))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let config = format!("tools = [{tools_str}]\n\n[core]\nmode = \"{mode}\"\n");
+
+        fs::write(repo_dir.join("config.toml"), config).unwrap();
+    }
+
+    /// Test: sync -> healthy -> delete file -> check detects missing
+    ///
+    /// Guards against: check() failing to detect real filesystem drift.
+    /// Verifies that the ledger projection system actually works end-to-end:
+    /// a file recorded in the ledger is detected as missing after deletion.
+    #[test]
+    fn drift_check_detects_deleted_file() {
+        let repo = TestRepo::new();
+        repo.init_git();
+        write_manifest_config(repo.root(), "standard", &["cursor"]);
+
+        let root = NormalizedPath::new(repo.root());
+        let engine = SyncEngine::new(root.clone(), Mode::Standard).unwrap();
+
+        // Sync to create files
+        let sync_report = engine.sync().unwrap();
+        assert!(sync_report.success, "Initial sync should succeed");
+
+        // Verify the file exists
+        let cursorrules_path = repo.root().join(".cursorrules");
+        assert!(
+            cursorrules_path.exists(),
+            ".cursorrules should exist after sync"
+        );
+
+        // Check should be healthy (no rules, so tool checksum matches)
+        let check1 = engine.check().unwrap();
+        assert_eq!(
+            check1.status,
+            CheckStatus::Healthy,
+            "Check after initial sync should be Healthy"
+        );
+
+        // Delete the managed file
+        fs::remove_file(&cursorrules_path).unwrap();
+        assert!(!cursorrules_path.exists(), ".cursorrules should be deleted");
+
+        // Check should detect the missing file
+        let check2 = engine.check().unwrap();
+        assert_ne!(
+            check2.status,
+            CheckStatus::Healthy,
+            "Check should detect missing .cursorrules"
+        );
+        assert!(
+            !check2.missing.is_empty(),
+            "Check should report missing items after file deletion"
+        );
+
+        // Verify the missing item references the correct file
+        let missing_files: Vec<&str> = check2
+            .missing
+            .iter()
+            .map(|d| d.file.as_str())
+            .collect();
+        assert!(
+            missing_files.iter().any(|f| f.contains("cursorrules")),
+            "Missing items should reference .cursorrules, got: {:?}",
+            missing_files
+        );
+    }
+
+    /// Test: sync -> healthy -> corrupt file -> check detects drift
+    ///
+    /// Guards against: check() only detecting missing files but not modified content.
+    /// The checksum comparison in the ledger should catch content corruption.
+    #[test]
+    fn drift_check_detects_corrupted_file() {
+        let repo = TestRepo::new();
+        repo.init_git();
+        write_manifest_config(repo.root(), "standard", &["cursor"]);
+
+        let root = NormalizedPath::new(repo.root());
+        let engine = SyncEngine::new(root.clone(), Mode::Standard).unwrap();
+
+        // Initial sync (no rules, so checksums will match)
+        let sync_report = engine.sync().unwrap();
+        assert!(sync_report.success, "Initial sync should succeed");
+
+        // Verify healthy
+        let check1 = engine.check().unwrap();
+        assert_eq!(
+            check1.status,
+            CheckStatus::Healthy,
+            "Should be healthy after initial sync"
+        );
+
+        // Corrupt the file by overwriting with different content
+        let cursorrules_path = repo.root().join(".cursorrules");
+        let original = fs::read_to_string(&cursorrules_path).unwrap();
+        assert!(
+            !original.is_empty(),
+            "Pre-condition: .cursorrules has content"
+        );
+
+        fs::write(
+            &cursorrules_path,
+            "CORRUPTED CONTENT - all managed blocks destroyed",
+        )
+        .unwrap();
+
+        // Check should detect the drift
+        let check2 = engine.check().unwrap();
+        assert_ne!(
+            check2.status,
+            CheckStatus::Healthy,
+            "Check should detect corruption. Status: {:?}, missing: {:?}, drifted: {:?}",
+            check2.status,
+            check2.missing,
+            check2.drifted
+        );
+
+        // It should report either drifted or missing (depending on projection type)
+        let total_issues = check2.drifted.len() + check2.missing.len();
+        assert!(
+            total_issues > 0,
+            "Check should report drifted or missing items after corruption"
+        );
+    }
+
+    /// Test: fix() re-runs sync when drift is detected
+    ///
+    /// Guards against: fix() being a complete no-op that doesn't attempt
+    /// to correct any issues. Verifies fix calls sync and reports actions.
+    #[test]
+    fn fix_runs_sync_on_unhealthy_repo() {
+        use repo_core::ledger::{Intent, Ledger, Projection};
+        use serde_json::json;
+
+        let repo = TestRepo::new();
+        repo.init_git();
+        write_manifest_config(repo.root(), "standard", &["cursor"]);
+
+        // Create a ledger with a projection for a nonexistent file,
+        // simulating a state where sync was run but the file was deleted.
+        let repo_dir = repo.root().join(".repository");
+        fs::create_dir_all(&repo_dir).unwrap();
+
+        let mut ledger = Ledger::new();
+        let mut intent = Intent::new("tool:cursor".to_string(), json!({}));
+        intent.add_projection(Projection::file_managed(
+            "cursor".to_string(),
+            std::path::PathBuf::from(".cursorrules"),
+            "sha256:bogus_checksum".to_string(),
+        ));
+        ledger.add_intent(intent);
+        ledger.save(&repo_dir.join("ledger.toml")).unwrap();
+
+        // Verify check detects the missing file
+        let root = NormalizedPath::new(repo.root());
+        let engine = SyncEngine::new(root.clone(), Mode::Standard).unwrap();
+        let check_before = engine.check().unwrap();
+        assert_ne!(
+            check_before.status,
+            CheckStatus::Healthy,
+            "Pre-condition: repo should be unhealthy"
+        );
+
+        // Fix should run sync
+        let fix_report = engine.fix().unwrap();
+        assert!(
+            fix_report.success,
+            "Fix should succeed: {:?}",
+            fix_report.errors
+        );
+        assert!(
+            !fix_report.actions.is_empty(),
+            "Fix should report actions taken"
+        );
+    }
+
+    /// Test: ledger records sync operations with correct projections
+    ///
+    /// Guards against: sync appearing to succeed but ledger not recording
+    /// the projections, which would make check() unable to detect drift.
+    #[test]
+    fn ledger_records_projections_after_sync() {
+        let repo = TestRepo::new();
+        repo.init_git();
+        write_manifest_config(repo.root(), "standard", &["cursor", "claude"]);
+
+        let root = NormalizedPath::new(repo.root());
+        let engine = SyncEngine::new(root.clone(), Mode::Standard).unwrap();
+
+        // Sync
+        let sync_report = engine.sync().unwrap();
+        assert!(sync_report.success, "Sync should succeed");
+
+        // Read the ledger file and verify it has content
+        let ledger_path = repo.root().join(".repository/ledger.toml");
+        assert!(ledger_path.exists(), "Ledger file should exist");
+
+        let ledger_content = fs::read_to_string(&ledger_path).unwrap();
+        assert!(
+            !ledger_content.is_empty(),
+            "Ledger should not be empty after sync"
+        );
+
+        // The ledger should reference the tools we synced
+        // (Ledger uses intent IDs like "tool:cursor")
+        assert!(
+            ledger_content.contains("cursor") || ledger_content.contains("claude"),
+            "Ledger should reference synced tools. Content: {}",
+            ledger_content
+        );
+
+        // Verify that the check actually works by using the ledger:
+        // If the ledger recorded projections, deleting a file should trigger a check failure.
+        // This proves the ledger is not just an empty stub.
+        let cursorrules_path = repo.root().join(".cursorrules");
+        if cursorrules_path.exists() {
+            fs::remove_file(&cursorrules_path).unwrap();
+            let check_report = engine.check().unwrap();
+            assert_ne!(
+                check_report.status,
+                CheckStatus::Healthy,
+                "Ledger projections should cause check to detect missing .cursorrules"
+            );
+        }
+    }
+
+    /// Test: fix on an already-healthy repo is a no-op
+    ///
+    /// Guards against: fix() erroneously modifying files that are already correct.
+    #[test]
+    fn fix_on_healthy_repo_is_noop() {
+        let repo = TestRepo::new();
+        repo.init_git();
+        write_manifest_config(repo.root(), "standard", &["cursor"]);
+
+        let root = NormalizedPath::new(repo.root());
+        let engine = SyncEngine::new(root.clone(), Mode::Standard).unwrap();
+
+        // Sync
+        let sync_report = engine.sync().unwrap();
+        assert!(sync_report.success);
+
+        // Record file content before fix
+        let cursorrules_path = repo.root().join(".cursorrules");
+        let content_before = fs::read_to_string(&cursorrules_path).unwrap();
+
+        // Fix on healthy repo
+        let fix_report = engine.fix().unwrap();
+        assert!(fix_report.success);
+
+        // Content should not change
+        let content_after = fs::read_to_string(&cursorrules_path).unwrap();
+        assert_eq!(
+            content_before, content_after,
+            "Fix on healthy repo should not modify files"
+        );
+    }
+}
+
+// =============================================================================
+// P3: Low-Quality Test Pattern Fixes
+// =============================================================================
+//
+// Audit findings for `assert!(result.is_ok())` as sole assertion:
+//
+// 1. robustness::empty_rules_sync (line ~1074) — sole assertion is
+//    `assert!(result.is_ok())`. Fixed below by also verifying the file was created.
+//
+// 2. robustness::special_chars_in_rule_id (line ~1113) — sole assertion is
+//    `assert!(result.is_ok())`. Fixed below by also verifying file content.
+//
+// 3. robustness::long_rule_content (line ~1093) — has `assert!(result.is_ok())`
+//    followed by `assert_file_exists`, which is acceptable (two assertions).
+//
+// Note: test_summary was removed previously because it contained zero assertions.
 // Mission status is tracked in documentation, not in test output.

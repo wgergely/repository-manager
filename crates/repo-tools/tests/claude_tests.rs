@@ -247,6 +247,10 @@ fn example() {
 
     let content = fs::read_to_string(temp_dir.path().join("CLAUDE.md")).unwrap();
 
+    // Format: managed block structure wraps rich markdown content
+    assert!(content.contains("<!-- repo:block:rich-content -->"));
+    assert!(content.contains("<!-- /repo:block:rich-content -->"));
+
     assert!(content.contains("## Code Guidelines"));
     assert!(content.contains("`snake_case`"));
     assert!(content.contains("```rust"));

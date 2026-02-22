@@ -113,7 +113,7 @@ fn test_init_worktree_mode() {
         .success();
 
     let config_content = fs::read_to_string(dir.path().join(".repository/config.toml")).unwrap();
-    assert!(config_content.contains("mode = \"worktree\""));
+    assert!(config_content.contains("mode = \"worktrees\""));
 
     // Worktree mode should create main/ directory
     assert!(dir.path().join("main").exists());
@@ -1127,7 +1127,7 @@ fn test_e2e_worktree_mode_init() {
 
     // 3. Verify config content
     let config_content = fs::read_to_string(dir.path().join(".repository/config.toml")).unwrap();
-    assert!(config_content.contains("mode = \"worktree\""));
+    assert!(config_content.contains("mode = \"worktrees\""));
     assert!(config_content.contains("cursor"));
     assert!(config_content.contains("claude"));
 }

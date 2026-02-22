@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
+use std::path::PathBuf;
 
 use super::manifest::Manifest;
 
@@ -61,8 +62,8 @@ impl From<Manifest> for ResolvedConfig {
 /// Resolves configuration by merging multiple sources
 ///
 /// Configuration is loaded from a hierarchy of sources:
-/// 1. Global defaults (~/.config/repo-manager/config.toml) - TODO
-/// 2. Organization config - TODO
+/// 1. Global defaults (~/.config/repo-manager/config.toml)
+/// 2. Organization config (~/.config/repo-manager/org/config.toml)
 /// 3. Repository config (.repository/config.toml)
 /// 4. Local overrides (.repository/config.local.toml) - git-ignored
 ///
@@ -70,19 +71,67 @@ impl From<Manifest> for ResolvedConfig {
 pub struct ConfigResolver {
     /// Repository root directory
     root: NormalizedPath,
+
+    /// Override for the global config directory (used for testing).
+    /// When `None`, the platform-appropriate directory is used via `dirs::config_dir()`.
+    global_config_dir_override: Option<PathBuf>,
 }
 
 impl ConfigResolver {
     /// Create a new configuration resolver for the given repository root
     ///
+    /// Uses the platform-appropriate global config directory:
+    /// - Linux: `~/.config/repo-manager/`
+    /// - macOS: `~/Library/Application Support/repo-manager/`
+    /// - Windows: `%APPDATA%\repo-manager\`
+    ///
     /// # Arguments
     ///
     /// * `root` - The repository root directory containing `.repository/`
     pub fn new(root: NormalizedPath) -> Self {
-        Self { root }
+        Self {
+            root,
+            global_config_dir_override: None,
+        }
+    }
+
+    /// Create a resolver with a custom global config directory.
+    ///
+    /// This is primarily useful for testing, where you need to control
+    /// the global config path without affecting the real user config.
+    ///
+    /// # Arguments
+    ///
+    /// * `root` - The repository root directory containing `.repository/`
+    /// * `global_config_dir` - Custom path to use as the global config directory
+    pub fn with_global_config_dir(root: NormalizedPath, global_config_dir: PathBuf) -> Self {
+        Self {
+            root,
+            global_config_dir_override: Some(global_config_dir),
+        }
+    }
+
+    /// Determine the global config directory path.
+    ///
+    /// Returns the override if set, otherwise falls back to the
+    /// platform-appropriate config directory via `dirs::config_dir()`.
+    fn global_config_dir(&self) -> Option<PathBuf> {
+        if let Some(ref override_dir) = self.global_config_dir_override {
+            return Some(override_dir.clone());
+        }
+        dirs::config_dir().map(|d| d.join("repo-manager"))
     }
 
     /// Resolve the configuration by merging all sources
+    ///
+    /// Loads and merges configuration from 4 layers in order:
+    /// 1. Global defaults (`<config_dir>/repo-manager/config.toml`)
+    /// 2. Organization config (`<config_dir>/repo-manager/org/config.toml`)
+    /// 3. Repository config (`.repository/config.toml`)
+    /// 4. Local overrides (`.repository/config.local.toml`)
+    ///
+    /// Each layer overrides values from the previous layer. Missing layers
+    /// are silently skipped. Invalid TOML in any layer produces an error.
     ///
     /// # Returns
     ///
@@ -102,16 +151,52 @@ impl ConfigResolver {
         let mut manifest = Manifest::empty();
 
         // Layer 1 - Global defaults (~/.config/repo-manager/config.toml)
-        // Not yet implemented - will load user-global settings
-        tracing::debug!("Config layer 1 (global defaults) not yet implemented");
+        if let Some(global_dir) = self.global_config_dir() {
+            let global_config_path = global_dir.join("config.toml");
+            if global_config_path.is_file() {
+                tracing::debug!(?global_config_path, "Loading global config (layer 1)");
+                let content = fs::read_to_string(&global_config_path)?;
+                let global_manifest = Manifest::parse(&content)?;
+                manifest.merge(&global_manifest);
+            } else {
+                tracing::debug!(
+                    ?global_config_path,
+                    "No global config found (layer 1) — skipping"
+                );
+            }
+        }
 
-        // Layer 2 - Organization config
-        // Not yet implemented - will load organization-level settings
-        tracing::debug!("Config layer 2 (organization config) not yet implemented");
+        // Layer 2 - Organization config (~/.config/repo-manager/org/config.toml)
+        //
+        // The org config provides a second layer of shared defaults that sit between
+        // user-global settings and per-repository config. This is useful for teams
+        // that want to share tool/preset/rule defaults across repositories.
+        //
+        // The org config lives in a subdirectory of the global config dir:
+        //   <config_dir>/repo-manager/org/config.toml
+        //
+        // Future enhancements could support multiple named orgs:
+        //   <config_dir>/repo-manager/org/<org-name>/config.toml
+        // with the org name derived from the git remote URL.
+        if let Some(global_dir) = self.global_config_dir() {
+            let org_config_path = global_dir.join("org").join("config.toml");
+            if org_config_path.is_file() {
+                tracing::debug!(?org_config_path, "Loading org config (layer 2)");
+                let content = fs::read_to_string(&org_config_path)?;
+                let org_manifest = Manifest::parse(&content)?;
+                manifest.merge(&org_manifest);
+            } else {
+                tracing::debug!(
+                    ?org_config_path,
+                    "No org config found (layer 2) — skipping"
+                );
+            }
+        }
 
         // Layer 3 - Repository config (.repository/config.toml)
         let repo_config_path = self.root.join(".repository/config.toml");
         if repo_config_path.is_file() {
+            tracing::debug!(?repo_config_path, "Loading repo config (layer 3)");
             let content = fs::read_to_string(repo_config_path.to_native())?;
             let repo_manifest = Manifest::parse(&content)?;
             manifest.merge(&repo_manifest);
@@ -120,6 +205,7 @@ impl ConfigResolver {
         // Layer 4 - Local overrides (.repository/config.local.toml)
         let local_config_path = self.root.join(".repository/config.local.toml");
         if local_config_path.is_file() {
+            tracing::debug!(?local_config_path, "Loading local config (layer 4)");
             let content = fs::read_to_string(local_config_path.to_native())?;
             let local_manifest = Manifest::parse(&content)?;
             manifest.merge(&local_manifest);

@@ -77,12 +77,15 @@ mod tests {
         let integration = cline_integration();
         integration.sync(&context, &rules).unwrap();
 
-        let path = temp_dir.path().join(".clinerules");
-        assert!(path.exists());
+        // The additional path `.clinerules/` replaces the primary `.clinerules` file
+        // with a directory, containing per-rule files.
+        let dir_path = temp_dir.path().join(".clinerules");
+        assert!(dir_path.is_dir(), ".clinerules should be a directory after sync");
 
-        let content = fs::read_to_string(&path).unwrap();
+        let rule_file = dir_path.join("01-coding-style.md");
+        assert!(rule_file.exists(), "Per-rule file should exist in .clinerules/");
+
+        let content = fs::read_to_string(&rule_file).unwrap();
         assert!(content.contains("Use TypeScript strict mode"));
-        // Raw content mode - no headers
-        assert!(!content.contains("## coding-style"));
     }
 }

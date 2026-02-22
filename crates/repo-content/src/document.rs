@@ -6,7 +6,7 @@ use crate::edit::Edit;
 use crate::error::{Error, Result};
 use crate::format::{Format, FormatHandler};
 use crate::handlers::{JsonHandler, MarkdownHandler, PlainTextHandler, TomlHandler, YamlHandler};
-use crate::path::{get_at_path, parse_path, remove_at_path, set_at_path};
+use crate::path::{get_at_path, parse_path, remove_at_path, set_at_path, PathSegment};
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -233,7 +233,7 @@ impl Document {
     /// ```
     pub fn set_path(&mut self, path: &str, value: impl Into<Value>) -> Result<Edit> {
         let old_source = self.source.clone();
-        let mut normalized = self.handler.normalize(&self.source)?;
+        let normalized = self.handler.normalize(&self.source)?;
         let segments = parse_path(path);
 
         // Check that the path exists (for set, we require existing path)
@@ -244,6 +244,20 @@ impl Document {
         }
 
         let new_value = value.into();
+
+        // For TOML, use toml_edit to preserve formatting, comments, and key ordering
+        if self.format == Format::Toml {
+            let new_source = self.toml_set_path(&segments, &new_value)?;
+            self.source = new_source.clone();
+            return Ok(Edit::path_set(
+                path,
+                0..old_source.len(),
+                old_source,
+                new_source,
+            ));
+        }
+
+        let mut normalized = normalized;
         if !set_at_path(&mut normalized, &segments, new_value) {
             return Err(Error::PathSetFailed {
                 format: format!("{:?}", self.format),
@@ -284,7 +298,7 @@ impl Document {
     /// ```
     pub fn remove_path(&mut self, path: &str) -> Result<Edit> {
         let old_source = self.source.clone();
-        let mut normalized = self.handler.normalize(&self.source)?;
+        let normalized = self.handler.normalize(&self.source)?;
         let segments = parse_path(path);
 
         // Check that the path exists
@@ -294,6 +308,14 @@ impl Document {
             });
         }
 
+        // For TOML, use toml_edit to preserve formatting, comments, and key ordering
+        if self.format == Format::Toml {
+            let new_source = self.toml_remove_path(&segments)?;
+            self.source = new_source;
+            return Ok(Edit::path_remove(path, 0..old_source.len(), old_source));
+        }
+
+        let mut normalized = normalized;
         if remove_at_path(&mut normalized, &segments).is_none() {
             return Err(Error::PathNotFound {
                 path: path.to_string(),
@@ -307,9 +329,53 @@ impl Document {
         Ok(Edit::path_remove(path, 0..old_source.len(), old_source))
     }
 
+    /// Set a value at the given path in a TOML document using toml_edit,
+    /// preserving comments, key ordering, and formatting.
+    fn toml_set_path(&self, segments: &[PathSegment], value: &Value) -> Result<String> {
+        let mut doc: toml_edit::DocumentMut = self
+            .source
+            .parse()
+            .map_err(|e: toml_edit::TomlError| Error::parse("TOML", e.to_string()))?;
+
+        let toml_value = json_value_to_toml_edit(value)?;
+
+        if segments.is_empty() {
+            return Err(Error::PathSetFailed {
+                format: "Toml".to_string(),
+                path: String::new(),
+                reason: "Empty path".to_string(),
+            });
+        }
+
+        // Use recursive helper to navigate and set the value in-place.
+        toml_edit_set(doc.as_item_mut(), segments, toml_value)?;
+
+        Ok(doc.to_string())
+    }
+
+    /// Remove a value at the given path in a TOML document using toml_edit,
+    /// preserving comments, key ordering, and formatting.
+    fn toml_remove_path(&self, segments: &[PathSegment]) -> Result<String> {
+        let mut doc: toml_edit::DocumentMut = self
+            .source
+            .parse()
+            .map_err(|e: toml_edit::TomlError| Error::parse("TOML", e.to_string()))?;
+
+        if segments.is_empty() {
+            return Err(Error::PathNotFound {
+                path: String::new(),
+            });
+        }
+
+        // Use recursive helper to navigate and remove the value in-place.
+        toml_edit_remove(doc.as_item_mut(), segments)?;
+
+        Ok(doc.to_string())
+    }
+
     /// Render the document from a normalized JSON value.
     ///
-    /// This is an internal helper for set_path and remove_path.
+    /// This is an internal helper for set_path and remove_path (non-TOML formats).
     fn render_from_normalized(&self, normalized: &Value) -> Result<String> {
         match self.format {
             Format::Json => {
@@ -365,6 +431,476 @@ fn json_to_toml(json: &Value) -> Result<toml::Value> {
                 toml_map.insert(k.clone(), json_to_toml(v)?);
             }
             Ok(toml::Value::Table(toml_map))
+        }
+    }
+}
+
+/// Convert a serde_json::Value to a toml_edit::Value for format-preserving edits
+fn json_value_to_toml_edit(json: &Value) -> Result<toml_edit::Value> {
+    match json {
+        Value::Null => Err(Error::parse("TOML", "TOML does not support null values")),
+        Value::Bool(b) => Ok(toml_edit::value(*b).into_value().unwrap()),
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(toml_edit::value(i).into_value().unwrap())
+            } else if let Some(f) = n.as_f64() {
+                Ok(toml_edit::value(f).into_value().unwrap())
+            } else {
+                Err(Error::parse("TOML", "Invalid number"))
+            }
+        }
+        Value::String(s) => Ok(toml_edit::value(s.as_str()).into_value().unwrap()),
+        Value::Array(arr) => {
+            let mut toml_arr = toml_edit::Array::new();
+            for item in arr {
+                toml_arr.push(json_value_to_toml_edit(item)?);
+            }
+            Ok(toml_edit::Value::Array(toml_arr))
+        }
+        Value::Object(obj) => {
+            let mut table = toml_edit::InlineTable::new();
+            for (k, v) in obj {
+                table.insert(k, json_value_to_toml_edit(v)?);
+            }
+            Ok(toml_edit::Value::InlineTable(table))
+        }
+    }
+}
+
+/// Recursively navigate a `toml_edit::Item` tree along `segments` and set
+/// the leaf value. Handles Tables, InlineTables, ArrayOfTables, and inline
+/// Arrays so that no lossy round-trip through serde_json is needed.
+fn toml_edit_set(
+    item: &mut toml_edit::Item,
+    segments: &[PathSegment],
+    value: toml_edit::Value,
+) -> Result<()> {
+    if segments.is_empty() {
+        *item = toml_edit::Item::Value(value);
+        return Ok(());
+    }
+
+    if segments.len() == 1 {
+        match &segments[0] {
+            PathSegment::Key(key) => match item {
+                toml_edit::Item::Table(t) => {
+                    if t.contains_key(key) {
+                        t.insert(key, toml_edit::Item::Value(value));
+                        Ok(())
+                    } else {
+                        Err(Error::PathNotFound { path: key.clone() })
+                    }
+                }
+                toml_edit::Item::Value(toml_edit::Value::InlineTable(t)) => {
+                    if t.contains_key(key) {
+                        t.insert(key, value);
+                        Ok(())
+                    } else {
+                        Err(Error::PathNotFound { path: key.clone() })
+                    }
+                }
+                _ => Err(Error::PathSetFailed {
+                    format: "Toml".to_string(),
+                    path: key.clone(),
+                    reason: "Parent is not a table".to_string(),
+                }),
+            },
+            PathSegment::Index(idx) => match item {
+                toml_edit::Item::Value(toml_edit::Value::Array(arr)) => {
+                    if *idx < arr.len() {
+                        arr.replace(*idx, value);
+                        Ok(())
+                    } else {
+                        Err(Error::PathNotFound {
+                            path: format!("[{}]", idx),
+                        })
+                    }
+                }
+                _ => Err(Error::PathSetFailed {
+                    format: "Toml".to_string(),
+                    path: format!("[{}]", idx),
+                    reason: "Parent is not an array".to_string(),
+                }),
+            },
+        }
+    } else {
+        let (first, rest) = segments.split_first().unwrap();
+        match first {
+            PathSegment::Key(key) => match item {
+                toml_edit::Item::Table(t) => {
+                    let child = t.get_mut(key).ok_or_else(|| Error::PathNotFound {
+                        path: key.clone(),
+                    })?;
+                    toml_edit_set(child, rest, value)
+                }
+                toml_edit::Item::Value(toml_edit::Value::InlineTable(t)) => {
+                    let child = t.get_mut(key).ok_or_else(|| Error::PathNotFound {
+                        path: key.clone(),
+                    })?;
+                    toml_edit_set_value(child, rest, value)
+                }
+                _ => Err(Error::PathSetFailed {
+                    format: "Toml".to_string(),
+                    path: key.clone(),
+                    reason: "Path segment is not a table".to_string(),
+                }),
+            },
+            PathSegment::Index(idx) => match item {
+                toml_edit::Item::ArrayOfTables(arr) => {
+                    let table = arr.get_mut(*idx).ok_or_else(|| Error::PathNotFound {
+                        path: format!("[{}]", idx),
+                    })?;
+                    toml_edit_set_in_table(table, rest, value)
+                }
+                toml_edit::Item::Value(toml_edit::Value::Array(arr)) => {
+                    let child = arr.get_mut(*idx).ok_or_else(|| Error::PathNotFound {
+                        path: format!("[{}]", idx),
+                    })?;
+                    toml_edit_set_value(child, rest, value)
+                }
+                _ => Err(Error::PathSetFailed {
+                    format: "Toml".to_string(),
+                    path: format!("[{}]", idx),
+                    reason: "Path segment is not an array".to_string(),
+                }),
+            },
+        }
+    }
+}
+
+/// Helper: set a value navigating from a `&mut toml_edit::Value`.
+fn toml_edit_set_value(
+    val: &mut toml_edit::Value,
+    segments: &[PathSegment],
+    new_value: toml_edit::Value,
+) -> Result<()> {
+    if segments.is_empty() {
+        *val = new_value;
+        return Ok(());
+    }
+
+    if segments.len() == 1 {
+        match &segments[0] {
+            PathSegment::Key(key) => {
+                if let toml_edit::Value::InlineTable(t) = val {
+                    if t.contains_key(key) {
+                        t.insert(key, new_value);
+                        Ok(())
+                    } else {
+                        Err(Error::PathNotFound { path: key.clone() })
+                    }
+                } else {
+                    Err(Error::PathSetFailed {
+                        format: "Toml".to_string(),
+                        path: key.clone(),
+                        reason: "Parent is not a table".to_string(),
+                    })
+                }
+            }
+            PathSegment::Index(idx) => {
+                if let toml_edit::Value::Array(arr) = val {
+                    if *idx < arr.len() {
+                        arr.replace(*idx, new_value);
+                        Ok(())
+                    } else {
+                        Err(Error::PathNotFound {
+                            path: format!("[{}]", idx),
+                        })
+                    }
+                } else {
+                    Err(Error::PathSetFailed {
+                        format: "Toml".to_string(),
+                        path: format!("[{}]", idx),
+                        reason: "Parent is not an array".to_string(),
+                    })
+                }
+            }
+        }
+    } else {
+        let (first, rest) = segments.split_first().unwrap();
+        match first {
+            PathSegment::Key(key) => {
+                if let toml_edit::Value::InlineTable(t) = val {
+                    let child = t.get_mut(key).ok_or_else(|| Error::PathNotFound {
+                        path: key.clone(),
+                    })?;
+                    toml_edit_set_value(child, rest, new_value)
+                } else {
+                    Err(Error::PathSetFailed {
+                        format: "Toml".to_string(),
+                        path: key.clone(),
+                        reason: "Path segment is not a table".to_string(),
+                    })
+                }
+            }
+            PathSegment::Index(idx) => {
+                if let toml_edit::Value::Array(arr) = val {
+                    let child = arr.get_mut(*idx).ok_or_else(|| Error::PathNotFound {
+                        path: format!("[{}]", idx),
+                    })?;
+                    toml_edit_set_value(child, rest, new_value)
+                } else {
+                    Err(Error::PathSetFailed {
+                        format: "Toml".to_string(),
+                        path: format!("[{}]", idx),
+                        reason: "Path segment is not an array".to_string(),
+                    })
+                }
+            }
+        }
+    }
+}
+
+/// Helper: set a value navigating from a `&mut toml_edit::Table`.
+fn toml_edit_set_in_table(
+    table: &mut toml_edit::Table,
+    segments: &[PathSegment],
+    value: toml_edit::Value,
+) -> Result<()> {
+    if segments.is_empty() {
+        return Err(Error::PathSetFailed {
+            format: "Toml".to_string(),
+            path: String::new(),
+            reason: "Cannot replace a table with a value".to_string(),
+        });
+    }
+
+    if segments.len() == 1 {
+        match &segments[0] {
+            PathSegment::Key(key) => {
+                if table.contains_key(key) {
+                    table.insert(key, toml_edit::Item::Value(value));
+                    Ok(())
+                } else {
+                    Err(Error::PathNotFound { path: key.clone() })
+                }
+            }
+            PathSegment::Index(idx) => Err(Error::PathSetFailed {
+                format: "Toml".to_string(),
+                path: format!("[{}]", idx),
+                reason: "Cannot index into a table at final position".to_string(),
+            }),
+        }
+    } else {
+        let (first, rest) = segments.split_first().unwrap();
+        match first {
+            PathSegment::Key(key) => {
+                let child = table.get_mut(key).ok_or_else(|| Error::PathNotFound {
+                    path: key.clone(),
+                })?;
+                toml_edit_set(child, rest, value)
+            }
+            PathSegment::Index(idx) => Err(Error::PathSetFailed {
+                format: "Toml".to_string(),
+                path: format!("[{}]", idx),
+                reason: "Cannot index into a table".to_string(),
+            }),
+        }
+    }
+}
+
+/// Recursively navigate a `toml_edit::Item` tree along `segments` and remove
+/// the leaf. Handles Tables, InlineTables, ArrayOfTables, and inline Arrays
+/// so that no lossy round-trip through serde_json is needed.
+fn toml_edit_remove(item: &mut toml_edit::Item, segments: &[PathSegment]) -> Result<()> {
+    if segments.is_empty() {
+        return Err(Error::PathNotFound {
+            path: String::new(),
+        });
+    }
+
+    if segments.len() == 1 {
+        match &segments[0] {
+            PathSegment::Key(key) => match item {
+                toml_edit::Item::Table(t) => {
+                    if t.contains_key(key) {
+                        t.remove(key);
+                        Ok(())
+                    } else {
+                        Err(Error::PathNotFound { path: key.clone() })
+                    }
+                }
+                toml_edit::Item::Value(toml_edit::Value::InlineTable(t)) => {
+                    if t.contains_key(key) {
+                        t.remove(key);
+                        Ok(())
+                    } else {
+                        Err(Error::PathNotFound { path: key.clone() })
+                    }
+                }
+                _ => Err(Error::PathNotFound {
+                    path: key.clone(),
+                }),
+            },
+            PathSegment::Index(idx) => match item {
+                toml_edit::Item::Value(toml_edit::Value::Array(arr)) => {
+                    if *idx < arr.len() {
+                        arr.remove(*idx);
+                        Ok(())
+                    } else {
+                        Err(Error::PathNotFound {
+                            path: format!("[{}]", idx),
+                        })
+                    }
+                }
+                toml_edit::Item::ArrayOfTables(arr) => {
+                    if *idx < arr.len() {
+                        arr.remove(*idx);
+                        Ok(())
+                    } else {
+                        Err(Error::PathNotFound {
+                            path: format!("[{}]", idx),
+                        })
+                    }
+                }
+                _ => Err(Error::PathNotFound {
+                    path: format!("[{}]", idx),
+                }),
+            },
+        }
+    } else {
+        let (first, rest) = segments.split_first().unwrap();
+        match first {
+            PathSegment::Key(key) => match item {
+                toml_edit::Item::Table(t) => {
+                    let child = t.get_mut(key).ok_or_else(|| Error::PathNotFound {
+                        path: key.clone(),
+                    })?;
+                    toml_edit_remove(child, rest)
+                }
+                toml_edit::Item::Value(toml_edit::Value::InlineTable(t)) => {
+                    let child = t.get_mut(key).ok_or_else(|| Error::PathNotFound {
+                        path: key.clone(),
+                    })?;
+                    toml_edit_remove_value(child, rest)
+                }
+                _ => Err(Error::PathNotFound {
+                    path: key.clone(),
+                }),
+            },
+            PathSegment::Index(idx) => match item {
+                toml_edit::Item::ArrayOfTables(arr) => {
+                    let table = arr.get_mut(*idx).ok_or_else(|| Error::PathNotFound {
+                        path: format!("[{}]", idx),
+                    })?;
+                    toml_edit_remove_in_table(table, rest)
+                }
+                toml_edit::Item::Value(toml_edit::Value::Array(arr)) => {
+                    let child = arr.get_mut(*idx).ok_or_else(|| Error::PathNotFound {
+                        path: format!("[{}]", idx),
+                    })?;
+                    toml_edit_remove_value(child, rest)
+                }
+                _ => Err(Error::PathNotFound {
+                    path: format!("[{}]", idx),
+                }),
+            },
+        }
+    }
+}
+
+/// Helper: remove a value navigating from a `&mut toml_edit::Value`.
+fn toml_edit_remove_value(val: &mut toml_edit::Value, segments: &[PathSegment]) -> Result<()> {
+    if segments.is_empty() {
+        return Err(Error::PathNotFound {
+            path: String::new(),
+        });
+    }
+
+    if segments.len() == 1 {
+        match &segments[0] {
+            PathSegment::Key(key) => {
+                if let toml_edit::Value::InlineTable(t) = val {
+                    if t.contains_key(key) {
+                        t.remove(key);
+                        Ok(())
+                    } else {
+                        Err(Error::PathNotFound { path: key.clone() })
+                    }
+                } else {
+                    Err(Error::PathNotFound { path: key.clone() })
+                }
+            }
+            PathSegment::Index(idx) => {
+                if let toml_edit::Value::Array(arr) = val {
+                    if *idx < arr.len() {
+                        arr.remove(*idx);
+                        Ok(())
+                    } else {
+                        Err(Error::PathNotFound {
+                            path: format!("[{}]", idx),
+                        })
+                    }
+                } else {
+                    Err(Error::PathNotFound {
+                        path: format!("[{}]", idx),
+                    })
+                }
+            }
+        }
+    } else {
+        let (first, rest) = segments.split_first().unwrap();
+        match first {
+            PathSegment::Key(key) => {
+                if let toml_edit::Value::InlineTable(t) = val {
+                    let child = t.get_mut(key).ok_or_else(|| Error::PathNotFound {
+                        path: key.clone(),
+                    })?;
+                    toml_edit_remove_value(child, rest)
+                } else {
+                    Err(Error::PathNotFound { path: key.clone() })
+                }
+            }
+            PathSegment::Index(idx) => {
+                if let toml_edit::Value::Array(arr) = val {
+                    let child = arr.get_mut(*idx).ok_or_else(|| Error::PathNotFound {
+                        path: format!("[{}]", idx),
+                    })?;
+                    toml_edit_remove_value(child, rest)
+                } else {
+                    Err(Error::PathNotFound {
+                        path: format!("[{}]", idx),
+                    })
+                }
+            }
+        }
+    }
+}
+
+/// Helper: remove a value navigating from a `&mut toml_edit::Table`.
+fn toml_edit_remove_in_table(table: &mut toml_edit::Table, segments: &[PathSegment]) -> Result<()> {
+    if segments.is_empty() {
+        return Err(Error::PathNotFound {
+            path: String::new(),
+        });
+    }
+
+    if segments.len() == 1 {
+        match &segments[0] {
+            PathSegment::Key(key) => {
+                if table.contains_key(key) {
+                    table.remove(key);
+                    Ok(())
+                } else {
+                    Err(Error::PathNotFound { path: key.clone() })
+                }
+            }
+            PathSegment::Index(idx) => Err(Error::PathNotFound {
+                path: format!("[{}]", idx),
+            }),
+        }
+    } else {
+        let (first, rest) = segments.split_first().unwrap();
+        match first {
+            PathSegment::Key(key) => {
+                let child = table.get_mut(key).ok_or_else(|| Error::PathNotFound {
+                    path: key.clone(),
+                })?;
+                toml_edit_remove(child, rest)
+            }
+            PathSegment::Index(idx) => Err(Error::PathNotFound {
+                path: format!("[{}]", idx),
+            }),
         }
     }
 }

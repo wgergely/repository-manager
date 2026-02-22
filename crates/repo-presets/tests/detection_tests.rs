@@ -3,21 +3,13 @@
 //! Tests that providers correctly identify project types based on actual
 //! file structures, not just empty directories.
 
-use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
+mod common;
+
+use common::create_test_context;
 use repo_presets::provider::PresetProvider;
-use repo_presets::{Context, NodeProvider, PresetStatus, RustProvider, UvProvider};
-use std::collections::HashMap;
+use repo_presets::{ApplyReport, ApplyStatus, NodeProvider, PresetStatus, RustProvider, UvProvider};
 use std::fs;
 use tempfile::TempDir;
-
-fn create_test_context(temp: &TempDir) -> Context {
-    let layout = WorkspaceLayout {
-        root: NormalizedPath::new(temp.path()),
-        active_context: NormalizedPath::new(temp.path()),
-        mode: LayoutMode::Classic,
-    };
-    Context::new(layout, HashMap::new())
-}
 
 // ==========================================================================
 // Rust Provider Detection Tests
@@ -124,14 +116,19 @@ async fn test_rust_apply_is_detection_only() {
     let provider = RustProvider::new();
 
     let report = provider.apply(&context).await.unwrap();
-    assert!(report.success);
     assert!(
-        report
-            .actions_taken
-            .iter()
-            .any(|a| a.contains("detection-only")),
-        "Rust provider should indicate it's detection-only, got: {:?}",
-        report.actions_taken
+        report.is_detection_only(),
+        "RustProvider.apply() must return DetectionOnly status, got: {:?}",
+        report.status
+    );
+    assert_eq!(
+        report.status,
+        ApplyStatus::DetectionOnly,
+        "Status must be DetectionOnly, not Success or Failed"
+    );
+    assert!(
+        !report.is_success(),
+        "RustProvider.apply() must NOT return Success — it does no real work"
     );
 }
 
@@ -249,14 +246,19 @@ async fn test_node_apply_is_detection_only() {
     let provider = NodeProvider::new();
 
     let report = provider.apply(&context).await.unwrap();
-    assert!(report.success);
     assert!(
-        report
-            .actions_taken
-            .iter()
-            .any(|a| a.contains("detection-only")),
-        "Node provider should indicate it's detection-only, got: {:?}",
-        report.actions_taken
+        report.is_detection_only(),
+        "NodeProvider.apply() must return DetectionOnly status, got: {:?}",
+        report.status
+    );
+    assert_eq!(
+        report.status,
+        ApplyStatus::DetectionOnly,
+        "Status must be DetectionOnly, not Success or Failed"
+    );
+    assert!(
+        !report.is_success(),
+        "NodeProvider.apply() must NOT return Success — it does no real work"
     );
 }
 
@@ -325,4 +327,143 @@ async fn test_empty_project_all_providers_missing() {
     assert_ne!(rust_report.status, PresetStatus::Healthy);
     assert_ne!(node_report.status, PresetStatus::Healthy);
     assert_ne!(uv_report.status, PresetStatus::Healthy);
+}
+
+// ==========================================================================
+// Type-system detection-only tests (P2 task requirements)
+// ==========================================================================
+
+/// Verify that DetectionOnly and Success are distinguishable via the type system.
+/// This test MUST fail if detection_only() is swapped for success().
+#[test]
+fn test_detection_only_not_equal_to_success() {
+    let detection = ApplyReport::detection_only(vec!["detected".to_string()]);
+    let success = ApplyReport::success(vec!["applied".to_string()]);
+
+    // Status enum values must differ
+    assert_ne!(
+        detection.status, success.status,
+        "DetectionOnly and Success must be different ApplyStatus variants"
+    );
+
+    // Helper methods must give opposite results
+    assert!(detection.is_detection_only());
+    assert!(!detection.is_success());
+    assert!(success.is_success());
+    assert!(!success.is_detection_only());
+
+    // Neither is a failure
+    assert!(!detection.is_failure());
+    assert!(!success.is_failure());
+}
+
+/// Verify that ApplyStatus::DetectionOnly is a distinct variant from Success and Failed.
+#[test]
+fn test_apply_status_variants_are_distinct() {
+    let detection_only = ApplyStatus::DetectionOnly;
+    let success = ApplyStatus::Success;
+    let failed = ApplyStatus::Failed;
+
+    assert_ne!(detection_only, success);
+    assert_ne!(detection_only, failed);
+    assert_ne!(success, failed);
+}
+
+/// NodeProvider.check() correctly detects a Node.js project with package.json.
+#[tokio::test]
+async fn test_node_provider_check_detects_package_json() {
+    let temp = TempDir::new().unwrap();
+
+    // Create package.json so check() detects Node
+    fs::write(
+        temp.path().join("package.json"),
+        r#"{"name": "test-project", "version": "1.0.0"}"#,
+    )
+    .unwrap();
+
+    let context = create_test_context(&temp);
+    let provider = NodeProvider::new();
+
+    let report = provider.check(&context).await.unwrap();
+
+    // With package.json present, check() must NOT report Missing for package.json
+    // (it may report Missing for node_modules or Broken for missing node binary,
+    // but the key assertion is that it sees the package.json).
+    let missing_package_json = report.status == PresetStatus::Missing
+        && report
+            .details
+            .iter()
+            .any(|d| d.contains("package.json not found"));
+    assert!(
+        !missing_package_json,
+        "check() must detect package.json when it exists, got status={:?} details={:?}",
+        report.status,
+        report.details
+    );
+}
+
+/// RustProvider.check() correctly detects a Rust project with Cargo.toml.
+#[tokio::test]
+async fn test_rust_provider_check_detects_cargo_toml() {
+    let temp = TempDir::new().unwrap();
+
+    // Create Cargo.toml so check() detects Rust
+    fs::write(
+        temp.path().join("Cargo.toml"),
+        "[package]\nname = \"test-project\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    )
+    .unwrap();
+
+    let context = create_test_context(&temp);
+    let provider = RustProvider::new();
+
+    let report = provider.check(&context).await.unwrap();
+
+    // With Cargo.toml present, check() must not report Missing
+    assert_ne!(
+        report.status,
+        PresetStatus::Missing,
+        "check() must detect Cargo.toml when it exists — expected Healthy or Broken, got Missing"
+    );
+}
+
+/// UvProvider.apply() does real work (runs uv venv), so it must return Success, not DetectionOnly.
+/// Skip if uv is not installed.
+#[tokio::test]
+async fn test_uv_provider_apply_is_real_success() {
+    let provider = UvProvider::new();
+
+    // Check if uv is available; skip if not
+    let temp = TempDir::new().unwrap();
+    let context = create_test_context(&temp);
+
+    let check_report = provider.check(&context).await.unwrap();
+    if check_report.status == PresetStatus::Broken {
+        eprintln!("Skipping test: uv not available on this system");
+        return;
+    }
+
+    let report = provider.apply(&context).await.unwrap();
+
+    // UvProvider does real work (creates a venv), so it must NOT be DetectionOnly
+    assert!(
+        !report.is_detection_only(),
+        "UvProvider.apply() does real work and must NOT return DetectionOnly, got: {:?}",
+        report.status
+    );
+
+    // It should be Success (assuming uv is available and can create a venv)
+    assert!(
+        report.is_success(),
+        "UvProvider.apply() should return Success when it creates a venv, got: {:?}",
+        report.status
+    );
+
+    // Verify the side effect: venv directory was actually created
+    let venv_path = context.venv_path();
+    assert!(
+        venv_path.exists(),
+        "UvProvider.apply() must create the venv directory at {}",
+        venv_path
+    );
 }

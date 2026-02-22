@@ -74,6 +74,19 @@ impl FormatHandler for JsonFormatHandler {
             // Cannot add managed section to non-object JSON (e.g., array)
             return content.to_string();
         };
+
+        // Warn and replace if the existing key is not a valid managed section (user key collision)
+        if let Some(existing) = obj.get(MANAGED_KEY)
+            && !existing.is_object()
+        {
+            tracing::warn!(
+                "JSON key '{}' exists but is not an object — possible collision with user data. \
+                 The key will be overwritten by the managed block system.",
+                MANAGED_KEY
+            );
+            obj.insert(MANAGED_KEY.to_string(), Value::Object(Map::new()));
+        }
+
         let managed = obj
             .entry(MANAGED_KEY)
             .or_insert_with(|| Value::Object(Map::new()));
@@ -335,5 +348,22 @@ mod tests {
             parsed[MANAGED_KEY]["6ba7b810-9dad-11d1-80b4-00c04fd430c8"]["second"],
             2
         );
+    }
+
+    #[test]
+    fn test_write_block_overwrites_non_object_managed_key() {
+        let handler = JsonFormatHandler::new();
+        // Simulate user data that happens to use the reserved key as a non-object
+        let existing = format!(r#"{{"{MANAGED_KEY}": "user string value"}}"#, MANAGED_KEY = MANAGED_KEY);
+        let uuid = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+
+        let result = handler.write_block(&existing, uuid, r#"{"setting": true}"#);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+
+        // The managed key should now be an object with the block, overwriting the string
+        assert!(parsed[MANAGED_KEY].is_object());
+        assert!(parsed[MANAGED_KEY]["550e8400-e29b-41d4-a716-446655440000"]["setting"]
+            .as_bool()
+            .unwrap());
     }
 }

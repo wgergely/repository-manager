@@ -1006,6 +1006,7 @@ dependencies = [
  "repo-mcp",
  "repo-meta",
  "repo-presets",
+ "repo-test-utils",
  "repo-tools",
  "serde_json",
  "tempfile",
@@ -1560,6 +1561,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "toml",
+ "tracing",
  "uuid",
 ]
 
@@ -1580,6 +1582,7 @@ dependencies = [
  "repo-git",
  "repo-meta",
  "repo-presets",
+ "repo-test-utils",
  "repo-tools",
  "serde",
  "serde_json",
@@ -1614,6 +1617,7 @@ name = "repo-core"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "dirs",
  "fs2",
  "pretty_assertions",
  "repo-content",
@@ -1622,10 +1626,12 @@ dependencies = [
  "repo-git",
  "repo-meta",
  "repo-presets",
+ "repo-test-utils",
  "repo-tools",
  "rstest",
  "serde",
  "serde_json",
+ "serde_yaml",
  "tempfile",
  "thiserror 2.0.18",
  "toml",
@@ -1694,9 +1700,11 @@ name = "repo-mcp"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "git2",
  "repo-core",
  "repo-extensions",
  "repo-fs",
+ "repo-git",
  "repo-meta",
  "rstest",
  "serde",
@@ -1742,17 +1750,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "repo-test-utils"
+version = "0.1.0"
+dependencies = [
+ "git2",
+ "tempfile",
+]
+
+[[package]]
 name = "repo-tools"
 version = "0.1.0"
 dependencies = [
  "insta",
  "pretty_assertions",
+ "regex",
  "repo-blocks",
  "repo-fs",
  "repo-meta",
  "rstest",
  "serde",
  "serde_json",
+ "serde_yaml",
  "tempfile",
  "thiserror 2.0.18",
  "tracing",

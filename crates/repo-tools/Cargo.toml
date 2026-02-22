@@ -19,3 +19,5 @@ tempfile = { workspace = true }
 rstest = { workspace = true }
 pretty_assertions = { workspace = true }
 insta = { workspace = true }
+serde_yaml = { workspace = true }
+regex = { workspace = true }

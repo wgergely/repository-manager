@@ -7,15 +7,13 @@ use repo_core::sync::{CheckReport, CheckStatus, DriftItem, SyncEngine};
 use repo_fs::NormalizedPath;
 use serde_json::json;
 use std::fs;
-use tempfile::tempdir;
+use repo_test_utils::git::fake_git_dir;
+use tempfile::TempDir;
 use uuid::Uuid;
 
-/// Helper to set up a standard git repo for testing
-fn setup_git_repo() -> tempfile::TempDir {
-    let dir = tempdir().unwrap();
-    fs::create_dir(dir.path().join(".git")).unwrap();
-    fs::write(dir.path().join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
-    fs::create_dir_all(dir.path().join(".git/refs/heads")).unwrap();
+fn setup_git_repo() -> TempDir {
+    let dir = TempDir::new().unwrap();
+    fake_git_dir(dir.path());
     dir
 }
 
@@ -219,7 +217,7 @@ fn test_check_healthy_when_text_block_marker_present() {
     fs::write(config_dir.join("test.mdc"), &text_content).unwrap();
 
     // Compute real checksum for the text block content
-    let text_checksum = repo_core::sync::compute_content_checksum(&text_content);
+    let text_checksum = repo_fs::checksum::compute_content_checksum(&text_content);
 
     // Create .repository directory and ledger
     let repo_dir = temp.path().join(".repository");

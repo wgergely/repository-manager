@@ -10,11 +10,13 @@
 use std::fs;
 use std::path::Path;
 
+use git2::Repository;
 use repo_core::{
     CheckStatus, Manifest, Mode, ModeBackend, StandardBackend, SyncEngine, SyncOptions,
     WorktreeBackend,
 };
 use repo_fs::NormalizedPath;
+use repo_git::{ClassicLayout, ContainerLayout, LayoutProvider};
 use repo_meta::Registry;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -35,10 +37,11 @@ pub async fn handle_tool_call(root: &Path, tool_name: &str, arguments: Value) ->
         "branch_create" => handle_branch_create(root, arguments).await,
         "branch_delete" => handle_branch_delete(root, arguments).await,
 
-        // Git Primitives (not implemented)
-        "git_push" => Err(Error::NotImplemented("git_push".to_string())),
-        "git_pull" => Err(Error::NotImplemented("git_pull".to_string())),
-        "git_merge" => Err(Error::NotImplemented("git_merge".to_string())),
+        // Git Primitives
+        "git_push" => handle_git_push(root, arguments).await,
+        "git_pull" => handle_git_pull(root, arguments).await,
+        "git_merge" => handle_git_merge(root, arguments).await,
+
 
         // Configuration Management
         "tool_add" => handle_tool_add(root, arguments).await,
@@ -401,6 +404,135 @@ async fn handle_branch_delete(root: &Path, arguments: Value) -> Result<Value> {
 }
 
 // ============================================================================
+// Git Primitive Handlers
+// ============================================================================
+
+/// Arguments for git_push
+#[derive(Debug, Deserialize)]
+struct GitPushArgs {
+    #[serde(default)]
+    remote: Option<String>,
+    #[serde(default)]
+    branch: Option<String>,
+}
+
+/// Handle git_push - Push current branch to remote
+async fn handle_git_push(root: &Path, arguments: Value) -> Result<Value> {
+    let args: GitPushArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    let ctx = RepoContext::new(root)?;
+    let provider = create_git_provider(&ctx.root, ctx.mode)?;
+    let repo = Repository::open(provider.main_worktree().to_native())
+        .map_err(repo_git::Error::from)?;
+
+    let remote_name = args.remote.as_deref().unwrap_or("origin");
+    let branch_ref = args.branch.as_deref();
+
+    // Resolve the branch name for reporting before the closure consumes provider
+    let pushed_branch = match &args.branch {
+        Some(b) => b.clone(),
+        None => provider
+            .current_branch()
+            .unwrap_or_else(|_| "unknown".to_string()),
+    };
+
+    let current_branch_fn = || provider.current_branch();
+    repo_git::push(&repo, Some(remote_name), branch_ref, current_branch_fn)?;
+
+    Ok(json!({
+        "success": true,
+        "remote": remote_name,
+        "branch": pushed_branch,
+        "message": format!("Pushed '{}' to '{}'", pushed_branch, remote_name),
+    }))
+}
+
+/// Arguments for git_pull
+#[derive(Debug, Deserialize)]
+struct GitPullArgs {
+    #[serde(default)]
+    remote: Option<String>,
+    #[serde(default)]
+    branch: Option<String>,
+}
+
+/// Handle git_pull - Pull changes from remote
+async fn handle_git_pull(root: &Path, arguments: Value) -> Result<Value> {
+    let args: GitPullArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    let ctx = RepoContext::new(root)?;
+    let provider = create_git_provider(&ctx.root, ctx.mode)?;
+    let repo = Repository::open(provider.main_worktree().to_native())
+        .map_err(repo_git::Error::from)?;
+
+    let remote_name = args.remote.as_deref().unwrap_or("origin");
+    let branch_ref = args.branch.as_deref();
+
+    // Resolve the branch name for reporting before the closure consumes provider
+    let pulled_branch = match &args.branch {
+        Some(b) => b.clone(),
+        None => provider
+            .current_branch()
+            .unwrap_or_else(|_| "unknown".to_string()),
+    };
+
+    let current_branch_fn = || provider.current_branch();
+    repo_git::pull(&repo, Some(remote_name), branch_ref, current_branch_fn, None)?;
+
+    Ok(json!({
+        "success": true,
+        "remote": remote_name,
+        "branch": pulled_branch,
+        "message": format!("Pulled '{}' from '{}'", pulled_branch, remote_name),
+    }))
+}
+
+/// Arguments for git_merge
+#[derive(Debug, Deserialize)]
+struct GitMergeArgs {
+    source: String,
+}
+
+/// Handle git_merge - Merge a branch into the current branch
+async fn handle_git_merge(root: &Path, arguments: Value) -> Result<Value> {
+    let args: GitMergeArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    let ctx = RepoContext::new(root)?;
+    let provider = create_git_provider(&ctx.root, ctx.mode)?;
+    let repo = Repository::open(provider.main_worktree().to_native())
+        .map_err(repo_git::Error::from)?;
+
+    let current_branch_fn = || provider.current_branch();
+    repo_git::merge(&repo, &args.source, current_branch_fn, None)?;
+
+    Ok(json!({
+        "success": true,
+        "source": args.source,
+        "message": format!("Merged '{}' into current branch", args.source),
+    }))
+}
+
+/// Create a LayoutProvider for git operations based on detected mode.
+fn create_git_provider(
+    root: &NormalizedPath,
+    mode: Mode,
+) -> Result<Box<dyn LayoutProvider>> {
+    match mode {
+        Mode::Standard => {
+            let layout = ClassicLayout::new(root.clone())?;
+            Ok(Box::new(layout))
+        }
+        Mode::Worktrees => {
+            let layout = ContainerLayout::new(root.clone(), Default::default())?;
+            Ok(Box::new(layout))
+        }
+    }
+}
+
+// ============================================================================
 // Configuration Management Handlers
 // ============================================================================
 
@@ -499,17 +631,9 @@ async fn handle_rule_add(root: &Path, arguments: Value) -> Result<Value> {
     let normalized_root = NormalizedPath::new(root);
     let rules_dir = find_rules_dir(&normalized_root)?;
 
-    // Validate rule ID (alphanumeric and hyphens only)
-    if !args
-        .id
-        .chars()
-        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-    {
-        return Err(Error::InvalidArgument(
-            "Rule ID must contain only alphanumeric characters, hyphens, and underscores"
-                .to_string(),
-        ));
-    }
+    // Validate rule ID
+    repo_core::validate_rule_id(&args.id)
+        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
 
     // Create the rule file
     let rule_path = rules_dir.join(&format!("{}.md", args.id));
@@ -547,17 +671,9 @@ async fn handle_rule_remove(root: &Path, arguments: Value) -> Result<Value> {
     let args: RuleRemoveArgs =
         serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
 
-    // Validate rule ID (same validation as rule_add to prevent path traversal)
-    if !args
-        .id
-        .chars()
-        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
-    {
-        return Err(Error::InvalidArgument(
-            "Rule ID must contain only alphanumeric characters, hyphens, and underscores"
-                .to_string(),
-        ));
-    }
+    // Validate rule ID
+    repo_core::validate_rule_id(&args.id)
+        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
 
     let normalized_root = NormalizedPath::new(root);
     let rules_dir = find_rules_dir(&normalized_root)?;
@@ -692,93 +808,24 @@ async fn handle_preset_remove(root: &Path, arguments: Value) -> Result<Value> {
 // Extension Management Handlers
 // ============================================================================
 
-/// Arguments for extension_install
-#[derive(Debug, Deserialize)]
-struct ExtensionInstallArgs {
-    source: String,
-}
-
 /// Handle extension_install - Install an extension from a URL or local path
-async fn handle_extension_install(arguments: Value) -> Result<Value> {
-    let args: ExtensionInstallArgs =
-        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
-
-    // Stub: actual install logic (clone, validate manifest, activate) comes later
-    Ok(json!({
-        "success": true,
-        "source": args.source,
-        "message": format!("Extension install from '{}' (stub - not yet implemented)", args.source),
-    }))
-}
-
-/// Arguments for extension_add
-#[derive(Debug, Deserialize)]
-struct ExtensionAddArgs {
-    name: String,
+async fn handle_extension_install(_arguments: Value) -> Result<Value> {
+    Err(Error::NotImplemented("extension_install".to_string()))
 }
 
 /// Handle extension_add - Add a known extension by name from the registry
-async fn handle_extension_add(arguments: Value) -> Result<Value> {
-    use repo_extensions::ExtensionRegistry;
-
-    let args: ExtensionAddArgs =
-        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
-
-    let registry = ExtensionRegistry::with_known();
-    if let Some(entry) = registry.get(&args.name) {
-        // Stub: actual add logic (resolve from registry, install, activate) comes later
-        Ok(json!({
-            "success": true,
-            "name": args.name,
-            "description": entry.description,
-            "source": entry.source,
-            "message": format!("Extension '{}' added (stub - not yet implemented)", args.name),
-        }))
-    } else {
-        Ok(json!({
-            "success": false,
-            "name": args.name,
-            "message": format!("Extension '{}' is not in the known registry. Use extension_install with a source URL instead.", args.name),
-        }))
-    }
-}
-
-/// Arguments for extension_init
-#[derive(Debug, Deserialize)]
-struct ExtensionInitArgs {
-    name: String,
+async fn handle_extension_add(_arguments: Value) -> Result<Value> {
+    Err(Error::NotImplemented("extension_add".to_string()))
 }
 
 /// Handle extension_init - Initialize a new extension scaffold
-async fn handle_extension_init(arguments: Value) -> Result<Value> {
-    let args: ExtensionInitArgs =
-        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
-
-    // Stub: actual init logic (create repo_extension.toml, directory structure) comes later
-    Ok(json!({
-        "success": true,
-        "name": args.name,
-        "message": format!("Extension '{}' initialized (stub - not yet implemented)", args.name),
-    }))
-}
-
-/// Arguments for extension_remove
-#[derive(Debug, Deserialize)]
-struct ExtensionRemoveArgs {
-    name: String,
+async fn handle_extension_init(_arguments: Value) -> Result<Value> {
+    Err(Error::NotImplemented("extension_init".to_string()))
 }
 
 /// Handle extension_remove - Remove an installed extension
-async fn handle_extension_remove(arguments: Value) -> Result<Value> {
-    let args: ExtensionRemoveArgs =
-        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
-
-    // Stub: actual remove logic (deactivate, remove files, update config) comes later
-    Ok(json!({
-        "success": true,
-        "name": args.name,
-        "message": format!("Extension '{}' removed (stub - not yet implemented)", args.name),
-    }))
+async fn handle_extension_remove(_arguments: Value) -> Result<Value> {
+    Err(Error::NotImplemented("extension_remove".to_string()))
 }
 
 /// Handle extension_list - List installed and known extensions
@@ -839,41 +886,13 @@ impl RepoContext {
     }
 }
 
-/// Detect the repository mode from the filesystem
+/// Detect the repository mode from filesystem markers and configuration.
+///
+/// Delegates to [`repo_core::detect_mode`] which checks filesystem markers
+/// (`.gt`, `.git`) and falls back to `.repository/config.toml` via ConfigResolver.
+/// Defaults to Standard mode when no indicators are found.
 fn detect_mode(root: &NormalizedPath) -> Result<Mode> {
-    // Check for .gt (worktree container)
-    if root.join(".gt").exists() {
-        return Ok(Mode::Worktrees);
-    }
-
-    // Check for .git (standard repo)
-    if root.join(".git").exists() {
-        return Ok(Mode::Standard);
-    }
-
-    // Check if we're inside a worktree (look for .repository in parent)
-    if let Some(parent) = root.as_ref().parent() {
-        let parent_path = NormalizedPath::new(parent);
-        if parent_path.join(".gt").exists() {
-            return Ok(Mode::Worktrees);
-        }
-    }
-
-    // Check for config.toml to determine mode
-    let config_path = find_config_path(root).ok();
-    if let Some(path) = config_path
-        && let Ok(content) = fs::read_to_string(path.as_ref())
-        && let Ok(manifest) = Manifest::parse(&content)
-    {
-        return manifest
-            .core
-            .mode
-            .parse()
-            .map_err(|_| Error::InvalidArgument("Invalid mode in config".to_string()));
-    }
-
-    // Default to standard mode
-    Ok(Mode::Standard)
+    repo_core::detect_mode(root).map_err(Error::Core)
 }
 
 /// Create the appropriate backend for the detected mode
@@ -1096,16 +1115,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_handle_not_implemented() {
+    async fn test_git_handlers_no_longer_return_not_implemented() {
         let temp = TempDir::new().unwrap();
         create_test_repo(temp.path());
+        // Initialize a real git repo so the handlers can proceed past mode detection
+        Repository::init(temp.path()).unwrap();
 
         for tool in &["git_push", "git_pull", "git_merge"] {
-            let result = handle_tool_call(temp.path(), tool, json!({})).await;
-            assert!(result.is_err());
-            match result {
-                Err(Error::NotImplemented(_)) => {}
-                _ => panic!("Expected NotImplemented error for {}", tool),
+            let args = if *tool == "git_merge" {
+                json!({"source": "nonexistent-branch"})
+            } else {
+                json!({})
+            };
+            let result = handle_tool_call(temp.path(), tool, args).await;
+            // The handlers should NOT return NotImplemented anymore.
+            // They may return other errors (e.g., no remote, no branch) but
+            // the key assertion is that NotImplemented is gone.
+            if let Err(Error::NotImplemented(name)) = &result {
+                panic!("{} still returns NotImplemented - it should be implemented now", name);
             }
         }
     }
@@ -1333,7 +1360,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_handle_extension_install() {
+    async fn test_handle_extension_install_returns_not_implemented() {
         let temp = TempDir::new().unwrap();
         let result = handle_tool_call(
             temp.path(),
@@ -1342,65 +1369,90 @@ mod tests {
         )
         .await;
 
-        assert!(result.is_ok());
-        let value = result.unwrap();
-        assert_eq!(value.get("success"), Some(&json!(true)));
-        assert_eq!(
-            value.get("source"),
-            Some(&json!("https://github.com/example/ext.git"))
-        );
+        assert!(result.is_err(), "extension_install must return an error");
+        match result {
+            Err(Error::NotImplemented(name)) => {
+                assert_eq!(name, "extension_install");
+            }
+            other => panic!(
+                "Expected NotImplemented error for extension_install, got: {:?}",
+                other
+            ),
+        }
     }
 
     #[tokio::test]
-    async fn test_handle_extension_add_known() {
+    async fn test_handle_extension_add_returns_not_implemented() {
         let temp = TempDir::new().unwrap();
         let result =
             handle_tool_call(temp.path(), "extension_add", json!({ "name": "vaultspec" })).await;
 
-        assert!(result.is_ok());
-        let value = result.unwrap();
-        assert_eq!(value.get("success"), Some(&json!(true)));
-        assert_eq!(value.get("name"), Some(&json!("vaultspec")));
-        assert!(value.get("source").is_some());
+        assert!(result.is_err(), "extension_add must return an error");
+        match result {
+            Err(Error::NotImplemented(name)) => {
+                assert_eq!(name, "extension_add");
+            }
+            other => panic!(
+                "Expected NotImplemented error for extension_add, got: {:?}",
+                other
+            ),
+        }
     }
 
     #[tokio::test]
-    async fn test_handle_extension_add_unknown() {
-        let temp = TempDir::new().unwrap();
-        let result = handle_tool_call(
-            temp.path(),
-            "extension_add",
-            json!({ "name": "nonexistent" }),
-        )
-        .await;
-
-        assert!(result.is_ok());
-        let value = result.unwrap();
-        assert_eq!(value.get("success"), Some(&json!(false)));
-    }
-
-    #[tokio::test]
-    async fn test_handle_extension_init() {
+    async fn test_handle_extension_init_returns_not_implemented() {
         let temp = TempDir::new().unwrap();
         let result =
             handle_tool_call(temp.path(), "extension_init", json!({ "name": "my-ext" })).await;
 
-        assert!(result.is_ok());
-        let value = result.unwrap();
-        assert_eq!(value.get("success"), Some(&json!(true)));
-        assert_eq!(value.get("name"), Some(&json!("my-ext")));
+        assert!(result.is_err(), "extension_init must return an error");
+        match result {
+            Err(Error::NotImplemented(name)) => {
+                assert_eq!(name, "extension_init");
+            }
+            other => panic!(
+                "Expected NotImplemented error for extension_init, got: {:?}",
+                other
+            ),
+        }
     }
 
     #[tokio::test]
-    async fn test_handle_extension_remove() {
+    async fn test_handle_extension_remove_returns_not_implemented() {
         let temp = TempDir::new().unwrap();
         let result =
             handle_tool_call(temp.path(), "extension_remove", json!({ "name": "my-ext" })).await;
 
-        assert!(result.is_ok());
-        let value = result.unwrap();
-        assert_eq!(value.get("success"), Some(&json!(true)));
-        assert_eq!(value.get("name"), Some(&json!("my-ext")));
+        assert!(result.is_err(), "extension_remove must return an error");
+        match result {
+            Err(Error::NotImplemented(name)) => {
+                assert_eq!(name, "extension_remove");
+            }
+            other => panic!(
+                "Expected NotImplemented error for extension_remove, got: {:?}",
+                other
+            ),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_extension_handlers_return_not_implemented() {
+        // Extension handlers should still return NotImplemented
+        let temp = TempDir::new().unwrap();
+
+        let extension_tools = ["extension_install", "extension_add", "extension_init", "extension_remove"];
+
+        for tool in extension_tools.iter() {
+            let result = handle_tool_call(temp.path(), tool, json!({})).await;
+            assert!(result.is_err(), "{} must return an error", tool);
+            match result {
+                Err(Error::NotImplemented(_)) => {}
+                other => panic!(
+                    "Expected NotImplemented error for {}, got: {:?}",
+                    tool, other
+                ),
+            }
+        }
     }
 
     #[tokio::test]

@@ -7,7 +7,9 @@ use std::path::Path;
 use colored::Colorize;
 use serde_json::json;
 
-use repo_core::{CheckStatus, ConfigResolver, Mode, SyncEngine, SyncOptions};
+use repo_core::config::Manifest;
+use repo_core::hooks::{HookContext, HookEvent, run_hooks};
+use repo_core::{CheckStatus, Mode, SyncEngine, SyncOptions};
 use repo_fs::NormalizedPath;
 
 use crate::context::{RepoContext, detect_context};
@@ -34,23 +36,27 @@ pub fn resolve_root(path: &Path) -> Result<NormalizedPath> {
 
 /// Detect the repository mode from config.toml
 ///
-/// Reads the mode from `.repository/config.toml` using ConfigResolver.
-/// Defaults to Standard mode if no config exists.
+/// Delegates to [`repo_core::detect_mode`] which checks filesystem markers
+/// (`.gt`, `.git`) and falls back to `.repository/config.toml` via ConfigResolver.
+/// Defaults to Standard mode when no indicators are found.
 pub fn detect_mode(root: &NormalizedPath) -> Result<Mode> {
-    let resolver = ConfigResolver::new(root.clone());
+    Ok(repo_core::detect_mode(root)?)
+}
 
-    if !resolver.has_config() {
-        // No config file, default to worktrees mode (per spec)
-        return Ok(Mode::Worktrees);
+/// Load hooks from config.toml if it exists
+fn load_hooks(path: &Path) -> Vec<repo_core::hooks::HookConfig> {
+    let config_path = path.join(".repository").join("config.toml");
+    if !config_path.exists() {
+        return Vec::new();
     }
-
-    let config = resolver.resolve()?;
-    let mode: Mode = config
-        .mode
-        .parse()
-        .map_err(|e: repo_meta::Error| CliError::user(format!("Invalid mode in config: {}", e)))?;
-
-    Ok(mode)
+    let content = match std::fs::read_to_string(&config_path) {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+    match Manifest::parse(&content) {
+        Ok(m) => m.hooks,
+        Err(_) => Vec::new(),
+    }
 }
 
 /// Run the check command
@@ -135,7 +141,14 @@ pub fn run_check(path: &Path) -> Result<()> {
 pub fn run_sync(path: &Path, dry_run: bool, json_output: bool) -> Result<()> {
     let root = resolve_root(path)?;
     let mode = detect_mode(&root)?;
+    let hooks = load_hooks(root.as_ref());
     let engine = SyncEngine::new(root.clone(), mode)?;
+
+    // Pre-sync hooks
+    let hook_context = HookContext::for_sync();
+    if let Err(e) = run_hooks(&hooks, HookEvent::PreSync, &hook_context, root.as_ref()) {
+        println!("{} Pre-sync hook failed: {}", "warn:".yellow().bold(), e);
+    }
 
     let options = SyncOptions { dry_run };
     let report = engine.sync_with_options(options)?;
@@ -197,6 +210,13 @@ pub fn run_sync(path: &Path, dry_run: bool, json_output: bool) -> Result<()> {
             }
             return Err(CliError::user("Synchronization failed"));
         }
+    }
+
+    // Post-sync hooks (only after successful sync)
+    if report.success
+        && let Err(e) = run_hooks(&hooks, HookEvent::PostSync, &hook_context, root.as_ref())
+    {
+        println!("{} Post-sync hook failed: {}", "warn:".yellow().bold(), e);
     }
 
     Ok(())
@@ -308,9 +328,13 @@ mod tests {
     use tempfile::TempDir;
 
     fn create_minimal_repo(dir: &Path, mode: &str) {
-        // Create .git directory to simulate git repo
-        let git_dir = dir.join(".git");
-        fs::create_dir_all(&git_dir).unwrap();
+        // Create filesystem marker matching the mode
+        if mode == "worktrees" {
+            fs::create_dir_all(dir.join(".gt")).unwrap();
+            fs::create_dir_all(dir.join("main")).unwrap();
+        } else {
+            fs::create_dir_all(dir.join(".git")).unwrap();
+        }
 
         // Create .repository directory
         let repo_dir = dir.join(".repository");
@@ -393,10 +417,10 @@ mode = "{}"
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
 
-        // No config file - should default to worktrees (per spec)
+        // No config file and no filesystem markers - defaults to Standard
         let root = NormalizedPath::new(path);
         let mode = detect_mode(&root).unwrap();
-        assert_eq!(mode, Mode::Worktrees);
+        assert_eq!(mode, Mode::Standard);
     }
 
     #[test]

@@ -213,6 +213,10 @@ fn test_cursor_multiline_rule_content() {
 
     let content = fs::read_to_string(temp_dir.path().join(".cursorrules")).unwrap();
 
+    // Format: managed block structure wraps multiline content
+    assert!(content.contains("<!-- repo:block:multiline -->"));
+    assert!(content.contains("<!-- /repo:block:multiline -->"));
+
     assert!(content.contains("Line 1"));
     assert!(content.contains("Line 2"));
     assert!(content.contains("Line 3"));

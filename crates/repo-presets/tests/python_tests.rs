@@ -1,5 +1,8 @@
 //! Integration tests for Python providers
 
+mod common;
+
+use common::create_test_context;
 use repo_fs::{LayoutMode, NormalizedPath, WorkspaceLayout};
 use repo_presets::PresetStatus;
 use repo_presets::context::Context;
@@ -8,15 +11,6 @@ use repo_presets::python::UvProvider;
 use std::collections::HashMap;
 use std::fs;
 use tempfile::TempDir;
-
-fn create_test_context(temp: &TempDir) -> Context {
-    let layout = WorkspaceLayout {
-        root: NormalizedPath::new(temp.path()),
-        active_context: NormalizedPath::new(temp.path()),
-        mode: LayoutMode::Classic,
-    };
-    Context::new(layout, HashMap::new())
-}
 
 fn create_context_with_config(temp: &TempDir, config: HashMap<String, toml::Value>) -> Context {
     let layout = WorkspaceLayout {

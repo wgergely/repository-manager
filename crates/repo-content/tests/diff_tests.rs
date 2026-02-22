@@ -1,4 +1,6 @@
-//! Integration tests for semantic diff
+//! Tests for semantic diff
+//!
+//! Category: component
 
 use repo_content::{Document, SemanticChange};
 use serde_json::json;

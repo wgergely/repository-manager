@@ -278,7 +278,7 @@ impl McpInstaller {
                         .spec
                         .field_mappings
                         .sse_url_field
-                        .map_or(false, |f| obj.contains_key(f));
+                        .is_some_and(|f| obj.contains_key(f));
                 if !has_command && !has_url {
                     issues.push("Server entry has neither 'command' nor a URL field".into());
                 }
