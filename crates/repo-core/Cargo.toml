@@ -33,6 +33,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+repo-test-utils = { path = "../repo-test-utils" }
 tempfile = { workspace = true }
 rstest = { workspace = true }
 pretty_assertions = { workspace = true }

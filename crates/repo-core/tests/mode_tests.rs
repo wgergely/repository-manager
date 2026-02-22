@@ -3,6 +3,7 @@
 use repo_core::backend::{ModeBackend, StandardBackend, WorktreeBackend};
 use repo_core::mode::Mode;
 use repo_fs::NormalizedPath;
+use repo_test_utils::git::fake_git_dir;
 use std::fs;
 use tempfile::TempDir;
 
@@ -54,25 +55,10 @@ fn test_mode_display() {
 // StandardBackend tests
 // =============================================================================
 
-fn setup_standard_repo() -> TempDir {
-    let dir = TempDir::new().unwrap();
-
-    // Create a basic git repository structure
-    fs::create_dir(dir.path().join(".git")).unwrap();
-
-    // Create HEAD file to make it look like a real repo
-    fs::write(dir.path().join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
-
-    // Create refs structure
-    fs::create_dir_all(dir.path().join(".git/refs/heads")).unwrap();
-    fs::write(dir.path().join(".git/refs/heads/main"), "").unwrap();
-
-    dir
-}
-
 #[test]
 fn test_standard_backend_new_valid() {
-    let temp = setup_standard_repo();
+    let temp = TempDir::new().unwrap();
+    fake_git_dir(temp.path());
     let root = NormalizedPath::new(temp.path());
 
     let backend = StandardBackend::new(root);
@@ -91,7 +77,8 @@ fn test_standard_backend_new_invalid() {
 
 #[test]
 fn test_standard_backend_config_root() {
-    let temp = setup_standard_repo();
+    let temp = TempDir::new().unwrap();
+    fake_git_dir(temp.path());
     let root = NormalizedPath::new(temp.path());
 
     let backend = StandardBackend::new(root.clone()).unwrap();
@@ -104,7 +91,8 @@ fn test_standard_backend_config_root() {
 
 #[test]
 fn test_standard_backend_working_dir() {
-    let temp = setup_standard_repo();
+    let temp = TempDir::new().unwrap();
+    fake_git_dir(temp.path());
     let root = NormalizedPath::new(temp.path());
 
     let backend = StandardBackend::new(root.clone()).unwrap();
