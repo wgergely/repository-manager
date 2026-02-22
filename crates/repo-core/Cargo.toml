@@ -37,3 +37,4 @@ repo-test-utils = { path = "../repo-test-utils" }
 tempfile = { workspace = true }
 rstest = { workspace = true }
 pretty_assertions = { workspace = true }
+serde_yaml = { workspace = true }
