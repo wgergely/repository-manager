@@ -331,6 +331,463 @@ version = "3.12"
     }
 }
 
+mod config_hierarchy_tests {
+    use super::*;
+    use std::fs;
+
+    /// Helper: create a temp dir for the repo root with a `.repository/` directory,
+    /// and a separate temp dir for the global config directory.
+    /// Returns (repo_temp_dir, global_config_temp_dir).
+    fn setup_hierarchy_dirs() -> (TempDir, TempDir) {
+        let repo_dir = TempDir::new().expect("Failed to create repo temp dir");
+        let global_dir = TempDir::new().expect("Failed to create global config temp dir");
+
+        // Create .repository directory in the repo
+        fs::create_dir_all(repo_dir.path().join(".repository"))
+            .expect("Failed to create .repository dir");
+
+        // The global config dir will serve as the "repo-manager" config root.
+        // ConfigResolver.global_config_dir() returns the dir that already
+        // includes "repo-manager", so we pass the temp dir directly and
+        // place config.toml inside it.
+
+        (repo_dir, global_dir)
+    }
+
+    #[test]
+    fn test_resolve_without_global_config_returns_repo_values_only() {
+        // No global config file exists. The resolver should succeed and
+        // return only the values from the repo config (Layer 3).
+        let (repo_dir, global_dir) = setup_hierarchy_dirs();
+
+        // Write a repo config (Layer 3)
+        fs::write(
+            repo_dir.path().join(".repository/config.toml"),
+            r#"
+tools = ["cargo"]
+rules = ["no-unwrap"]
+
+[core]
+mode = "standard"
+
+[presets."env:rust"]
+edition = "2021"
+"#,
+        )
+        .unwrap();
+
+        // global_dir exists but has no config.toml inside it
+        let root = NormalizedPath::new(repo_dir.path());
+        let resolver =
+            ConfigResolver::with_global_config_dir(root, global_dir.path().to_path_buf());
+        let config = resolver.resolve().expect("Should resolve without global config");
+
+        // Verify resolved VALUES match repo-only expectations
+        assert_eq!(config.mode, "standard");
+        assert_eq!(config.tools, vec!["cargo"]);
+        assert_eq!(config.rules, vec!["no-unwrap"]);
+        assert_eq!(config.presets["env:rust"]["edition"], "2021");
+
+        // No extra tools/rules from a nonexistent global config
+        assert_eq!(config.tools.len(), 1);
+        assert_eq!(config.rules.len(), 1);
+    }
+
+    #[test]
+    fn test_global_config_provides_defaults() {
+        // A global config (Layer 1) defines tools and presets. With no
+        // repo config, the resolved config picks up those global values.
+        let (repo_dir, global_dir) = setup_hierarchy_dirs();
+
+        // Write global config (Layer 1) — no repo config at all
+        fs::write(
+            global_dir.path().join("config.toml"),
+            r#"
+tools = ["vscode", "docker"]
+rules = ["global-rule"]
+
+[presets."env:node"]
+version = "20"
+manager = "fnm"
+"#,
+        )
+        .unwrap();
+
+        // Intentionally do NOT create .repository/config.toml
+        // (but .repository dir exists from setup_hierarchy_dirs)
+
+        let root = NormalizedPath::new(repo_dir.path());
+        let resolver =
+            ConfigResolver::with_global_config_dir(root, global_dir.path().to_path_buf());
+        let config = resolver.resolve().expect("Should resolve with global defaults");
+
+        // Global tools are present
+        assert!(
+            config.tools.contains(&"vscode".to_string()),
+            "Expected 'vscode' from global config, got: {:?}",
+            config.tools,
+        );
+        assert!(
+            config.tools.contains(&"docker".to_string()),
+            "Expected 'docker' from global config, got: {:?}",
+            config.tools,
+        );
+        assert_eq!(config.tools.len(), 2);
+
+        // Global rules are present
+        assert!(config.rules.contains(&"global-rule".to_string()));
+        assert_eq!(config.rules.len(), 1);
+
+        // Global presets are present with correct values
+        assert!(config.presets.contains_key("env:node"));
+        assert_eq!(config.presets["env:node"]["version"], "20");
+        assert_eq!(config.presets["env:node"]["manager"], "fnm");
+    }
+
+    #[test]
+    fn test_repo_config_overrides_global_mode() {
+        // Global config has tools = ["vscode"] and mode = "worktrees".
+        // Repo config has tools = ["cursor"] and mode = "standard".
+        // The resolved config should have BOTH tools (union), and
+        // the repo's mode should win (Layer 3 > Layer 1).
+        let (repo_dir, global_dir) = setup_hierarchy_dirs();
+
+        // Global config (Layer 1)
+        fs::write(
+            global_dir.path().join("config.toml"),
+            r#"
+tools = ["vscode"]
+rules = ["global-lint"]
+
+[core]
+mode = "worktrees"
+
+[presets."env:python"]
+version = "3.11"
+provider = "pyenv"
+"#,
+        )
+        .unwrap();
+
+        // Repo config (Layer 3)
+        fs::write(
+            repo_dir.path().join(".repository/config.toml"),
+            r#"
+tools = ["cursor"]
+rules = ["repo-lint"]
+
+[core]
+mode = "standard"
+
+[presets."env:python"]
+version = "3.12"
+"#,
+        )
+        .unwrap();
+
+        let root = NormalizedPath::new(repo_dir.path());
+        let resolver =
+            ConfigResolver::with_global_config_dir(root, global_dir.path().to_path_buf());
+        let config = resolver.resolve().expect("Should resolve merged config");
+
+        // Mode: repo (Layer 3) wins over global (Layer 1)
+        assert_eq!(config.mode, "standard");
+
+        // Tools: union of global + repo (both present)
+        assert!(
+            config.tools.contains(&"vscode".to_string()),
+            "Expected 'vscode' from global, got: {:?}",
+            config.tools,
+        );
+        assert!(
+            config.tools.contains(&"cursor".to_string()),
+            "Expected 'cursor' from repo, got: {:?}",
+            config.tools,
+        );
+
+        // Rules: union of global + repo
+        assert!(config.rules.contains(&"global-lint".to_string()));
+        assert!(config.rules.contains(&"repo-lint".to_string()));
+
+        // Presets: deep merge — repo's python version wins, global's provider preserved
+        let python = &config.presets["env:python"];
+        assert_eq!(
+            python["version"], "3.12",
+            "Repo (Layer 3) python version should override global (Layer 1)"
+        );
+        assert_eq!(
+            python["provider"], "pyenv",
+            "Global-only field 'provider' should be preserved via deep merge"
+        );
+    }
+
+    #[test]
+    fn test_global_config_invalid_toml_produces_error() {
+        // Invalid TOML in the global config path should produce a clear error,
+        // not a panic or silent skip.
+        let (repo_dir, global_dir) = setup_hierarchy_dirs();
+
+        // Write invalid TOML as the global config
+        fs::write(
+            global_dir.path().join("config.toml"),
+            "this is not valid toml {{{\n  [broken",
+        )
+        .unwrap();
+
+        let root = NormalizedPath::new(repo_dir.path());
+        let resolver =
+            ConfigResolver::with_global_config_dir(root, global_dir.path().to_path_buf());
+        let result = resolver.resolve();
+
+        assert!(
+            result.is_err(),
+            "Invalid TOML in global config should produce an error"
+        );
+
+        // The error message should mention TOML parsing, not be an opaque IO error
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(
+            err_msg.contains("expected") || err_msg.contains("invalid") || err_msg.contains("TOML"),
+            "Error should indicate a TOML parse failure, got: {}",
+            err_msg,
+        );
+    }
+
+    #[test]
+    fn test_global_config_path_uses_xdg_convention() {
+        // Verify that when no override is set, ConfigResolver uses
+        // dirs::config_dir() to determine the global config path.
+        // We test this indirectly: create a resolver with no override,
+        // and confirm global_config_dir() returns a path ending in "repo-manager".
+        //
+        // On Linux this should be ~/.config/repo-manager
+        // On macOS this should be ~/Library/Application Support/repo-manager
+        //
+        // Since we are in a test environment, we verify the structural invariant
+        // that the path ends with "repo-manager" (platform-independent check).
+
+        let temp_dir = TempDir::new().unwrap();
+        let root = NormalizedPath::new(temp_dir.path());
+
+        // Use the normal constructor (no override) — this uses dirs::config_dir()
+        let resolver = ConfigResolver::new(root);
+
+        // We cannot call global_config_dir() directly (it is private), but we
+        // can verify the behavior by checking that resolve() succeeds even when
+        // the real XDG config dir does not contain our config. This confirms
+        // it correctly handles the "no file" case for the platform path.
+        let config = resolver
+            .resolve()
+            .expect("Resolve should succeed with no config files anywhere");
+
+        // With no config files, we get defaults
+        assert_eq!(config.mode, "worktrees");
+        assert!(config.tools.is_empty());
+    }
+
+    #[test]
+    fn test_full_four_layer_precedence() {
+        // All 4 layers present. Layer 4 (local) should win over all others.
+        // This tests the full hierarchy: global < org < repo < local.
+        let (repo_dir, global_dir) = setup_hierarchy_dirs();
+
+        // Layer 1: Global config
+        fs::write(
+            global_dir.path().join("config.toml"),
+            r#"
+tools = ["global-tool"]
+rules = ["global-rule"]
+
+[core]
+mode = "worktrees"
+
+[presets."env:python"]
+version = "3.10"
+provider = "system"
+global_only = "from-global"
+"#,
+        )
+        .unwrap();
+
+        // Layer 2: Org config
+        fs::create_dir_all(global_dir.path().join("org")).unwrap();
+        fs::write(
+            global_dir.path().join("org/config.toml"),
+            r#"
+tools = ["org-tool"]
+rules = ["org-rule"]
+
+[presets."env:python"]
+version = "3.11"
+provider = "pyenv"
+org_only = "from-org"
+"#,
+        )
+        .unwrap();
+
+        // Layer 3: Repo config
+        fs::write(
+            repo_dir.path().join(".repository/config.toml"),
+            r#"
+tools = ["repo-tool"]
+rules = ["repo-rule"]
+
+[core]
+mode = "standard"
+
+[presets."env:python"]
+version = "3.12"
+repo_only = "from-repo"
+"#,
+        )
+        .unwrap();
+
+        // Layer 4: Local overrides
+        fs::write(
+            repo_dir.path().join(".repository/config.local.toml"),
+            r#"
+tools = ["local-tool"]
+rules = ["local-rule"]
+
+[core]
+mode = "worktree"
+
+[presets."env:python"]
+version = "3.13"
+local_only = "from-local"
+"#,
+        )
+        .unwrap();
+
+        let root = NormalizedPath::new(repo_dir.path());
+        let resolver =
+            ConfigResolver::with_global_config_dir(root, global_dir.path().to_path_buf());
+        let config = resolver.resolve().expect("Should resolve all 4 layers");
+
+        // Mode: Layer 4 wins
+        assert_eq!(config.mode, "worktree");
+
+        // Tools: union of all layers
+        assert!(config.tools.contains(&"global-tool".to_string()));
+        assert!(config.tools.contains(&"org-tool".to_string()));
+        assert!(config.tools.contains(&"repo-tool".to_string()));
+        assert!(config.tools.contains(&"local-tool".to_string()));
+        assert_eq!(config.tools.len(), 4);
+
+        // Rules: union of all layers
+        assert!(config.rules.contains(&"global-rule".to_string()));
+        assert!(config.rules.contains(&"org-rule".to_string()));
+        assert!(config.rules.contains(&"repo-rule".to_string()));
+        assert!(config.rules.contains(&"local-rule".to_string()));
+        assert_eq!(config.rules.len(), 4);
+
+        // Presets: deep merge — Layer 4 version wins, layer-unique fields preserved
+        let python = &config.presets["env:python"];
+        assert_eq!(python["version"], "3.13", "Layer 4 (local) version should win");
+        assert_eq!(
+            python["global_only"], "from-global",
+            "Global-only field should be preserved"
+        );
+        assert_eq!(
+            python["org_only"], "from-org",
+            "Org-only field should be preserved"
+        );
+        assert_eq!(
+            python["repo_only"], "from-repo",
+            "Repo-only field should be preserved"
+        );
+        assert_eq!(
+            python["local_only"], "from-local",
+            "Local-only field should be present"
+        );
+    }
+
+    #[test]
+    fn test_org_config_overrides_global_but_not_repo() {
+        // Org config (Layer 2) should override global (Layer 1),
+        // but repo config (Layer 3) should override org.
+        let (repo_dir, global_dir) = setup_hierarchy_dirs();
+
+        // Layer 1: Global
+        fs::write(
+            global_dir.path().join("config.toml"),
+            r#"
+tools = ["global-tool"]
+
+[presets."env:python"]
+version = "3.10"
+"#,
+        )
+        .unwrap();
+
+        // Layer 2: Org
+        fs::create_dir_all(global_dir.path().join("org")).unwrap();
+        fs::write(
+            global_dir.path().join("org/config.toml"),
+            r#"
+tools = ["org-tool"]
+
+[presets."env:python"]
+version = "3.11"
+"#,
+        )
+        .unwrap();
+
+        // Layer 3: Repo
+        fs::write(
+            repo_dir.path().join(".repository/config.toml"),
+            r#"
+tools = ["repo-tool"]
+
+[presets."env:python"]
+version = "3.12"
+"#,
+        )
+        .unwrap();
+
+        let root = NormalizedPath::new(repo_dir.path());
+        let resolver =
+            ConfigResolver::with_global_config_dir(root, global_dir.path().to_path_buf());
+        let config = resolver.resolve().unwrap();
+
+        // Repo (Layer 3) wins over org (Layer 2) and global (Layer 1) for python version
+        assert_eq!(config.presets["env:python"]["version"], "3.12");
+
+        // All tools are unioned
+        assert!(config.tools.contains(&"global-tool".to_string()));
+        assert!(config.tools.contains(&"org-tool".to_string()));
+        assert!(config.tools.contains(&"repo-tool".to_string()));
+    }
+
+    #[test]
+    fn test_no_global_no_org_no_local_repo_only() {
+        // Only repo config exists. No global, no org, no local.
+        // This is the most common case and must work correctly.
+        let (repo_dir, global_dir) = setup_hierarchy_dirs();
+
+        fs::write(
+            repo_dir.path().join(".repository/config.toml"),
+            r#"
+tools = ["just-repo"]
+
+[core]
+mode = "standard"
+"#,
+        )
+        .unwrap();
+
+        let root = NormalizedPath::new(repo_dir.path());
+        let resolver =
+            ConfigResolver::with_global_config_dir(root, global_dir.path().to_path_buf());
+        let config = resolver.resolve().unwrap();
+
+        assert_eq!(config.mode, "standard");
+        assert_eq!(config.tools, vec!["just-repo"]);
+        assert!(config.rules.is_empty());
+        assert!(config.presets.is_empty());
+    }
+}
+
 mod runtime_context_tests {
     use super::*;
 

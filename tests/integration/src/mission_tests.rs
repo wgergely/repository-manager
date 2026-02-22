@@ -1,7 +1,6 @@
 //! Mission-based Integration Tests
 //!
 //! These tests validate production scenarios against spec claims.
-//! Tests marked with `#[ignore]` are expected to fail due to known gaps.
 //!
 //! Each test documents:
 //! - Which spec it validates
@@ -928,12 +927,16 @@ mod sync_integration {
     #[tokio::test]
     async fn gap_018_mcp_server() {
         use repo_mcp::RepoMcpServer;
-        use std::path::PathBuf;
 
-        // Create and initialize server
-        let mut server = RepoMcpServer::new(PathBuf::from("."));
+        // Create a valid repo structure for MCP server initialization
+        let mut repo = TestRepo::new();
+        repo.init_git();
+        repo.init_repo_manager("standard", &["vscode"], &[]);
+
+        // Create and initialize server pointing to the valid repo
+        let mut server = RepoMcpServer::new(repo.root().to_path_buf());
         let init_result = server.initialize().await;
-        assert!(init_result.is_ok(), "Server should initialize");
+        assert!(init_result.is_ok(), "Server should initialize in valid repo");
         assert!(server.is_initialized());
 
         // Verify tools are loaded
@@ -960,26 +963,67 @@ mod sync_integration {
         assert!(resource_uris.contains(&"repo://rules"));
     }
 
-    /// GAP-019: add-tool should trigger sync automatically
-    /// TODO: Enable when add-tool triggers an automatic sync
+    /// GAP-019: add-tool followed by sync creates tool config files
+    ///
+    /// Rewrites the original GAP-019 test which was stale: it manually edited
+    /// config.toml and expected files to appear without running any command.
+    /// The actual `add-tool` CLI triggers `trigger_sync_and_report()`, which
+    /// is tested in `repo-cli/tests/integration_tests.rs`.
+    ///
+    /// This test validates the underlying mechanism: updating config.toml to
+    /// include a tool, then running SyncEngine::sync(), produces the expected
+    /// config files on disk.
     #[test]
-    #[ignore = "GAP-019: add-tool does not yet trigger automatic sync"]
     fn gap_019_add_tool_triggers_sync() {
-        let mut repo = TestRepo::new();
+        let repo = TestRepo::new();
         repo.init_git();
-        repo.init_repo_manager("standard", &[], &[]);
 
-        // Manually update config to add vscode (simulating add-tool)
-        let config_path = repo.root().join(".repository/config.toml");
-        let mut config = fs::read_to_string(&config_path).unwrap();
-        config = config.replace("tools = []", "tools = [\"vscode\"]");
-        fs::write(&config_path, config).unwrap();
+        // Start with no tools, like a fresh init
+        let repo_dir = repo.root().join(".repository");
+        fs::create_dir_all(&repo_dir).unwrap();
+        fs::write(
+            repo_dir.join("config.toml"),
+            "tools = []\n\n[core]\nmode = \"standard\"\n",
+        )
+        .unwrap();
 
-        // Correct behavior: after add-tool, .vscode/settings.json should be created
-        let vscode_exists = repo.root().join(".vscode/settings.json").exists();
+        // Simulate what add-tool does: update config to include vscode
+        fs::write(
+            repo_dir.join("config.toml"),
+            "tools = [\"vscode\"]\n\n[core]\nmode = \"standard\"\n",
+        )
+        .unwrap();
+
+        // Then trigger sync (this is what trigger_sync_and_report does)
+        let root = NormalizedPath::new(repo.root());
+        let engine = SyncEngine::new(root, Mode::Standard).unwrap();
+        let report = engine.sync().unwrap();
+
+        assert!(report.success, "Sync after add-tool should succeed: {:?}", report.errors);
         assert!(
-            vscode_exists,
-            "add-tool should automatically trigger sync and create .vscode/settings.json"
+            !report.actions.is_empty(),
+            "Sync should report actions taken"
+        );
+
+        // Verify the tool config file was actually created
+        let vscode_settings = repo.root().join(".vscode/settings.json");
+        assert!(
+            vscode_settings.exists(),
+            "add-tool + sync should create .vscode/settings.json"
+        );
+
+        // Verify the file has real content (not empty)
+        let content = fs::read_to_string(&vscode_settings).unwrap();
+        assert!(
+            !content.is_empty(),
+            ".vscode/settings.json should have content after sync"
+        );
+
+        // Verify ledger recorded the sync
+        let ledger_path = repo.root().join(".repository/ledger.toml");
+        assert!(
+            ledger_path.exists(),
+            "Ledger should be created after sync"
         );
     }
 }

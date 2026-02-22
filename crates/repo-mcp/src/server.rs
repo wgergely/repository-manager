@@ -322,6 +322,28 @@ impl RepoMcpServer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    /// Create a temp dir with valid .repository/config.toml and return the server
+    fn create_valid_repo_dir() -> TempDir {
+        let temp = TempDir::new().unwrap();
+        fs::create_dir_all(temp.path().join(".repository")).unwrap();
+        fs::write(
+            temp.path().join(".repository/config.toml"),
+            "tools = []\n\n[core]\nmode = \"standard\"\n",
+        )
+        .unwrap();
+        temp
+    }
+
+    /// Create an initialized server with a valid repo structure
+    async fn setup_initialized_server() -> (TempDir, RepoMcpServer) {
+        let temp = create_valid_repo_dir();
+        let mut server = RepoMcpServer::new(PathBuf::from(temp.path()));
+        server.initialize().await.unwrap();
+        (temp, server)
+    }
 
     #[test]
     fn server_creation() {
@@ -335,7 +357,8 @@ mod tests {
 
     #[tokio::test]
     async fn server_initialization() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
+        let temp = create_valid_repo_dir();
+        let mut server = RepoMcpServer::new(PathBuf::from(temp.path()));
         let result = server.initialize().await;
         assert!(result.is_ok());
         assert!(server.is_initialized());
@@ -343,8 +366,7 @@ mod tests {
 
     #[tokio::test]
     async fn server_loads_tools_on_initialize() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
-        server.initialize().await.unwrap();
+        let (_temp, server) = setup_initialized_server().await;
 
         // Should have loaded tools
         assert!(!server.tools().is_empty());
@@ -365,8 +387,7 @@ mod tests {
 
     #[tokio::test]
     async fn server_loads_resources_on_initialize() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
-        server.initialize().await.unwrap();
+        let (_temp, server) = setup_initialized_server().await;
 
         // Should have loaded resources
         assert!(!server.resources().is_empty());
@@ -381,8 +402,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_initialize() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
-        server.initialize().await.unwrap();
+        let (_temp, server) = setup_initialized_server().await;
 
         let request = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}"#;
 
@@ -394,8 +414,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_initialized_notification() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
-        server.initialize().await.unwrap();
+        let (_temp, server) = setup_initialized_server().await;
 
         let request = r#"{"jsonrpc":"2.0","method":"initialized"}"#;
 
@@ -406,8 +425,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_notifications_initialized() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
-        server.initialize().await.unwrap();
+        let (_temp, server) = setup_initialized_server().await;
 
         let request = r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#;
 
@@ -418,8 +436,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_tools_list() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
-        server.initialize().await.unwrap();
+        let (_temp, server) = setup_initialized_server().await;
 
         let request = r#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#;
 
@@ -432,8 +449,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_resources_list() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
-        server.initialize().await.unwrap();
+        let (_temp, server) = setup_initialized_server().await;
 
         let request = r#"{"jsonrpc":"2.0","id":3,"method":"resources/list","params":{}}"#;
 
@@ -445,8 +461,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_unknown_method() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
-        server.initialize().await.unwrap();
+        let (_temp, server) = setup_initialized_server().await;
 
         let request = r#"{"jsonrpc":"2.0","id":4,"method":"unknown/method","params":{}}"#;
 
@@ -458,8 +473,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_tools_call_unknown_tool() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
-        server.initialize().await.unwrap();
+        let (_temp, server) = setup_initialized_server().await;
 
         let request = r#"{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"unknown_tool","arguments":{}}}"#;
 
@@ -472,8 +486,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_resources_read() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
-        server.initialize().await.unwrap();
+        let (_temp, server) = setup_initialized_server().await;
 
         let request = r#"{"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"repo://config"}}"#;
 
@@ -485,8 +498,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_resources_read_unknown() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
-        server.initialize().await.unwrap();
+        let (_temp, server) = setup_initialized_server().await;
 
         let request = r#"{"jsonrpc":"2.0","id":7,"method":"resources/read","params":{"uri":"repo://unknown"}}"#;
 
@@ -497,8 +509,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_invalid_json() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
-        server.initialize().await.unwrap();
+        let (_temp, server) = setup_initialized_server().await;
 
         let request = r#"{"invalid json"#;
 
@@ -508,8 +519,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_response_format() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
-        server.initialize().await.unwrap();
+        let (_temp, server) = setup_initialized_server().await;
 
         let request = r#"{"jsonrpc":"2.0","id":10,"method":"initialize","params":{}}"#;
 
@@ -525,8 +535,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_error_response_format() {
-        let mut server = RepoMcpServer::new(PathBuf::from("/tmp/test"));
-        server.initialize().await.unwrap();
+        let (_temp, server) = setup_initialized_server().await;
 
         let request = r#"{"jsonrpc":"2.0","id":11,"method":"unknown","params":{}}"#;
 

@@ -7,8 +7,8 @@
 //!
 //! Configuration is loaded and merged from these sources (later sources override earlier):
 //!
-//! 1. **Global defaults** - `~/.config/repo-manager/config.toml` (TODO)
-//! 2. **Organization config** - Organization-level settings (TODO)
+//! 1. **Global defaults** - `~/.config/repo-manager/config.toml`
+//! 2. **Organization config** - `~/.config/repo-manager/org/config.toml`
 //! 3. **Repository config** - `.repository/config.toml`
 //! 4. **Local overrides** - `.repository/config.local.toml` (git-ignored)
 //!

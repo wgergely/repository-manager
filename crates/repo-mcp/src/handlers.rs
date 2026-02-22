@@ -1131,11 +1131,8 @@ mod tests {
             // The handlers should NOT return NotImplemented anymore.
             // They may return other errors (e.g., no remote, no branch) but
             // the key assertion is that NotImplemented is gone.
-            match &result {
-                Err(Error::NotImplemented(name)) => {
-                    panic!("{} still returns NotImplemented - it should be implemented now", name);
-                }
-                _ => {} // Any other result (Ok or non-NotImplemented Err) is acceptable
+            if let Err(Error::NotImplemented(name)) = &result {
+                panic!("{} still returns NotImplemented - it should be implemented now", name);
             }
         }
     }

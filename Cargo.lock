@@ -1615,6 +1615,7 @@ name = "repo-core"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "dirs",
  "fs2",
  "pretty_assertions",
  "repo-content",

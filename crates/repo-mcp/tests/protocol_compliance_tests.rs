@@ -10,8 +10,19 @@ use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
+/// Create a temp dir with a valid repository structure needed for server initialization.
+fn setup_repo_structure(temp: &TempDir) {
+    fs::create_dir_all(temp.path().join(".repository")).unwrap();
+    fs::write(
+        temp.path().join(".repository/config.toml"),
+        "tools = []\n\n[core]\nmode = \"standard\"\n",
+    )
+    .unwrap();
+}
+
 /// Create an initialized server with a temp directory as root.
 async fn setup_server(temp: &TempDir) -> RepoMcpServer {
+    setup_repo_structure(temp);
     let mut server = RepoMcpServer::new(PathBuf::from(temp.path()));
     server.initialize().await.unwrap();
     server
@@ -466,6 +477,8 @@ async fn test_resources_list_returns_all_defined_resources() {
 async fn test_tool_call_repo_init_creates_repo() {
     let temp = TempDir::new().unwrap();
     let server = setup_server(&temp).await;
+    // Remove .repository so repo_init can create it fresh
+    fs::remove_dir_all(temp.path().join(".repository")).unwrap();
     // Create minimal .git so mode detection works
     fs::create_dir_all(temp.path().join(".git")).unwrap();
 
@@ -620,14 +633,14 @@ async fn test_tool_call_not_implemented_returns_is_error() {
     let server = setup_server(&temp).await;
     create_test_repo(&temp);
 
-    // git_push is explicitly not implemented
+    // extension_install is explicitly not implemented
     let request = serde_json::to_string(&json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "tools/call",
         "params": {
-            "name": "git_push",
-            "arguments": {}
+            "name": "extension_install",
+            "arguments": { "source": "https://example.com/ext.git" }
         }
     }))
     .unwrap();

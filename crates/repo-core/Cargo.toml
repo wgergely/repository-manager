@@ -24,6 +24,7 @@ toml = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 fs2 = { workspace = true }
+dirs = { workspace = true }
 
 # Error handling
 thiserror = { workspace = true }
