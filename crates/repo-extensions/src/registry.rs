@@ -38,6 +38,12 @@ impl ExtensionRegistry {
             description: "A governed development framework for AI agents".to_string(),
             source: "https://github.com/vaultspec/vaultspec.git".to_string(),
         });
+        registry.register(ExtensionEntry {
+            name: "registry-manager".to_string(),
+            description: "Manage collections of git repositories organized into registries"
+                .to_string(),
+            source: "https://github.com/registry-manager/registry-manager.git".to_string(),
+        });
         registry
     }
 
