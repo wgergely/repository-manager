@@ -1,6 +1,7 @@
-//! Integration tests for repo-content crate
+//! Lifecycle tests for repo-content crate
 //!
-//! These tests verify end-to-end behavior across multiple operations and formats.
+//! Category: component
+//! These tests verify document lifecycle behavior across multiple operations and formats.
 
 use repo_content::Document;
 use repo_content::block::BlockLocation;

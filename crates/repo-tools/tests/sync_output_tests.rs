@@ -1,6 +1,7 @@
-//! Integration tests for tool sync operations
+//! Sync output tests for tool integrations
 //!
-//! Tests that sync produces correct output files for each tool.
+//! Category: component
+//! Tests that tool sync operations produce expected file output.
 
 use repo_fs::NormalizedPath;
 use repo_tools::{
