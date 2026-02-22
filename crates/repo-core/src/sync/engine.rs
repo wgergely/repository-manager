@@ -236,7 +236,9 @@ impl SyncEngine {
                                         let block_content =
                                             extract_managed_block(&content, &marker_str);
                                         let actual_checksum =
-                                            repo_fs::checksum::compute_content_checksum(&block_content);
+                                            repo_fs::checksum::compute_content_checksum(
+                                                &block_content,
+                                            );
                                         if actual_checksum != *checksum {
                                             drifted.push(DriftItem {
                                                 intent_id: intent.id.clone(),
@@ -481,13 +483,13 @@ impl SyncEngine {
             .saturating_sub(post_check.missing.len());
 
         if fixed_drift > 0 {
-            sync_report = sync_report
-                .with_action(format!("Fixed {} drifted projections", fixed_drift));
+            sync_report =
+                sync_report.with_action(format!("Fixed {} drifted projections", fixed_drift));
         }
 
         if fixed_missing > 0 {
-            sync_report = sync_report
-                .with_action(format!("Recreated {} missing projections", fixed_missing));
+            sync_report =
+                sync_report.with_action(format!("Recreated {} missing projections", fixed_missing));
         }
 
         Ok(sync_report)
@@ -625,7 +627,6 @@ impl SyncEngine {
         None
     }
 }
-
 
 /// Extract managed block content from a file by marker UUID
 ///

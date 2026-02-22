@@ -36,17 +36,11 @@ pub enum Error {
 
     /// MCP config file declared in extension manifest was not found.
     #[error("MCP config not found at {path} for extension '{extension}'")]
-    McpConfigNotFound {
-        path: PathBuf,
-        extension: String,
-    },
+    McpConfigNotFound { path: PathBuf, extension: String },
 
     /// Failed to parse MCP config JSON.
     #[error("failed to parse MCP config at {path}: {reason}")]
-    McpConfigParse {
-        path: PathBuf,
-        reason: String,
-    },
+    McpConfigParse { path: PathBuf, reason: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

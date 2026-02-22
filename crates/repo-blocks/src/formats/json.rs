@@ -354,7 +354,10 @@ mod tests {
     fn test_write_block_overwrites_non_object_managed_key() {
         let handler = JsonFormatHandler::new();
         // Simulate user data that happens to use the reserved key as a non-object
-        let existing = format!(r#"{{"{MANAGED_KEY}": "user string value"}}"#, MANAGED_KEY = MANAGED_KEY);
+        let existing = format!(
+            r#"{{"{MANAGED_KEY}": "user string value"}}"#,
+            MANAGED_KEY = MANAGED_KEY
+        );
         let uuid = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
 
         let result = handler.write_block(&existing, uuid, r#"{"setting": true}"#);
@@ -362,8 +365,10 @@ mod tests {
 
         // The managed key should now be an object with the block, overwriting the string
         assert!(parsed[MANAGED_KEY].is_object());
-        assert!(parsed[MANAGED_KEY]["550e8400-e29b-41d4-a716-446655440000"]["setting"]
-            .as_bool()
-            .unwrap());
+        assert!(
+            parsed[MANAGED_KEY]["550e8400-e29b-41d4-a716-446655440000"]["setting"]
+                .as_bool()
+                .unwrap()
+        );
     }
 }

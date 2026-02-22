@@ -705,11 +705,17 @@ mod sync_integration {
 
         // Verify rules directory created at .agent/rules/
         let rules_dir = repo.root().join(".agent/rules");
-        assert!(rules_dir.is_dir(), "Antigravity rules directory should be created");
+        assert!(
+            rules_dir.is_dir(),
+            "Antigravity rules directory should be created"
+        );
 
         // Verify per-rule file exists inside the directory (format: 01-<id>.md)
         let rule_file = rules_dir.join("01-test-rule.md");
-        assert!(rule_file.exists(), "Per-rule file should be created in .agent/rules/");
+        assert!(
+            rule_file.exists(),
+            "Per-rule file should be created in .agent/rules/"
+        );
 
         let content = fs::read_to_string(&rule_file).unwrap();
         assert!(content.contains("Test content for Antigravity"));
@@ -839,7 +845,10 @@ mod sync_integration {
         // Create and initialize server pointing to the valid repo
         let mut server = RepoMcpServer::new(repo.root().to_path_buf());
         let init_result = server.initialize().await;
-        assert!(init_result.is_ok(), "Server should initialize in valid repo");
+        assert!(
+            init_result.is_ok(),
+            "Server should initialize in valid repo"
+        );
         assert!(server.is_initialized());
 
         // Verify tools are loaded
@@ -902,7 +911,11 @@ mod sync_integration {
         let engine = SyncEngine::new(root, Mode::Standard).unwrap();
         let report = engine.sync().unwrap();
 
-        assert!(report.success, "Sync after add-tool should succeed: {:?}", report.errors);
+        assert!(
+            report.success,
+            "Sync after add-tool should succeed: {:?}",
+            report.errors
+        );
         assert!(
             !report.actions.is_empty(),
             "Sync should report actions taken"
@@ -924,10 +937,7 @@ mod sync_integration {
 
         // Verify ledger recorded the sync
         let ledger_path = repo.root().join(".repository/ledger.toml");
-        assert!(
-            ledger_path.exists(),
-            "Ledger should be created after sync"
-        );
+        assert!(ledger_path.exists(), "Ledger should be created after sync");
     }
 }
 
@@ -983,8 +993,7 @@ mod robustness {
         repo.assert_file_exists(".vscode/settings.json");
 
         // Verify it contains valid JSON (not empty or garbage)
-        let content =
-            fs::read_to_string(repo.root().join(".vscode/settings.json")).unwrap();
+        let content = fs::read_to_string(repo.root().join(".vscode/settings.json")).unwrap();
         let parsed: Result<serde_json::Value, _> = serde_json::from_str(&content);
         assert!(
             parsed.is_ok(),
@@ -1507,8 +1516,7 @@ mod p3_end_to_end_pipeline {
         );
 
         // Verify files have real content (not empty stubs)
-        let cursorrules_content =
-            fs::read_to_string(repo.root().join(".cursorrules")).unwrap();
+        let cursorrules_content = fs::read_to_string(repo.root().join(".cursorrules")).unwrap();
         assert!(
             !cursorrules_content.is_empty(),
             ".cursorrules should have content after sync"
@@ -1520,13 +1528,9 @@ mod p3_end_to_end_pipeline {
             "CLAUDE.md should have content after sync"
         );
 
-        let vscode_content =
-            fs::read_to_string(repo.root().join(".vscode/settings.json")).unwrap();
+        let vscode_content = fs::read_to_string(repo.root().join(".vscode/settings.json")).unwrap();
         let parsed: Result<serde_json::Value, _> = serde_json::from_str(&vscode_content);
-        assert!(
-            parsed.is_ok(),
-            ".vscode/settings.json should be valid JSON"
-        );
+        assert!(parsed.is_ok(), ".vscode/settings.json should be valid JSON");
 
         // Step 4: Check should report healthy (no rules added, so tool checksums
         // in the ledger should match what is on disk)
@@ -1542,7 +1546,10 @@ mod p3_end_to_end_pipeline {
 
         // Step 5: Delete a managed file to simulate drift
         let cursorrules_path = repo.root().join(".cursorrules");
-        assert!(cursorrules_path.exists(), "Pre-condition: .cursorrules exists");
+        assert!(
+            cursorrules_path.exists(),
+            "Pre-condition: .cursorrules exists"
+        );
         fs::remove_file(&cursorrules_path).unwrap();
         assert!(!cursorrules_path.exists(), ".cursorrules should be deleted");
 
@@ -1611,8 +1618,7 @@ mod p3_end_to_end_pipeline {
         );
 
         // Verify rule content appears in tool config files
-        let cursorrules_content =
-            fs::read_to_string(repo.root().join(".cursorrules")).unwrap();
+        let cursorrules_content = fs::read_to_string(repo.root().join(".cursorrules")).unwrap();
         assert!(
             cursorrules_content.contains("coding-standards"),
             ".cursorrules should contain rule ID, got: {}",
@@ -1718,11 +1724,7 @@ mod p3_drift_detection {
         );
 
         // Verify the missing item references the correct file
-        let missing_files: Vec<&str> = check2
-            .missing
-            .iter()
-            .map(|d| d.file.as_str())
-            .collect();
+        let missing_files: Vec<&str> = check2.missing.iter().map(|d| d.file.as_str()).collect();
         assert!(
             missing_files.iter().any(|f| f.contains("cursorrules")),
             "Missing items should reference .cursorrules, got: {:?}",

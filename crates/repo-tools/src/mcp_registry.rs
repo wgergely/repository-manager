@@ -11,8 +11,8 @@
 //! 3. Add the slug to [`MCP_CAPABLE_TOOLS`].
 
 use repo_meta::schema::{
-    McpConfigEmbedding, McpConfigSpec, McpEnvSyntax, McpFieldMappings, McpTransport,
-    McpTypeValues, McpUserPath,
+    McpConfigEmbedding, McpConfigSpec, McpEnvSyntax, McpFieldMappings, McpTransport, McpTypeValues,
+    McpUserPath,
 };
 
 /// All tool slugs that support MCP, in alphabetical order.
@@ -120,7 +120,7 @@ fn gemini_mcp_spec() -> McpConfigSpec {
         embedding: McpConfigEmbedding::Nested, // settings.json has other keys too
         transports: &[McpTransport::Stdio, McpTransport::Http, McpTransport::Sse],
         field_mappings: McpFieldMappings {
-            http_url_field: "httpUrl", // Gemini uses "httpUrl" for Streamable HTTP
+            http_url_field: "httpUrl",  // Gemini uses "httpUrl" for Streamable HTTP
             sse_url_field: Some("url"), // and "url" for SSE
             requires_type_field: false,
             type_values: McpTypeValues::default(),
@@ -549,10 +549,7 @@ mod tests {
             let spec = mcp_config_spec(slug).unwrap();
             if let Some(ref user_path) = spec.user_path {
                 let resolved = user_path.resolve().unwrap();
-                assert_safe_relative_path(
-                    &resolved,
-                    &format!("{slug} user_path (resolved)"),
-                );
+                assert_safe_relative_path(&resolved, &format!("{slug} user_path (resolved)"));
             }
         }
     }

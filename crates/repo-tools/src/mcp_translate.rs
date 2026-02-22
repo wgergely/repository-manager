@@ -24,9 +24,10 @@ pub fn to_tool_json(config: &McpServerConfig, spec: &McpConfigSpec) -> Value {
     match &config.transport {
         McpTransportConfig::Stdio { command, args, cwd } => {
             if fm.requires_type_field
-                && let Some(type_val) = fm.type_values.stdio {
-                    obj.insert("type".into(), json!(type_val));
-                }
+                && let Some(type_val) = fm.type_values.stdio
+            {
+                obj.insert("type".into(), json!(type_val));
+            }
             obj.insert("command".into(), json!(command));
             if !args.is_empty() {
                 obj.insert("args".into(), json!(args));
@@ -37,9 +38,10 @@ pub fn to_tool_json(config: &McpServerConfig, spec: &McpConfigSpec) -> Value {
         }
         McpTransportConfig::Http { url, headers } => {
             if fm.requires_type_field
-                && let Some(type_val) = fm.type_values.http {
-                    obj.insert("type".into(), json!(type_val));
-                }
+                && let Some(type_val) = fm.type_values.http
+            {
+                obj.insert("type".into(), json!(type_val));
+            }
             obj.insert(fm.http_url_field.into(), json!(url));
             if let Some(headers) = headers {
                 obj.insert("headers".into(), json!(headers));
@@ -47,9 +49,10 @@ pub fn to_tool_json(config: &McpServerConfig, spec: &McpConfigSpec) -> Value {
         }
         McpTransportConfig::Sse { url, headers } => {
             if fm.requires_type_field
-                && let Some(type_val) = fm.type_values.sse {
-                    obj.insert("type".into(), json!(type_val));
-                }
+                && let Some(type_val) = fm.type_values.sse
+            {
+                obj.insert("type".into(), json!(type_val));
+            }
             let url_field = fm.sse_url_field.unwrap_or(fm.http_url_field);
             obj.insert(url_field.into(), json!(url));
             if let Some(headers) = headers {
@@ -60,9 +63,10 @@ pub fn to_tool_json(config: &McpServerConfig, spec: &McpConfigSpec) -> Value {
 
     // Add env if present and non-empty.
     if let Some(env) = &config.env
-        && !env.is_empty() {
-            obj.insert("env".into(), json!(env));
-        }
+        && !env.is_empty()
+    {
+        obj.insert("env".into(), json!(env));
+    }
 
     // NOTE: auto_approve is intentionally omitted — it is tool-specific.
 
@@ -107,8 +111,8 @@ pub fn from_tool_json(value: &Value, spec: &McpConfigSpec) -> Option<McpServerCo
 
         // If the SSE URL field is the same as (or None, falling back to) the
         // HTTP URL field, we need the type discriminator to tell them apart.
-        let sse_field_same = fm.sse_url_field.is_none()
-            || fm.sse_url_field == Some(fm.http_url_field);
+        let sse_field_same =
+            fm.sse_url_field.is_none() || fm.sse_url_field == Some(fm.http_url_field);
 
         if is_sse_by_type && sse_field_same {
             let url = obj.get(fm.http_url_field)?.as_str()?.to_string();

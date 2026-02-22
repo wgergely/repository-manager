@@ -111,11 +111,10 @@ pub fn resolve_mcp_config(
         }
     }
 
-    let mut json: Value =
-        serde_json::from_str(&content).map_err(|e| Error::McpConfigParse {
-            path: full_path.clone(),
-            reason: e.to_string(),
-        })?;
+    let mut json: Value = serde_json::from_str(&content).map_err(|e| Error::McpConfigParse {
+        path: full_path.clone(),
+        reason: e.to_string(),
+    })?;
 
     // The mcp.json must be an object at the top level
     if !json.is_object() {
@@ -446,8 +445,7 @@ version = "1.0.0"
         resolve_templates(&mut value, &ctx);
         // The resolved value should contain the literal {{extension.source}}, NOT "INJECTED"
         assert_eq!(
-            value["path"],
-            "/repo/{{extension.source}}/subdir/file",
+            value["path"], "/repo/{{extension.source}}/subdir/file",
             "Template chaining must not expand context values"
         );
     }

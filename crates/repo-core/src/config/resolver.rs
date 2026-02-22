@@ -186,10 +186,7 @@ impl ConfigResolver {
                 let org_manifest = Manifest::parse(&content)?;
                 manifest.merge(&org_manifest);
             } else {
-                tracing::debug!(
-                    ?org_config_path,
-                    "No org config found (layer 2) — skipping"
-                );
+                tracing::debug!(?org_config_path, "No org config found (layer 2) — skipping");
             }
         }
 

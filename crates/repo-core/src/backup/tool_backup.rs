@@ -59,9 +59,8 @@ impl BackupManager {
 
     /// Validate that a tool name is safe for use as a directory component.
     fn validate_tool_name(tool: &str) -> crate::Result<()> {
-        validate_path_identifier(tool, "Tool name").map_err(|msg| crate::Error::SyncError {
-            message: msg,
-        })
+        validate_path_identifier(tool, "Tool name")
+            .map_err(|msg| crate::Error::SyncError { message: msg })
     }
 
     /// Get the backup directory for a tool

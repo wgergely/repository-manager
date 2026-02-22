@@ -71,13 +71,19 @@ mod unc_network_path_security {
         let path = NormalizedPath::new("smb://server/share");
         // After normalization, the scheme:// gets collapsed, so this won't match
         // is_network_path(). The important thing is it doesn't become a routeable path.
-        assert!(!path.as_str().starts_with("//"), "Must not become a UNC path");
+        assert!(
+            !path.as_str().starts_with("//"),
+            "Must not become a UNC path"
+        );
     }
 
     #[test]
     fn test_nfs_url_normalized_away() {
         let path = NormalizedPath::new("nfs://server/export");
-        assert!(!path.as_str().starts_with("//"), "Must not become a UNC path");
+        assert!(
+            !path.as_str().starts_with("//"),
+            "Must not become a UNC path"
+        );
     }
 
     #[test]

@@ -108,8 +108,14 @@ fn test_generic_integration_text() {
     assert!(content.contains("test-rule"));
     assert!(content.contains("Test content"));
     // Format: must use managed block markers
-    assert!(content.contains("<!-- repo:block:test-rule -->"), "Must have block start marker");
-    assert!(content.contains("<!-- /repo:block:test-rule -->"), "Must have block end marker");
+    assert!(
+        content.contains("<!-- repo:block:test-rule -->"),
+        "Must have block start marker"
+    );
+    assert!(
+        content.contains("<!-- /repo:block:test-rule -->"),
+        "Must have block end marker"
+    );
 }
 
 #[test]
@@ -364,8 +370,14 @@ fn test_sync_all_with_schema_tools() {
         "Windsurf must contain rule content"
     );
     // Format: both files must have managed block markers
-    assert!(cursor_content.contains("<!-- repo:block:test -->"), "Cursor must have block marker");
-    assert!(windsurf_content.contains("<!-- repo:block:test -->"), "Windsurf must have block marker");
+    assert!(
+        cursor_content.contains("<!-- repo:block:test -->"),
+        "Cursor must have block marker"
+    );
+    assert!(
+        windsurf_content.contains("<!-- repo:block:test -->"),
+        "Windsurf must have block marker"
+    );
 }
 
 #[test]
@@ -432,8 +444,14 @@ fn test_generic_integration_markdown_type() {
     assert!(content.contains("**bold**"));
     assert!(content.contains("_italic_"));
     // Format: markdown output must use managed block markers
-    assert!(content.contains("<!-- repo:block:md-rule -->"), "Must have block start marker");
-    assert!(content.contains("<!-- /repo:block:md-rule -->"), "Must have block end marker");
+    assert!(
+        content.contains("<!-- repo:block:md-rule -->"),
+        "Must have block start marker"
+    );
+    assert!(
+        content.contains("<!-- /repo:block:md-rule -->"),
+        "Must have block end marker"
+    );
 }
 
 #[test]

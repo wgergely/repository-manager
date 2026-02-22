@@ -31,7 +31,11 @@ impl JsonWriter {
             return Ok(json!({}));
         }
         let content = io::read_text(path).map_err(|e| {
-            tracing::warn!("Failed to read existing JSON config at {}: {}", path.as_str(), e);
+            tracing::warn!(
+                "Failed to read existing JSON config at {}: {}",
+                path.as_str(),
+                e
+            );
             e
         })?;
         let value = serde_json::from_str(&content)?;

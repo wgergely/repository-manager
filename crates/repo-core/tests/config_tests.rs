@@ -380,7 +380,9 @@ edition = "2021"
         let root = NormalizedPath::new(repo_dir.path());
         let resolver =
             ConfigResolver::with_global_config_dir(root, global_dir.path().to_path_buf());
-        let config = resolver.resolve().expect("Should resolve without global config");
+        let config = resolver
+            .resolve()
+            .expect("Should resolve without global config");
 
         // Verify resolved VALUES match repo-only expectations
         assert_eq!(config.mode, "standard");
@@ -419,7 +421,9 @@ manager = "fnm"
         let root = NormalizedPath::new(repo_dir.path());
         let resolver =
             ConfigResolver::with_global_config_dir(root, global_dir.path().to_path_buf());
-        let config = resolver.resolve().expect("Should resolve with global defaults");
+        let config = resolver
+            .resolve()
+            .expect("Should resolve with global defaults");
 
         // Global tools are present
         assert!(
@@ -683,7 +687,10 @@ local_only = "from-local"
 
         // Presets: deep merge — Layer 4 version wins, layer-unique fields preserved
         let python = &config.presets["env:python"];
-        assert_eq!(python["version"], "3.13", "Layer 4 (local) version should win");
+        assert_eq!(
+            python["version"], "3.13",
+            "Layer 4 (local) version should win"
+        );
         assert_eq!(
             python["global_only"], "from-global",
             "Global-only field should be preserved"

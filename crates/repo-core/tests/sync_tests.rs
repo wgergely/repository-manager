@@ -5,9 +5,9 @@ use repo_core::Mode;
 use repo_core::ledger::{Intent, Ledger, Projection};
 use repo_core::sync::{CheckReport, CheckStatus, DriftItem, SyncEngine};
 use repo_fs::NormalizedPath;
+use repo_test_utils::git::fake_git_dir;
 use serde_json::json;
 use std::fs;
-use repo_test_utils::git::fake_git_dir;
 use tempfile::TempDir;
 use uuid::Uuid;
 

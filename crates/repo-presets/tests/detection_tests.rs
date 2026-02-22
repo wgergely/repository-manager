@@ -7,7 +7,9 @@ mod common;
 
 use common::create_test_context;
 use repo_presets::provider::PresetProvider;
-use repo_presets::{ApplyReport, ApplyStatus, NodeProvider, PresetStatus, RustProvider, UvProvider};
+use repo_presets::{
+    ApplyReport, ApplyStatus, NodeProvider, PresetStatus, RustProvider, UvProvider,
+};
 use std::fs;
 use tempfile::TempDir;
 
@@ -397,8 +399,7 @@ async fn test_node_provider_check_detects_package_json() {
     assert!(
         !missing_package_json,
         "check() must detect package.json when it exists, got status={:?} details={:?}",
-        report.status,
-        report.details
+        report.status, report.details
     );
 }
 

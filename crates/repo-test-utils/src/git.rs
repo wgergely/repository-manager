@@ -38,8 +38,12 @@ pub fn fake_git_dir(path: &Path) {
 /// # Panics
 /// Panics if `git2::Repository::init` fails.
 pub fn real_git_repo(path: &Path) -> git2::Repository {
-    git2::Repository::init(path)
-        .unwrap_or_else(|e| panic!("real_git_repo: failed to init repository at {}: {e}", path.display()))
+    git2::Repository::init(path).unwrap_or_else(|e| {
+        panic!(
+            "real_git_repo: failed to init repository at {}: {e}",
+            path.display()
+        )
+    })
 }
 
 /// Initialises a real git repository with an initial commit using the `git` CLI.
@@ -64,7 +68,9 @@ pub fn real_git_repo_with_commit(path: &Path) {
             .args(args)
             .current_dir(path)
             .output()
-            .unwrap_or_else(|e| panic!("real_git_repo_with_commit: failed to run `git {args:?}`: {e}"));
+            .unwrap_or_else(|e| {
+                panic!("real_git_repo_with_commit: failed to run `git {args:?}`: {e}")
+            });
         if !output.status.success() {
             panic!(
                 "real_git_repo_with_commit: `git {args:?}` failed:\n{}",

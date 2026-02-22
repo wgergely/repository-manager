@@ -17,6 +17,8 @@ pub const MANIFEST_FILENAME: &str = "repo_extension.toml";
 
 pub use config::ExtensionConfig;
 pub use error::Error;
-pub use manifest::{EntryPoints, ExtensionManifest, Provides, ResolvedCommand, ResolvedEntryPoints};
+pub use manifest::{
+    EntryPoints, ExtensionManifest, Provides, ResolvedCommand, ResolvedEntryPoints,
+};
 pub use mcp::{ResolveContext, merge_mcp_configs, resolve_mcp_config};
 pub use registry::{ExtensionEntry, ExtensionRegistry};

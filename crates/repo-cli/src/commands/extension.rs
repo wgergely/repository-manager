@@ -106,7 +106,10 @@ mod tests {
     #[test]
     fn test_extension_install_no_activate_returns_error() {
         let result = handle_extension_install("https://example.com/ext.git", true);
-        assert!(result.is_err(), "extension install with no_activate must return an error");
+        assert!(
+            result.is_err(),
+            "extension install with no_activate must return an error"
+        );
     }
 
     #[test]

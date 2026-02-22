@@ -116,7 +116,10 @@ fn roo_creates_rules_directory_with_valid_structure() {
 
     // Content validation
     let content = fs::read_to_string(rules_dir.join("01-conventions.md")).unwrap();
-    assert!(!content.trim().is_empty(), "Roo rule file must not be empty");
+    assert!(
+        !content.trim().is_empty(),
+        "Roo rule file must not be empty"
+    );
     assert!(
         content.contains("Follow project conventions."),
         "Roo rule file must contain rule content"

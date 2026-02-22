@@ -149,7 +149,11 @@ pub fn write_atomic(path: &NormalizedPath, content: &[u8], config: RobustnessCon
         // 4. Release lock (advisory locks are also released on fd close,
         // so an explicit unlock failure is non-critical but worth logging)
         if let Err(e) = lock_file.unlock() {
-            tracing::warn!("Failed to release lock for {}: {}", native_path.display(), e);
+            tracing::warn!(
+                "Failed to release lock for {}: {}",
+                native_path.display(),
+                e
+            );
         }
 
         Ok(())

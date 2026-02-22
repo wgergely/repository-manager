@@ -8,9 +8,7 @@ use crate::error::{Error, Result};
 use crate::mcp_registry::mcp_config_spec;
 use crate::mcp_translate::to_tool_json;
 use repo_fs::NormalizedPath;
-use repo_meta::schema::{
-    McpConfigSpec, McpScope, McpServerConfig, McpSyncResult, McpVerifyResult,
-};
+use repo_meta::schema::{McpConfigSpec, McpScope, McpServerConfig, McpSyncResult, McpVerifyResult};
 use serde_json::{Map, Value, json};
 use std::path::PathBuf;
 use tracing::warn;
@@ -72,13 +70,13 @@ impl McpInstaller {
     fn config_path(&self, scope: McpScope) -> Result<PathBuf> {
         match scope {
             McpScope::Project => {
-                let rel =
-                    self.spec
-                        .project_path
-                        .ok_or_else(|| Error::McpScopeNotSupported {
-                            tool: self.slug.clone(),
-                            scope: "project".into(),
-                        })?;
+                let rel = self
+                    .spec
+                    .project_path
+                    .ok_or_else(|| Error::McpScopeNotSupported {
+                        tool: self.slug.clone(),
+                        scope: "project".into(),
+                    })?;
                 Ok(self.root.join(rel).to_native())
             }
             McpScope::User => {
@@ -154,7 +152,11 @@ impl McpInstaller {
         })?;
         std::fs::rename(&tmp_path, path).map_err(|e| Error::McpConfig {
             tool: self.slug.clone(),
-            message: format!("Failed to rename {} -> {}: {e}", tmp_path.display(), path.display()),
+            message: format!(
+                "Failed to rename {} -> {}: {e}",
+                tmp_path.display(),
+                path.display()
+            ),
         })?;
         Ok(())
     }
@@ -565,9 +567,7 @@ mod tests {
 
         // .cursor/mcp.json parent dir doesn't exist yet
         let config = stdio_config("test");
-        installer
-            .install(McpScope::Project, "s1", &config)
-            .unwrap();
+        installer.install(McpScope::Project, "s1", &config).unwrap();
 
         let path = temp.path().join(".cursor").join("mcp.json");
         assert!(path.exists());
@@ -719,9 +719,7 @@ mod tests {
         managed.insert("s1".into(), stdio_config("cmd1"));
         managed.insert("s2".into(), stdio_config("cmd2"));
 
-        let result = installer
-            .sync(McpScope::Project, &managed, &[])
-            .unwrap();
+        let result = installer.sync(McpScope::Project, &managed, &[]).unwrap();
         assert_eq!(result.added.len(), 2);
         assert!(result.updated.is_empty());
         assert!(result.removed.is_empty());
@@ -741,9 +739,7 @@ mod tests {
         // Sync managed servers (not including user-server)
         let mut managed = BTreeMap::new();
         managed.insert("managed-server".into(), stdio_config("managed"));
-        let result = installer
-            .sync(McpScope::Project, &managed, &[])
-            .unwrap();
+        let result = installer.sync(McpScope::Project, &managed, &[]).unwrap();
 
         // user-server should still be there
         let all = installer.list(McpScope::Project).unwrap();
@@ -834,9 +830,7 @@ mod tests {
         // Sync with updated version
         let mut managed = BTreeMap::new();
         managed.insert("s1".into(), stdio_config("new"));
-        let result = installer
-            .sync(McpScope::Project, &managed, &[])
-            .unwrap();
+        let result = installer.sync(McpScope::Project, &managed, &[]).unwrap();
 
         assert!(result.added.is_empty());
         assert_eq!(result.updated, vec!["s1"]);
@@ -857,9 +851,7 @@ mod tests {
 
         let mut managed = BTreeMap::new();
         managed.insert("s1".into(), stdio_config("test"));
-        let result = installer
-            .sync(McpScope::Project, &managed, &[])
-            .unwrap();
+        let result = installer.sync(McpScope::Project, &managed, &[]).unwrap();
 
         assert!(result.is_empty());
         assert_eq!(result.unchanged, vec!["s1"]);
@@ -878,9 +870,7 @@ mod tests {
 
         // Sync with empty set — nothing should change
         let managed = BTreeMap::new();
-        let result = installer
-            .sync(McpScope::Project, &managed, &[])
-            .unwrap();
+        let result = installer.sync(McpScope::Project, &managed, &[]).unwrap();
         assert!(result.is_empty());
         assert!(result.added.is_empty());
         assert!(result.removed.is_empty());

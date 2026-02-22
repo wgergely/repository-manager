@@ -121,11 +121,7 @@ impl GenericToolIntegration {
     }
 
     /// Write rules as individual files to an explicit directory path.
-    fn sync_to_directory_at_path(
-        &self,
-        dir_path: &NormalizedPath,
-        rules: &[Rule],
-    ) -> Result<()> {
+    fn sync_to_directory_at_path(&self, dir_path: &NormalizedPath, rules: &[Rule]) -> Result<()> {
         let native = dir_path.to_native();
 
         // If a regular file exists at this path, remove it first so we can
@@ -262,9 +258,7 @@ impl GenericToolIntegration {
             }
 
             // MCP servers
-            if let (Some(key), Some(mcp_servers)) =
-                (&schema_keys.mcp_key, &context.mcp_servers)
-            {
+            if let (Some(key), Some(mcp_servers)) = (&schema_keys.mcp_key, &context.mcp_servers) {
                 settings[key] = mcp_servers.clone();
             }
         }
@@ -510,8 +504,7 @@ mod tests {
                 "args": ["serve.py", "--port", "8080"]
             }
         });
-        let context = SyncContext::new(NormalizedPath::new(temp.path()))
-            .with_mcp_servers(mcp_data);
+        let context = SyncContext::new(NormalizedPath::new(temp.path())).with_mcp_servers(mcp_data);
 
         // No rules — just MCP config
         integration.sync(&context, &[]).unwrap();
@@ -519,8 +512,14 @@ mod tests {
         let content = fs::read_to_string(temp.path().join("config.json")).unwrap();
         let json: serde_json::Value = serde_json::from_str(&content).unwrap();
 
-        assert!(json["mcpServers"].is_object(), "mcpServers must exist as object");
-        assert_eq!(json["mcpServers"]["my-server"]["command"], "/usr/bin/python3");
+        assert!(
+            json["mcpServers"].is_object(),
+            "mcpServers must exist as object"
+        );
+        assert_eq!(
+            json["mcpServers"]["my-server"]["command"],
+            "/usr/bin/python3"
+        );
         assert_eq!(json["mcpServers"]["my-server"]["args"][0], "serve.py");
         assert_eq!(json["mcpServers"]["my-server"]["args"][1], "--port");
         assert_eq!(json["mcpServers"]["my-server"]["args"][2], "8080");
@@ -552,8 +551,7 @@ mod tests {
 
         let integration = GenericToolIntegration::new(definition);
         let mcp_data = serde_json::json!({"server": {"command": "test"}});
-        let context = SyncContext::new(NormalizedPath::new(temp.path()))
-            .with_mcp_servers(mcp_data);
+        let context = SyncContext::new(NormalizedPath::new(temp.path())).with_mcp_servers(mcp_data);
 
         integration.sync(&context, &[]).unwrap();
 
@@ -577,7 +575,11 @@ mod tests {
                 "old-server": {"command": "old"}
             }
         });
-        fs::write(&config_path, serde_json::to_string_pretty(&existing).unwrap()).unwrap();
+        fs::write(
+            &config_path,
+            serde_json::to_string_pretty(&existing).unwrap(),
+        )
+        .unwrap();
 
         let definition = ToolDefinition {
             meta: ToolMeta {
@@ -604,8 +606,7 @@ mod tests {
 
         let integration = GenericToolIntegration::new(definition);
         let mcp_data = serde_json::json!({"new-server": {"command": "new"}});
-        let context = SyncContext::new(NormalizedPath::new(temp.path()))
-            .with_mcp_servers(mcp_data);
+        let context = SyncContext::new(NormalizedPath::new(temp.path())).with_mcp_servers(mcp_data);
 
         integration.sync(&context, &[]).unwrap();
 
@@ -824,7 +825,10 @@ mod tests {
 
         // Additional directory must be created
         let dir = temp.path().join(".tool/rules");
-        assert!(dir.is_dir(), "Additional directory path must be a directory");
+        assert!(
+            dir.is_dir(),
+            "Additional directory path must be a directory"
+        );
 
         // Per-rule files must exist
         let rule1 = dir.join("01-rule-alpha.md");
@@ -884,8 +888,7 @@ mod tests {
         integration.sync(&context, &rules).unwrap();
 
         // Verify secondary file has actual managed block structure, not empty
-        let secondary_content =
-            fs::read_to_string(temp.path().join(".secondary")).unwrap();
+        let secondary_content = fs::read_to_string(temp.path().join(".secondary")).unwrap();
 
         // Must have opening and closing markers for both blocks
         assert!(
@@ -965,10 +968,7 @@ mod tests {
             entries.len(),
             1,
             "Only primary file should exist, found: {:?}",
-            entries
-                .iter()
-                .map(|e| e.file_name())
-                .collect::<Vec<_>>()
+            entries.iter().map(|e| e.file_name()).collect::<Vec<_>>()
         );
     }
 

@@ -495,10 +495,7 @@ async fn test_mcp_git_merge_succeeds_with_valid_branch() {
     .unwrap();
 
     // Switch back to the default branch (main or master)
-    let default_branch = if repo
-        .find_branch("main", git2::BranchType::Local)
-        .is_ok()
-    {
+    let default_branch = if repo.find_branch("main", git2::BranchType::Local).is_ok() {
         "main"
     } else {
         "master"
@@ -510,12 +507,7 @@ async fn test_mcp_git_merge_succeeds_with_valid_branch() {
         .unwrap();
 
     // Now merge feature into main/master
-    let result = handle_tool_call(
-        temp.path(),
-        "git_merge",
-        json!({"source": "feature"}),
-    )
-    .await;
+    let result = handle_tool_call(temp.path(), "git_merge", json!({"source": "feature"})).await;
 
     assert!(
         result.is_ok(),

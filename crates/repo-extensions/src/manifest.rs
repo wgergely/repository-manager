@@ -518,8 +518,8 @@ content_types = []
 
     #[test]
     fn test_from_path_not_found() {
-        let err =
-            ExtensionManifest::from_path(Path::new("/nonexistent/repo_extension.toml")).unwrap_err();
+        let err = ExtensionManifest::from_path(Path::new("/nonexistent/repo_extension.toml"))
+            .unwrap_err();
         assert!(matches!(err, Error::ManifestNotFound(_)));
     }
 
@@ -601,18 +601,12 @@ version = "1.0.0"
 
         let cli = resolved.cli.unwrap();
         assert_eq!(cli.program, PathBuf::from("/py"));
-        let expected_cli = source
-            .join("scripts/cli.py")
-            .to_string_lossy()
-            .into_owned();
+        let expected_cli = source.join("scripts/cli.py").to_string_lossy().into_owned();
         assert_eq!(cli.args, vec![expected_cli]);
 
         let mcp = resolved.mcp.unwrap();
         assert_eq!(mcp.program, PathBuf::from("/py"));
-        let expected_mcp = source
-            .join("scripts/mcp.py")
-            .to_string_lossy()
-            .into_owned();
+        let expected_mcp = source.join("scripts/mcp.py").to_string_lossy().into_owned();
         assert_eq!(
             mcp.args,
             vec![

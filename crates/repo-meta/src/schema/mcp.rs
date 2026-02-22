@@ -110,9 +110,7 @@ impl McpUserPath {
                     "extension_id must not contain path separators: {extension_id}"
                 );
                 debug_assert!(
-                    !filename.contains('/')
-                        && !filename.contains('\\')
-                        && !filename.contains(".."),
+                    !filename.contains('/') && !filename.contains('\\') && !filename.contains(".."),
                     "filename must not contain path separators: {filename}"
                 );
                 let base = if cfg!(target_os = "macos") {

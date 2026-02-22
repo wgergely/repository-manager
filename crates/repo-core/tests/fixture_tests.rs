@@ -276,10 +276,7 @@ fn test_golden_file_aider_output_matches_expected() {
         generated.contains("rustfmt"),
         "Rule content must be present"
     );
-    assert!(
-        generated.contains("clippy"),
-        "Rule content must be present"
-    );
+    assert!(generated.contains("clippy"), "Rule content must be present");
 
     // YAML validity: the file should parse as valid YAML
     let yaml_result: Result<serde_yaml::Value, _> = serde_yaml::from_str(&generated);
@@ -537,5 +534,8 @@ actual content here
 fn test_strip_provenance_header_passes_through_no_provenance() {
     let input = "no provenance here\njust content\n";
     let stripped = strip_provenance_header(input);
-    assert_eq!(stripped, input, "Content without provenance should be unchanged");
+    assert_eq!(
+        stripped, input,
+        "Content without provenance should be unchanged"
+    );
 }

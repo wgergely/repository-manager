@@ -535,7 +535,11 @@ mod dispatcher_tests {
         );
 
         // Format: all files must have balanced block markers
-        for (name, content) in [("cursor", &cursor_content), ("claude", &claude_content), ("windsurf", &windsurf_content)] {
+        for (name, content) in [
+            ("cursor", &cursor_content),
+            ("claude", &claude_content),
+            ("windsurf", &windsurf_content),
+        ] {
             let opens = content.matches("<!-- repo:block:").count();
             let closes = content.matches("<!-- /repo:block:").count();
             assert_eq!(opens, closes, "{name} must have balanced block markers");
@@ -607,7 +611,11 @@ mod cross_tool_tests {
         assert!(windsurf_content.contains("Write tests"));
 
         // Format: all tools must produce balanced managed blocks
-        for (name, content) in [("cursor", &cursor_content), ("claude", &claude_content), ("windsurf", &windsurf_content)] {
+        for (name, content) in [
+            ("cursor", &cursor_content),
+            ("claude", &claude_content),
+            ("windsurf", &windsurf_content),
+        ] {
             let opens = content.matches("<!-- repo:block:").count();
             let closes = content.matches("<!-- /repo:block:").count();
             assert_eq!(opens, closes, "{name} must have balanced block markers");
@@ -774,8 +782,14 @@ mod cross_tool_tests {
         assert!(claude_content.contains("Test content for partial sync"));
 
         // Format: synced tools must have managed block structure
-        assert!(cursor_content.contains("<!-- repo:block:test-rule -->"), "Cursor must have block marker");
-        assert!(claude_content.contains("<!-- repo:block:test-rule -->"), "Claude must have block marker");
+        assert!(
+            cursor_content.contains("<!-- repo:block:test-rule -->"),
+            "Cursor must have block marker"
+        );
+        assert!(
+            claude_content.contains("<!-- repo:block:test-rule -->"),
+            "Claude must have block marker"
+        );
     }
 
     #[test]

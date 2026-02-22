@@ -45,9 +45,10 @@ impl CapabilityTranslator {
 
         // MCP servers (if tool supports MCP and config is provided)
         if tool.capabilities.supports_mcp
-            && let Some(servers) = mcp_servers {
-                content.mcp_servers = Some(servers.clone());
-            }
+            && let Some(servers) = mcp_servers
+        {
+            content.mcp_servers = Some(servers.clone());
+        }
 
         content
     }
@@ -191,7 +192,10 @@ mod tests {
 
         let content = CapabilityTranslator::translate_with_mcp(&tool, &[], Some(&servers));
         assert!(content.mcp_servers.is_some());
-        assert_eq!(content.mcp_servers.unwrap()["my-server"]["command"], "python");
+        assert_eq!(
+            content.mcp_servers.unwrap()["my-server"]["command"],
+            "python"
+        );
     }
 
     #[test]

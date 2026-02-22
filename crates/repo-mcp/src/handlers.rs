@@ -42,7 +42,6 @@ pub async fn handle_tool_call(root: &Path, tool_name: &str, arguments: Value) ->
         "git_pull" => handle_git_pull(root, arguments).await,
         "git_merge" => handle_git_merge(root, arguments).await,
 
-
         // Configuration Management
         "tool_add" => handle_tool_add(root, arguments).await,
         "tool_remove" => handle_tool_remove(root, arguments).await,
@@ -423,8 +422,8 @@ async fn handle_git_push(root: &Path, arguments: Value) -> Result<Value> {
 
     let ctx = RepoContext::new(root)?;
     let provider = create_git_provider(&ctx.root, ctx.mode)?;
-    let repo = Repository::open(provider.main_worktree().to_native())
-        .map_err(repo_git::Error::from)?;
+    let repo =
+        Repository::open(provider.main_worktree().to_native()).map_err(repo_git::Error::from)?;
 
     let remote_name = args.remote.as_deref().unwrap_or("origin");
     let branch_ref = args.branch.as_deref();
@@ -464,8 +463,8 @@ async fn handle_git_pull(root: &Path, arguments: Value) -> Result<Value> {
 
     let ctx = RepoContext::new(root)?;
     let provider = create_git_provider(&ctx.root, ctx.mode)?;
-    let repo = Repository::open(provider.main_worktree().to_native())
-        .map_err(repo_git::Error::from)?;
+    let repo =
+        Repository::open(provider.main_worktree().to_native()).map_err(repo_git::Error::from)?;
 
     let remote_name = args.remote.as_deref().unwrap_or("origin");
     let branch_ref = args.branch.as_deref();
@@ -479,7 +478,13 @@ async fn handle_git_pull(root: &Path, arguments: Value) -> Result<Value> {
     };
 
     let current_branch_fn = || provider.current_branch();
-    repo_git::pull(&repo, Some(remote_name), branch_ref, current_branch_fn, None)?;
+    repo_git::pull(
+        &repo,
+        Some(remote_name),
+        branch_ref,
+        current_branch_fn,
+        None,
+    )?;
 
     Ok(json!({
         "success": true,
@@ -502,8 +507,8 @@ async fn handle_git_merge(root: &Path, arguments: Value) -> Result<Value> {
 
     let ctx = RepoContext::new(root)?;
     let provider = create_git_provider(&ctx.root, ctx.mode)?;
-    let repo = Repository::open(provider.main_worktree().to_native())
-        .map_err(repo_git::Error::from)?;
+    let repo =
+        Repository::open(provider.main_worktree().to_native()).map_err(repo_git::Error::from)?;
 
     let current_branch_fn = || provider.current_branch();
     repo_git::merge(&repo, &args.source, current_branch_fn, None)?;
@@ -516,10 +521,7 @@ async fn handle_git_merge(root: &Path, arguments: Value) -> Result<Value> {
 }
 
 /// Create a LayoutProvider for git operations based on detected mode.
-fn create_git_provider(
-    root: &NormalizedPath,
-    mode: Mode,
-) -> Result<Box<dyn LayoutProvider>> {
+fn create_git_provider(root: &NormalizedPath, mode: Mode) -> Result<Box<dyn LayoutProvider>> {
     match mode {
         Mode::Standard => {
             let layout = ClassicLayout::new(root.clone())?;
@@ -632,8 +634,7 @@ async fn handle_rule_add(root: &Path, arguments: Value) -> Result<Value> {
     let rules_dir = find_rules_dir(&normalized_root)?;
 
     // Validate rule ID
-    repo_core::validate_rule_id(&args.id)
-        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
+    repo_core::validate_rule_id(&args.id).map_err(|e| Error::InvalidArgument(e.to_string()))?;
 
     // Create the rule file
     let rule_path = rules_dir.join(&format!("{}.md", args.id));
@@ -672,8 +673,7 @@ async fn handle_rule_remove(root: &Path, arguments: Value) -> Result<Value> {
         serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
 
     // Validate rule ID
-    repo_core::validate_rule_id(&args.id)
-        .map_err(|e| Error::InvalidArgument(e.to_string()))?;
+    repo_core::validate_rule_id(&args.id).map_err(|e| Error::InvalidArgument(e.to_string()))?;
 
     let normalized_root = NormalizedPath::new(root);
     let rules_dir = find_rules_dir(&normalized_root)?;
@@ -1132,7 +1132,10 @@ mod tests {
             // They may return other errors (e.g., no remote, no branch) but
             // the key assertion is that NotImplemented is gone.
             if let Err(Error::NotImplemented(name)) = &result {
-                panic!("{} still returns NotImplemented - it should be implemented now", name);
+                panic!(
+                    "{} still returns NotImplemented - it should be implemented now",
+                    name
+                );
             }
         }
     }
@@ -1440,7 +1443,12 @@ mod tests {
         // Extension handlers should still return NotImplemented
         let temp = TempDir::new().unwrap();
 
-        let extension_tools = ["extension_install", "extension_add", "extension_init", "extension_remove"];
+        let extension_tools = [
+            "extension_install",
+            "extension_add",
+            "extension_init",
+            "extension_remove",
+        ];
 
         for tool in extension_tools.iter() {
             let result = handle_tool_call(temp.path(), tool, json!({})).await;

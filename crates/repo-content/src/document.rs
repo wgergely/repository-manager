@@ -6,7 +6,7 @@ use crate::edit::Edit;
 use crate::error::{Error, Result};
 use crate::format::{Format, FormatHandler};
 use crate::handlers::{JsonHandler, MarkdownHandler, PlainTextHandler, TomlHandler, YamlHandler};
-use crate::path::{get_at_path, parse_path, remove_at_path, set_at_path, PathSegment};
+use crate::path::{PathSegment, get_at_path, parse_path, remove_at_path, set_at_path};
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -528,15 +528,15 @@ fn toml_edit_set(
         match first {
             PathSegment::Key(key) => match item {
                 toml_edit::Item::Table(t) => {
-                    let child = t.get_mut(key).ok_or_else(|| Error::PathNotFound {
-                        path: key.clone(),
-                    })?;
+                    let child = t
+                        .get_mut(key)
+                        .ok_or_else(|| Error::PathNotFound { path: key.clone() })?;
                     toml_edit_set(child, rest, value)
                 }
                 toml_edit::Item::Value(toml_edit::Value::InlineTable(t)) => {
-                    let child = t.get_mut(key).ok_or_else(|| Error::PathNotFound {
-                        path: key.clone(),
-                    })?;
+                    let child = t
+                        .get_mut(key)
+                        .ok_or_else(|| Error::PathNotFound { path: key.clone() })?;
                     toml_edit_set_value(child, rest, value)
                 }
                 _ => Err(Error::PathSetFailed {
@@ -621,9 +621,9 @@ fn toml_edit_set_value(
         match first {
             PathSegment::Key(key) => {
                 if let toml_edit::Value::InlineTable(t) = val {
-                    let child = t.get_mut(key).ok_or_else(|| Error::PathNotFound {
-                        path: key.clone(),
-                    })?;
+                    let child = t
+                        .get_mut(key)
+                        .ok_or_else(|| Error::PathNotFound { path: key.clone() })?;
                     toml_edit_set_value(child, rest, new_value)
                 } else {
                     Err(Error::PathSetFailed {
@@ -685,9 +685,9 @@ fn toml_edit_set_in_table(
         let (first, rest) = segments.split_first().unwrap();
         match first {
             PathSegment::Key(key) => {
-                let child = table.get_mut(key).ok_or_else(|| Error::PathNotFound {
-                    path: key.clone(),
-                })?;
+                let child = table
+                    .get_mut(key)
+                    .ok_or_else(|| Error::PathNotFound { path: key.clone() })?;
                 toml_edit_set(child, rest, value)
             }
             PathSegment::Index(idx) => Err(Error::PathSetFailed {
@@ -728,9 +728,7 @@ fn toml_edit_remove(item: &mut toml_edit::Item, segments: &[PathSegment]) -> Res
                         Err(Error::PathNotFound { path: key.clone() })
                     }
                 }
-                _ => Err(Error::PathNotFound {
-                    path: key.clone(),
-                }),
+                _ => Err(Error::PathNotFound { path: key.clone() }),
             },
             PathSegment::Index(idx) => match item {
                 toml_edit::Item::Value(toml_edit::Value::Array(arr)) => {
@@ -763,20 +761,18 @@ fn toml_edit_remove(item: &mut toml_edit::Item, segments: &[PathSegment]) -> Res
         match first {
             PathSegment::Key(key) => match item {
                 toml_edit::Item::Table(t) => {
-                    let child = t.get_mut(key).ok_or_else(|| Error::PathNotFound {
-                        path: key.clone(),
-                    })?;
+                    let child = t
+                        .get_mut(key)
+                        .ok_or_else(|| Error::PathNotFound { path: key.clone() })?;
                     toml_edit_remove(child, rest)
                 }
                 toml_edit::Item::Value(toml_edit::Value::InlineTable(t)) => {
-                    let child = t.get_mut(key).ok_or_else(|| Error::PathNotFound {
-                        path: key.clone(),
-                    })?;
+                    let child = t
+                        .get_mut(key)
+                        .ok_or_else(|| Error::PathNotFound { path: key.clone() })?;
                     toml_edit_remove_value(child, rest)
                 }
-                _ => Err(Error::PathNotFound {
-                    path: key.clone(),
-                }),
+                _ => Err(Error::PathNotFound { path: key.clone() }),
             },
             PathSegment::Index(idx) => match item {
                 toml_edit::Item::ArrayOfTables(arr) => {
@@ -843,9 +839,9 @@ fn toml_edit_remove_value(val: &mut toml_edit::Value, segments: &[PathSegment]) 
         match first {
             PathSegment::Key(key) => {
                 if let toml_edit::Value::InlineTable(t) = val {
-                    let child = t.get_mut(key).ok_or_else(|| Error::PathNotFound {
-                        path: key.clone(),
-                    })?;
+                    let child = t
+                        .get_mut(key)
+                        .ok_or_else(|| Error::PathNotFound { path: key.clone() })?;
                     toml_edit_remove_value(child, rest)
                 } else {
                     Err(Error::PathNotFound { path: key.clone() })
@@ -893,9 +889,9 @@ fn toml_edit_remove_in_table(table: &mut toml_edit::Table, segments: &[PathSegme
         let (first, rest) = segments.split_first().unwrap();
         match first {
             PathSegment::Key(key) => {
-                let child = table.get_mut(key).ok_or_else(|| Error::PathNotFound {
-                    path: key.clone(),
-                })?;
+                let child = table
+                    .get_mut(key)
+                    .ok_or_else(|| Error::PathNotFound { path: key.clone() })?;
                 toml_edit_remove(child, rest)
             }
             PathSegment::Index(idx) => Err(Error::PathNotFound {

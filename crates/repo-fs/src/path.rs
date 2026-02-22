@@ -23,7 +23,10 @@ pub fn validate_path_identifier(id: &str, label: &str) -> std::result::Result<()
         return Err(format!("{} must not start with '-'", label));
     }
     if id.len() > 255 {
-        return Err(format!("{} exceeds maximum length of 255 characters", label));
+        return Err(format!(
+            "{} exceeds maximum length of 255 characters",
+            label
+        ));
     }
     if !id
         .chars()
@@ -322,7 +325,10 @@ mod tests {
     fn test_unc_path_rewritten_to_local() {
         // UNC paths should be rewritten to local paths (strip leading //)
         let path = NormalizedPath::new("//server/share/path");
-        assert!(!path.is_network_path(), "UNC paths should be rejected at construction");
+        assert!(
+            !path.is_network_path(),
+            "UNC paths should be rejected at construction"
+        );
         assert_eq!(path.as_str(), "/server/share/path");
     }
 

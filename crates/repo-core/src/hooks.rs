@@ -187,18 +187,19 @@ fn execute_hook(
     if let Some(ref custom_dir) = hook.working_dir
         && let (Ok(canon_custom), Ok(canon_default)) =
             (custom_dir.canonicalize(), default_dir.canonicalize())
-        && !canon_custom.starts_with(&canon_default) {
-            return Err(Error::HookFailed {
-                event: hook.event.to_string(),
-                command: hook.command.clone(),
-                message: format!(
-                    "Hook working_dir {:?} is outside the repository root {:?}",
-                    custom_dir, default_dir
-                ),
-            });
-        }
-        // If canonicalize fails (directory doesn't exist yet), allow it — the
-        // Command::new call will fail with a clear OS error.
+        && !canon_custom.starts_with(&canon_default)
+    {
+        return Err(Error::HookFailed {
+            event: hook.event.to_string(),
+            command: hook.command.clone(),
+            message: format!(
+                "Hook working_dir {:?} is outside the repository root {:?}",
+                custom_dir, default_dir
+            ),
+        });
+    }
+    // If canonicalize fails (directory doesn't exist yet), allow it — the
+    // Command::new call will fail with a clear OS error.
 
     // Substitute context variables in args
     let args: Vec<String> = hook
@@ -253,10 +254,7 @@ mod tests {
             HookEvent::parse("pre-branch-create"),
             Some(HookEvent::PreBranchCreate)
         );
-        assert_eq!(
-            HookEvent::parse("post-sync"),
-            Some(HookEvent::PostSync)
-        );
+        assert_eq!(HookEvent::parse("post-sync"), Some(HookEvent::PostSync));
         assert_eq!(HookEvent::parse("invalid"), None);
         // Agent events should no longer parse
         assert_eq!(HookEvent::parse("pre-agent-complete"), None);

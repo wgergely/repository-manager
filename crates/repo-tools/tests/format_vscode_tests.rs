@@ -26,8 +26,7 @@ fn vscode_settings_is_valid_json_object() {
     let context = SyncContext::new(root).with_python(python);
 
     let content = sync_and_read(&context, &[]);
-    let parsed: Value =
-        serde_json::from_str(&content).expect("settings.json must be valid JSON");
+    let parsed: Value = serde_json::from_str(&content).expect("settings.json must be valid JSON");
     assert!(
         parsed.is_object(),
         "Top-level value must be a JSON object, got: {parsed}"

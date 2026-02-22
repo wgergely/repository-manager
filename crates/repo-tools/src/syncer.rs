@@ -54,11 +54,8 @@ impl ToolCapabilitySyncer {
         }
 
         // Translate rules and MCP config for this tool
-        let content = CapabilityTranslator::translate_with_mcp(
-            tool,
-            rules,
-            self.mcp_servers.as_ref(),
-        );
+        let content =
+            CapabilityTranslator::translate_with_mcp(tool, rules, self.mcp_servers.as_ref());
         if content.is_empty() {
             return Ok(false);
         }
