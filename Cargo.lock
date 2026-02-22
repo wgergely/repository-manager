@@ -1006,6 +1006,7 @@ dependencies = [
  "repo-mcp",
  "repo-meta",
  "repo-presets",
+ "repo-test-utils",
  "repo-tools",
  "serde_json",
  "tempfile",
@@ -1581,6 +1582,7 @@ dependencies = [
  "repo-git",
  "repo-meta",
  "repo-presets",
+ "repo-test-utils",
  "repo-tools",
  "serde",
  "serde_json",
@@ -1624,6 +1626,7 @@ dependencies = [
  "repo-git",
  "repo-meta",
  "repo-presets",
+ "repo-test-utils",
  "repo-tools",
  "rstest",
  "serde",
@@ -1743,6 +1746,14 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "toml",
+]
+
+[[package]]
+name = "repo-test-utils"
+version = "0.1.0"
+dependencies = [
+ "git2",
+ "tempfile",
 ]
 
 [[package]]
