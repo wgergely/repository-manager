@@ -99,12 +99,31 @@ P0: Sync Engine & Tool Paths
 
 ---
 
+## Test Health Remediation (extends P3 Test Hygiene)
+
+The [Test Health Audit](../audits/2026-02-22-test-health-audit.md) identified 5 structural
+problems (TH-1 through TH-5) beyond the stale-test issues in P3. These are addressed by a
+5-phase implementation chain in [plans/](../plans/_index.md#test-health-remediation-chain-2026-02-22):
+
+- Phase 1: [Taxonomy & Renaming](../plans/2026-02-22-test-health-phase1-taxonomy.md) — TH-1
+- Phase 2: [Shared Fixture Library](../plans/2026-02-22-test-health-phase2-fixtures.md) — TH-2
+- Phase 3: [Format Validation Tests](../plans/2026-02-22-test-health-phase3-format-validation.md) — TH-3
+- Phase 4: [Golden File Rehabilitation](../plans/2026-02-22-test-health-phase4-golden-files.md) — TH-4
+- Phase 5: [Tautological Test Elimination](../plans/2026-02-22-test-health-phase5-tautological-tests.md) — TH-5
+
+These phases run **after P3 Test Hygiene** and share its prerequisite (P0/P1/P2 complete first).
+
+---
+
 ## Cross-References
 
-- [2026-02-22 Deep Implementation Audit](../audits/2026-02-22-deep-implementation-audit.md) — source findings
+- [2026-02-22 Deep Implementation Audit](../audits/2026-02-22-deep-implementation-audit.md) — source findings (C-1 through C-4, H-1 through H-4, M-1 through M-3)
+- [2026-02-22 Test Health Audit](../audits/2026-02-22-test-health-audit.md) — test-specific findings (TH-1 through TH-5)
 - [2026-02-17 Roadmap](../plans/2026-02-17-roadmap.md) — strategic context
 - [ADR documents](../adr/) — architectural decisions
+- [Test Health Phase Plans](../plans/_index.md#test-health-remediation-chain-2026-02-22) — 5-phase implementation chain
 
 ---
 
 *Index created: 2026-02-22*
+*Updated: 2026-02-22 — added Test Health Remediation chain*
