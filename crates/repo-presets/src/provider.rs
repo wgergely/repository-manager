@@ -64,10 +64,22 @@ impl PresetCheckReport {
     }
 }
 
+/// Status of a preset apply operation
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApplyStatus {
+    /// The provider performed real setup actions successfully.
+    Success,
+    /// The provider checked the environment but does not perform setup.
+    /// Callers should not treat this as a real apply success.
+    DetectionOnly,
+    /// The provider attempted setup but it failed.
+    Failed,
+}
+
 /// Report from applying a preset
 #[derive(Debug, Clone)]
 pub struct ApplyReport {
-    pub success: bool,
+    pub status: ApplyStatus,
     pub actions_taken: Vec<String>,
     pub errors: Vec<String>,
 }
@@ -75,18 +87,38 @@ pub struct ApplyReport {
 impl ApplyReport {
     pub fn success(actions: Vec<String>) -> Self {
         Self {
-            success: true,
+            status: ApplyStatus::Success,
             actions_taken: actions,
+            errors: vec![],
+        }
+    }
+
+    pub fn detection_only(messages: Vec<String>) -> Self {
+        Self {
+            status: ApplyStatus::DetectionOnly,
+            actions_taken: messages,
             errors: vec![],
         }
     }
 
     pub fn failure(errors: Vec<String>) -> Self {
         Self {
-            success: false,
+            status: ApplyStatus::Failed,
             actions_taken: vec![],
             errors,
         }
+    }
+
+    pub fn is_success(&self) -> bool {
+        matches!(self.status, ApplyStatus::Success)
+    }
+
+    pub fn is_detection_only(&self) -> bool {
+        matches!(self.status, ApplyStatus::DetectionOnly)
+    }
+
+    pub fn is_failure(&self) -> bool {
+        matches!(self.status, ApplyStatus::Failed)
     }
 }
 

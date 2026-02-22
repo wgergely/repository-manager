@@ -73,10 +73,21 @@ impl RepoMcpServer {
     pub async fn initialize(&mut self) -> Result<()> {
         tracing::info!(root = ?self.root, "Initializing MCP server");
 
-        // Repository configuration loading not yet implemented
-        tracing::warn!("Repository configuration loading not yet implemented");
-        // Repository structure validation not yet implemented
-        tracing::warn!("Repository structure validation not yet implemented");
+        // Validate that .repository/ directory exists
+        let repo_dir = self.root.join(".repository");
+        if !repo_dir.is_dir() {
+            return Err(Error::InvalidRepository(
+                "Not a repository-manager project: .repository/ directory not found. Run `repo init` first.".to_string(),
+            ));
+        }
+
+        // Validate that .repository/config.toml exists
+        let config_path = repo_dir.join("config.toml");
+        if !config_path.is_file() {
+            return Err(Error::InvalidRepository(
+                "Missing .repository/config.toml. Repository structure is incomplete. Run `repo init` to create it.".to_string(),
+            ));
+        }
 
         // Load tool and resource definitions
         self.tools = get_tool_definitions();

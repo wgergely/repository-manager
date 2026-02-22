@@ -10,11 +10,13 @@
 use std::fs;
 use std::path::Path;
 
+use git2::Repository;
 use repo_core::{
     CheckStatus, Manifest, Mode, ModeBackend, StandardBackend, SyncEngine, SyncOptions,
     WorktreeBackend,
 };
 use repo_fs::NormalizedPath;
+use repo_git::{ClassicLayout, ContainerLayout, LayoutProvider};
 use repo_meta::Registry;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -35,10 +37,11 @@ pub async fn handle_tool_call(root: &Path, tool_name: &str, arguments: Value) ->
         "branch_create" => handle_branch_create(root, arguments).await,
         "branch_delete" => handle_branch_delete(root, arguments).await,
 
-        // Git Primitives (not implemented)
-        "git_push" => Err(Error::NotImplemented("git_push".to_string())),
-        "git_pull" => Err(Error::NotImplemented("git_pull".to_string())),
-        "git_merge" => Err(Error::NotImplemented("git_merge".to_string())),
+        // Git Primitives
+        "git_push" => handle_git_push(root, arguments).await,
+        "git_pull" => handle_git_pull(root, arguments).await,
+        "git_merge" => handle_git_merge(root, arguments).await,
+
 
         // Configuration Management
         "tool_add" => handle_tool_add(root, arguments).await,
@@ -398,6 +401,135 @@ async fn handle_branch_delete(root: &Path, arguments: Value) -> Result<Value> {
         "branch": args.name,
         "message": format!("Deleted branch '{}'", args.name),
     }))
+}
+
+// ============================================================================
+// Git Primitive Handlers
+// ============================================================================
+
+/// Arguments for git_push
+#[derive(Debug, Deserialize)]
+struct GitPushArgs {
+    #[serde(default)]
+    remote: Option<String>,
+    #[serde(default)]
+    branch: Option<String>,
+}
+
+/// Handle git_push - Push current branch to remote
+async fn handle_git_push(root: &Path, arguments: Value) -> Result<Value> {
+    let args: GitPushArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    let ctx = RepoContext::new(root)?;
+    let provider = create_git_provider(&ctx.root, ctx.mode)?;
+    let repo = Repository::open(provider.main_worktree().to_native())
+        .map_err(repo_git::Error::from)?;
+
+    let remote_name = args.remote.as_deref().unwrap_or("origin");
+    let branch_ref = args.branch.as_deref();
+
+    // Resolve the branch name for reporting before the closure consumes provider
+    let pushed_branch = match &args.branch {
+        Some(b) => b.clone(),
+        None => provider
+            .current_branch()
+            .unwrap_or_else(|_| "unknown".to_string()),
+    };
+
+    let current_branch_fn = || provider.current_branch();
+    repo_git::push(&repo, Some(remote_name), branch_ref, current_branch_fn)?;
+
+    Ok(json!({
+        "success": true,
+        "remote": remote_name,
+        "branch": pushed_branch,
+        "message": format!("Pushed '{}' to '{}'", pushed_branch, remote_name),
+    }))
+}
+
+/// Arguments for git_pull
+#[derive(Debug, Deserialize)]
+struct GitPullArgs {
+    #[serde(default)]
+    remote: Option<String>,
+    #[serde(default)]
+    branch: Option<String>,
+}
+
+/// Handle git_pull - Pull changes from remote
+async fn handle_git_pull(root: &Path, arguments: Value) -> Result<Value> {
+    let args: GitPullArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    let ctx = RepoContext::new(root)?;
+    let provider = create_git_provider(&ctx.root, ctx.mode)?;
+    let repo = Repository::open(provider.main_worktree().to_native())
+        .map_err(repo_git::Error::from)?;
+
+    let remote_name = args.remote.as_deref().unwrap_or("origin");
+    let branch_ref = args.branch.as_deref();
+
+    // Resolve the branch name for reporting before the closure consumes provider
+    let pulled_branch = match &args.branch {
+        Some(b) => b.clone(),
+        None => provider
+            .current_branch()
+            .unwrap_or_else(|_| "unknown".to_string()),
+    };
+
+    let current_branch_fn = || provider.current_branch();
+    repo_git::pull(&repo, Some(remote_name), branch_ref, current_branch_fn, None)?;
+
+    Ok(json!({
+        "success": true,
+        "remote": remote_name,
+        "branch": pulled_branch,
+        "message": format!("Pulled '{}' from '{}'", pulled_branch, remote_name),
+    }))
+}
+
+/// Arguments for git_merge
+#[derive(Debug, Deserialize)]
+struct GitMergeArgs {
+    source: String,
+}
+
+/// Handle git_merge - Merge a branch into the current branch
+async fn handle_git_merge(root: &Path, arguments: Value) -> Result<Value> {
+    let args: GitMergeArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    let ctx = RepoContext::new(root)?;
+    let provider = create_git_provider(&ctx.root, ctx.mode)?;
+    let repo = Repository::open(provider.main_worktree().to_native())
+        .map_err(repo_git::Error::from)?;
+
+    let current_branch_fn = || provider.current_branch();
+    repo_git::merge(&repo, &args.source, current_branch_fn, None)?;
+
+    Ok(json!({
+        "success": true,
+        "source": args.source,
+        "message": format!("Merged '{}' into current branch", args.source),
+    }))
+}
+
+/// Create a LayoutProvider for git operations based on detected mode.
+fn create_git_provider(
+    root: &NormalizedPath,
+    mode: Mode,
+) -> Result<Box<dyn LayoutProvider>> {
+    match mode {
+        Mode::Standard => {
+            let layout = ClassicLayout::new(root.clone())?;
+            Ok(Box::new(layout))
+        }
+        Mode::Worktrees => {
+            let layout = ContainerLayout::new(root.clone(), Default::default())?;
+            Ok(Box::new(layout))
+        }
+    }
 }
 
 // ============================================================================
@@ -983,16 +1115,27 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_handle_not_implemented() {
+    async fn test_git_handlers_no_longer_return_not_implemented() {
         let temp = TempDir::new().unwrap();
         create_test_repo(temp.path());
+        // Initialize a real git repo so the handlers can proceed past mode detection
+        Repository::init(temp.path()).unwrap();
 
         for tool in &["git_push", "git_pull", "git_merge"] {
-            let result = handle_tool_call(temp.path(), tool, json!({})).await;
-            assert!(result.is_err());
-            match result {
-                Err(Error::NotImplemented(_)) => {}
-                _ => panic!("Expected NotImplemented error for {}", tool),
+            let args = if *tool == "git_merge" {
+                json!({"source": "nonexistent-branch"})
+            } else {
+                json!({})
+            };
+            let result = handle_tool_call(temp.path(), tool, args).await;
+            // The handlers should NOT return NotImplemented anymore.
+            // They may return other errors (e.g., no remote, no branch) but
+            // the key assertion is that NotImplemented is gone.
+            match &result {
+                Err(Error::NotImplemented(name)) => {
+                    panic!("{} still returns NotImplemented - it should be implemented now", name);
+                }
+                _ => {} // Any other result (Ok or non-NotImplemented Err) is acceptable
             }
         }
     }
@@ -1296,14 +1439,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_extension_handlers_consistent_with_git_not_implemented() {
-        // Extension handlers should return the same error type as git_push/git_pull/git_merge
+    async fn test_extension_handlers_return_not_implemented() {
+        // Extension handlers should still return NotImplemented
         let temp = TempDir::new().unwrap();
 
         let extension_tools = ["extension_install", "extension_add", "extension_init", "extension_remove"];
-        let git_tools = ["git_push", "git_pull", "git_merge"];
 
-        for tool in extension_tools.iter().chain(git_tools.iter()) {
+        for tool in extension_tools.iter() {
             let result = handle_tool_call(temp.path(), tool, json!({})).await;
             assert!(result.is_err(), "{} must return an error", tool);
             match result {
