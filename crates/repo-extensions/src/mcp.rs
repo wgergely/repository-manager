@@ -62,8 +62,11 @@ pub fn resolve_mcp_config(
         None => return Ok(None),
     };
 
-    // Reject absolute paths — mcp_config must be relative to source_dir
-    if Path::new(mcp_config_path).is_absolute() {
+    // Reject absolute/rooted paths — mcp_config must be relative to source_dir.
+    // Use has_root() instead of is_absolute() so that Unix-style paths like
+    // "/etc/passwd" are also rejected on Windows (where is_absolute() requires
+    // a drive letter and would return false for root-relative paths).
+    if Path::new(mcp_config_path).has_root() {
         return Err(Error::McpConfigParse {
             path: PathBuf::from(mcp_config_path),
             reason: "mcp_config must be a relative path, not absolute".to_string(),
