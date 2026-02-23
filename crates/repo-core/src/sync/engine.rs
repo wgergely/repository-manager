@@ -4,7 +4,6 @@
 //! and the filesystem (actual tool configurations).
 
 use std::fs;
-use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -14,6 +13,7 @@ use crate::backend::{ModeBackend, StandardBackend, WorktreeBackend};
 use crate::config::Manifest;
 use crate::ledger::{Ledger, ProjectionKind};
 use crate::mode::Mode;
+use repo_extensions::{ExtensionManifest, ResolveContext, merge_mcp_configs, resolve_mcp_config};
 use repo_fs::NormalizedPath;
 
 use super::check::{CheckReport, CheckStatus, DriftItem};
@@ -182,7 +182,7 @@ impl SyncEngine {
                             });
                         } else {
                             // Check checksum
-                            match compute_file_checksum(file_path.as_ref()) {
+                            match repo_fs::checksum::compute_file_checksum(file_path.as_ref()) {
                                 Ok(actual_checksum) => {
                                     if &actual_checksum != checksum {
                                         drifted.push(DriftItem {
@@ -236,7 +236,7 @@ impl SyncEngine {
                                         let block_content =
                                             extract_managed_block(&content, &marker_str);
                                         let actual_checksum =
-                                            compute_content_checksum(&block_content);
+                                            repo_fs::checksum::compute_content_checksum(&block_content);
                                         if actual_checksum != *checksum {
                                             drifted.push(DriftItem {
                                                 intent_id: intent.id.clone(),
@@ -383,11 +383,23 @@ impl SyncEngine {
             Ok(m) => m,
             Err(e) => {
                 tracing::warn!("Failed to parse config.toml: {}", e);
-                return Ok(report.with_action(format!("Failed to parse config.toml: {}", e)));
+                report.success = false;
+                report
+                    .errors
+                    .push(format!("Failed to parse config.toml: {}", e));
+                return Ok(report);
             }
         };
-        let tool_syncer = ToolSyncer::new(self.root.clone(), options.dry_run);
         let tool_names = &manifest.tools;
+
+        // Resolve MCP server configs from extensions
+        let mcp_servers = self.resolve_extension_mcp_configs(&manifest, &mut report);
+
+        let tool_syncer = if let Some(servers) = mcp_servers {
+            ToolSyncer::new(self.root.clone(), options.dry_run).with_mcp_servers(servers)
+        } else {
+            ToolSyncer::new(self.root.clone(), options.dry_run)
+        };
 
         // Sync tool configurations
         for tool_name in tool_names {
@@ -448,34 +460,37 @@ impl SyncEngine {
         // Check first to identify issues
         let check_report = self.check()?;
 
-        let mut report = SyncReport::success();
-
         if check_report.status == CheckStatus::Healthy {
-            return Ok(report.with_action("No fixes needed".to_string()));
+            let report = SyncReport::success().with_action("No fixes needed".to_string());
+            return Ok(report);
         }
 
         // Re-sync will fix drift and recreate missing files
-        let sync_report = self.sync_with_options(options)?;
+        let mut sync_report = self.sync_with_options(options)?;
 
-        report.actions = sync_report.actions;
-        report.errors = sync_report.errors;
-        report.success = sync_report.success;
+        // Re-check after sync to report actual fix counts instead of stale pre-sync counts
+        let post_check = self.check()?;
 
-        if !check_report.drifted.is_empty() {
-            report = report.with_action(format!(
-                "Fixed {} drifted projections",
-                check_report.drifted.len()
-            ));
+        let fixed_drift = check_report
+            .drifted
+            .len()
+            .saturating_sub(post_check.drifted.len());
+        let fixed_missing = check_report
+            .missing
+            .len()
+            .saturating_sub(post_check.missing.len());
+
+        if fixed_drift > 0 {
+            sync_report = sync_report
+                .with_action(format!("Fixed {} drifted projections", fixed_drift));
         }
 
-        if !check_report.missing.is_empty() {
-            report = report.with_action(format!(
-                "Recreated {} missing projections",
-                check_report.missing.len()
-            ));
+        if fixed_missing > 0 {
+            sync_report = sync_report
+                .with_action(format!("Recreated {} missing projections", fixed_missing));
         }
 
-        Ok(report)
+        Ok(sync_report)
     }
 
     /// Fix synchronization issues
@@ -498,23 +513,119 @@ impl SyncEngine {
     pub fn mode(&self) -> Mode {
         self.mode
     }
+
+    /// Resolve MCP server configurations from all configured extensions.
+    ///
+    /// For each extension in the manifest:
+    /// 1. Loads the extension's `repo_extension.toml` from its source directory
+    /// 2. If the extension declares `provides.mcp_config`, reads and resolves
+    ///    template variables in the referenced `mcp.json`
+    /// 3. Merges all resolved configs into a single JSON object
+    ///
+    /// Returns `None` if no extensions provide MCP configuration.
+    fn resolve_extension_mcp_configs(
+        &self,
+        manifest: &Manifest,
+        report: &mut SyncReport,
+    ) -> Option<Value> {
+        if manifest.extensions.is_empty() {
+            return None;
+        }
+
+        let extensions_dir = self.root.join(".repository/extensions");
+        let mut mcp_configs: Vec<Value> = Vec::new();
+
+        for ext_name in manifest.extensions.keys() {
+            let ext_source_dir = extensions_dir.join(ext_name);
+            let manifest_path = ext_source_dir.join(repo_extensions::MANIFEST_FILENAME);
+
+            // Read the extension manifest
+            let ext_manifest = match fs::read_to_string(manifest_path.as_ref()) {
+                Ok(content) => match ExtensionManifest::from_toml(&content) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to parse repo_extension.toml for '{}': {}",
+                            ext_name,
+                            e
+                        );
+                        report.errors.push(format!(
+                            "Failed to parse repo_extension.toml for '{}': {}",
+                            ext_name, e
+                        ));
+                        continue;
+                    }
+                },
+                Err(_) => {
+                    // Extension source not installed yet - skip silently
+                    tracing::debug!(
+                        "Extension '{}' source not found at {:?}, skipping MCP resolution",
+                        ext_name,
+                        ext_source_dir.as_ref()
+                    );
+                    continue;
+                }
+            };
+
+            // Build resolve context for this extension
+            let ctx = ResolveContext {
+                root: self.root.as_ref().to_string_lossy().to_string(),
+                extension_source: ext_source_dir.as_ref().to_string_lossy().to_string(),
+                python_path: self.find_extension_python(&ext_source_dir),
+            };
+
+            // Resolve MCP config if declared
+            match resolve_mcp_config(&ext_manifest, ext_source_dir.as_ref(), &ctx) {
+                Ok(Some(config)) => {
+                    let server_count = config.as_object().map_or(0, |o| o.len());
+                    report.actions.push(format!(
+                        "Resolved {} MCP server(s) from extension '{}'",
+                        server_count, ext_name
+                    ));
+                    mcp_configs.push(config);
+                }
+                Ok(None) => {
+                    // Extension doesn't provide MCP config - that's fine
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to resolve MCP config for extension '{}': {}",
+                        ext_name,
+                        e
+                    );
+                    report.errors.push(format!(
+                        "Failed to resolve MCP config for extension '{}': {}",
+                        ext_name, e
+                    ));
+                }
+            }
+        }
+
+        if mcp_configs.is_empty() {
+            None
+        } else {
+            Some(merge_mcp_configs(&mcp_configs))
+        }
+    }
+
+    /// Try to find the Python interpreter in an extension's virtual environment.
+    fn find_extension_python(&self, ext_source_dir: &NormalizedPath) -> Option<String> {
+        // Check common venv locations
+        let candidates = [
+            ext_source_dir.join(".venv/bin/python"),
+            ext_source_dir.join("venv/bin/python"),
+            ext_source_dir.join(".venv/Scripts/python.exe"),
+        ];
+
+        for candidate in &candidates {
+            if candidate.exists() {
+                return Some(candidate.as_ref().to_string_lossy().to_string());
+            }
+        }
+        None
+    }
 }
 
-/// Compute the SHA-256 checksum of a string content
-///
-/// Delegates to [`repo_fs::checksum::compute_content_checksum`] for the
-/// canonical `"sha256:<hex>"` format.
-pub fn compute_content_checksum(content: &str) -> String {
-    repo_fs::checksum::compute_content_checksum(content)
-}
-
-/// Compute the SHA-256 checksum of a file
-///
-/// Delegates to [`repo_fs::checksum::compute_file_checksum`] for the
-/// canonical `"sha256:<hex>"` format.
-pub fn compute_file_checksum(path: &Path) -> Result<String> {
-    Ok(repo_fs::checksum::compute_file_checksum(path)?)
-}
 
 /// Extract managed block content from a file by marker UUID
 ///
@@ -580,7 +691,7 @@ mod tests {
         let mut file = fs::File::create(&file_path).unwrap();
         file.write_all(b"hello world").unwrap();
 
-        let checksum = compute_file_checksum(&file_path).unwrap();
+        let checksum = repo_fs::checksum::compute_file_checksum(&file_path).unwrap();
 
         // Known SHA-256 of "hello world" with canonical prefix
         assert_eq!(

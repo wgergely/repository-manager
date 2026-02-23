@@ -96,7 +96,7 @@ The repo manager will run `pip install -r requirements.txt` (or `pip install .`)
 
 **Needed:** A `requirements.txt` at the repo root that accurately lists all runtime dependencies. It doesn't need to be an installable package -- just accurate dependency declarations so the repo manager can `pip install -r requirements.txt` into the venv.
 
-### 4. Add `extension.toml` to repo root
+### 4. Add `repo_extension.toml` to repo root
 
 The repo manager reads this to understand what VaultSpec provides and requires:
 
@@ -145,7 +145,7 @@ agents_md = "AGENTS.md"
 | 2 | Update `init_paths()` to derive source dirs from content path, output dirs from root | Medium |
 | 3 | Make `_paths.py` ROOT_DIR a fallback, not the authority when env vars are set | Small |
 | 4 | Fix `requirements.txt` to match actual dependencies | Small |
-| 5 | Add `extension.toml` to repo root | Small |
+| 5 | Add `repo_extension.toml` to repo root | Small |
 
 Items 1-3 are the critical path. Item 4 is a bugfix regardless. Item 5 is a new file with no code impact.
 

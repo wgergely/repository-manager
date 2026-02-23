@@ -62,14 +62,24 @@ impl RuleRegistry {
         }
     }
 
-    /// Save registry to TOML file
+    /// Save registry to TOML file atomically (temp file + rename).
+    ///
+    /// Uses write-to-temp-then-rename to prevent partial writes from
+    /// corrupting the registry on disk.
     pub fn save(&self) -> Result<()> {
         // Ensure parent directory exists
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent)?;
         }
         let content = toml::to_string_pretty(self)?;
-        std::fs::write(&self.path, content)?;
+
+        // Atomic write: temp file then rename
+        let temp_path = self.path.with_extension("toml.tmp");
+        std::fs::write(&temp_path, &content)?;
+        std::fs::rename(&temp_path, &self.path).inspect_err(|_e| {
+            // Best-effort cleanup of temp file on rename failure
+            let _ = std::fs::remove_file(&temp_path);
+        })?;
         Ok(())
     }
 
@@ -121,14 +131,19 @@ impl RuleRegistry {
     /// Remove a rule by UUID
     ///
     /// Returns the removed rule if found, or `Ok(None)` if no rule with that UUID exists.
-    /// Returns `Err` if the rule was found and removed from memory but persistence failed,
-    /// in which case the in-memory state and on-disk file will have diverged.
+    /// The in-memory state is only modified after the save succeeds, preventing
+    /// divergence between memory and disk.
     pub fn remove_rule(&mut self, uuid: Uuid) -> Result<Option<Rule>> {
         let Some(pos) = self.rules.iter().position(|r| r.uuid == uuid) else {
             return Ok(None);
         };
+        // Remove from in-memory state, save, and restore on failure
         let rule = self.rules.remove(pos);
-        self.save()?;
+        if let Err(e) = self.save() {
+            // Restore the in-memory state on save failure
+            self.rules.insert(pos, rule);
+            return Err(e);
+        }
         Ok(Some(rule))
     }
 

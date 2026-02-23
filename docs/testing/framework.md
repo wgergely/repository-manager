@@ -20,15 +20,17 @@ Gaps reveal WHERE implementation is incomplete
 
 ### Coverage Matrix
 
+> **Last updated:** 2026-02-21 (1,482 tests across 11 crates)
+
 | Mission Category | Spec Claims | Implemented | Tested | Gap Score |
 |------------------|-------------|-------------|--------|-----------|
 | Repository Init | 100% | ~80% | 60% | HIGH |
 | Branch Management | 100% | 90% | 70% | MEDIUM |
-| Configuration Sync | 100% | 30% | 20% | CRITICAL |
-| Tool Integration | 100% | 40% | 40% | HIGH |
+| Configuration Sync | 100% | 70% | 50% | MEDIUM |
+| Tool Integration | 100% | 60% | 50% | MEDIUM |
 | Preset Providers | 100% | 15% | 10% | CRITICAL |
-| Git Operations | 100% | 0% | 0% | CRITICAL |
-| MCP Server | 100% | 0% | 0% | CRITICAL |
+| Git Operations | 100% | 60% | 40% | HIGH |
+| MCP Server | 100% | 80% | 60% | MEDIUM |
 
 ---
 
@@ -430,11 +432,6 @@ fn gap_test_feature_x() {
 
 | Gap ID | Spec Claim | Implementation Status |
 |--------|------------|----------------------|
-| GAP-001 | `repo push` command | Not implemented |
-| GAP-002 | `repo pull` command | Not implemented |
-| GAP-003 | `repo merge` command | Not implemented |
-| GAP-004 | `sync()` applies projections | Only creates ledger |
-| GAP-005 | `fix()` repairs drift | Calls sync (stub) |
 | GAP-006 | Antigravity tool integration | Not implemented |
 | GAP-007 | Windsurf tool integration | Not implemented |
 | GAP-008 | Gemini CLI tool integration | Not implemented |
@@ -447,9 +444,9 @@ fn gap_test_feature_x() {
 | GAP-015 | GitIgnore provider | Not implemented |
 | GAP-016 | tool:ruff provider | Not implemented |
 | GAP-017 | tool:pytest provider | Not implemented |
-| GAP-018 | MCP Server crate | Not started |
-| GAP-019 | add-tool triggers sync | Only updates config |
-| GAP-020 | remove-tool cleans up | Only updates config |
+
+> **Resolved since original audit:** GAP-001 through GAP-005 (push/pull/merge, sync, fix),
+> GAP-018 (MCP server — 108 tests), GAP-019/020 (add-tool/remove-tool trigger sync).
 
 ---
 
@@ -555,19 +552,21 @@ mod robustness_tests {
 
 ### Test Health Dashboard
 
+> **Last updated:** 2026-02-21
+
 ```
 Mission Success Rate:
   M1 (Init):     ████████░░ 80%
   M2 (Branch):   ███████░░░ 70%
-  M3 (Sync):     ██░░░░░░░░ 20%
-  M4 (Tools):    ████░░░░░░ 40%
+  M3 (Sync):     █████░░░░░ 50%
+  M4 (Tools):    █████░░░░░ 50%
   M5 (Presets):  █░░░░░░░░░ 10%
-  M6 (Git):      ░░░░░░░░░░ 0%
+  M6 (Git):      ████░░░░░░ 40%
   M7 (Rules):    ███░░░░░░░ 30%
 
 Gap Closure:
-  Open Gaps:     20
-  Closed Gaps:   0
+  Open Gaps:     12
+  Closed Gaps:   8
   In Progress:   0
 ```
 
@@ -585,31 +584,36 @@ A mission is considered "production ready" when:
 
 ### Unit Tests (per crate)
 
-| Crate | Test Files | Coverage Focus |
-|-------|-----------|----------------|
-| repo-fs | 12 | Path normalization, atomic I/O, security |
-| repo-git | 5 | Layout providers, worktree ops |
-| repo-core | 5 | Ledger, sync engine, modes |
-| repo-content | 12 | Format handlers, block operations |
-| repo-blocks | 2 | Block parsing/writing |
-| repo-meta | - | Config loading, validation |
-| repo-tools | - | Tool integrations |
-| repo-presets | - | Provider implementations |
-| repo-cli | 1 | CLI parsing |
+> **Last updated:** 2026-02-21 — 1,482 total tests
+
+| Crate | Tests | Coverage Focus |
+|-------|-------|----------------|
+| repo-fs | 85 | Path normalization, atomic I/O, security |
+| repo-git | 52 | Layout providers, worktree ops, git helpers |
+| repo-core | 223 | Ledger, sync engine, modes, governance |
+| repo-content | 158 | Format handlers, block operations |
+| repo-blocks | 98 | Block parsing/writing per format |
+| repo-meta | 59 | Config loading, validation |
+| repo-tools | 281 | Tool integrations, MCP translate |
+| repo-presets | 53 | Provider implementations |
+| repo-mcp | 108 | MCP protocol, handlers, tool dispatch |
+| repo-cli | 261 | CLI commands, integration |
+| repo-extensions | 45 | Extension manifests, security |
 
 ### Integration Tests
 
 | Test File | Coverage |
 |-----------|----------|
 | `tests/integration/src/integration_test.rs` | Vertical slice: config->preset->tool |
+| `crates/repo-core/tests/integration_tests.rs` | Sync engine, ledger, projections |
+| `crates/repo-core/tests/sync_tests.rs` | Check/fix drift detection |
 
 ### Missing Test Categories
 
-1. **CLI End-to-End Tests**: Full command execution
-2. **Cross-Mode Tests**: Same operation in both modes
-3. **Multi-Worktree Tests**: Operations across worktrees
-4. **Error Recovery Tests**: Graceful failure handling
-5. **Upgrade/Migration Tests**: Config version changes
+1. **Cross-Mode Tests**: Same operation in both modes
+2. **Multi-Worktree Tests**: Operations across worktrees
+3. **Error Recovery Tests**: Graceful failure handling
+4. **Upgrade/Migration Tests**: Config version changes
 
 ---
 

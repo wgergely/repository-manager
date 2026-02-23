@@ -16,6 +16,7 @@ use crate::projection::compute_checksum;
 use crate::{Error, Result};
 use repo_fs::NormalizedPath;
 use repo_tools::{Rule, SyncContext, ToolDispatcher};
+use serde_json::Value;
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -45,6 +46,8 @@ pub struct ToolSyncer {
     backup_manager: BackupManager,
     /// Tool dispatcher for routing to appropriate integrations
     dispatcher: ToolDispatcher,
+    /// Resolved MCP server configuration from extensions.
+    mcp_servers: Option<Value>,
 }
 
 impl ToolSyncer {
@@ -62,7 +65,14 @@ impl ToolSyncer {
             dry_run,
             backup_manager,
             dispatcher,
+            mcp_servers: None,
         }
+    }
+
+    /// Set the resolved MCP server configuration from extensions.
+    pub fn with_mcp_servers(mut self, servers: Value) -> Self {
+        self.mcp_servers = Some(servers);
+        self
     }
 
     /// Check if a backup exists for a tool
@@ -314,7 +324,7 @@ impl ToolSyncer {
     /// This is the write-side counterpart to `get_tool_config_files`.
     fn ensure_tool_config_files(&self, tool_name: &str) -> Vec<(String, String)> {
         if let Some(integration) = self.dispatcher.get_integration(tool_name) {
-            let context = SyncContext::new(self.root.clone());
+            let context = self.make_sync_context();
             let initial_rule = Rule {
                 id: format!("{}-init", tool_name),
                 content: format!(
@@ -377,8 +387,8 @@ impl ToolSyncer {
             }
         };
 
-        // Create sync context
-        let context = SyncContext::new(self.root.clone());
+        // Create sync context (with MCP servers if available)
+        let context = self.make_sync_context();
 
         if self.dry_run {
             actions.push(format!(
@@ -390,9 +400,11 @@ impl ToolSyncer {
         }
 
         // Sync rules using the integration
-        integration
-            .sync(&context, rules)
-            .map_err(|e| Error::Io(std::io::Error::other(format!("Tool sync failed: {}", e))))?;
+        integration.sync(&context, rules).map_err(|e| {
+            Error::SyncError {
+                message: format!("Tool sync failed for {}: {}", tool_name, e),
+            }
+        })?;
 
         // Create projections for ledger
         let mut projections = Vec::new();
@@ -427,6 +439,15 @@ impl ToolSyncer {
         }
 
         Ok(actions)
+    }
+
+    /// Create a SyncContext with MCP servers if available.
+    fn make_sync_context(&self) -> SyncContext {
+        let mut ctx = SyncContext::new(self.root.clone());
+        if let Some(ref servers) = self.mcp_servers {
+            ctx.mcp_servers = Some(servers.clone());
+        }
+        ctx
     }
 
     /// Check if a tool is supported
@@ -612,9 +633,16 @@ mod tests {
         let root = NormalizedPath::new(dir.path());
         let syncer = ToolSyncer::new(root, false);
 
+        // Antigravity uses a directory config (.agent/rules/), so
+        // get_tool_config_files (which filters out directories) returns 0.
         let files = syncer.get_tool_config_files("antigravity");
-        assert_eq!(files.len(), 1);
-        // Read-only: only verify path, not content
+        assert_eq!(files.len(), 0);
+
+        // But config_locations should still report the directory location
+        let integration = syncer.dispatcher.get_integration("antigravity").unwrap();
+        let locations = integration.config_locations();
+        assert_eq!(locations.len(), 1);
+        assert!(locations[0].is_directory);
     }
 
     #[test]

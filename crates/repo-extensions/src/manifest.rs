@@ -1,7 +1,9 @@
-//! Extension manifest parsing for `extension.toml` files.
+//! Extension manifest parsing for `repo_extension.toml` files.
 //!
 //! An extension manifest declares metadata, runtime requirements, entry points,
-//! and output directories for a repository-manager extension.
+//! and output directories for a repository-manager extension. The canonical
+//! filename is [`MANIFEST_FILENAME`](crate::MANIFEST_FILENAME)
+//! (`repo_extension.toml`).
 //!
 //! # Example TOML
 //!
@@ -24,6 +26,7 @@
 //!
 //! [provides]
 //! mcp = ["vs-subagent-mcp"]
+//! mcp_config = "mcp.json"
 //! content_types = ["rules", "agents", "skills", "system", "templates"]
 //!
 //! [outputs]
@@ -39,7 +42,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 
-/// Complete extension manifest loaded from `extension.toml`.
+/// Complete extension manifest loaded from `repo_extension.toml`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExtensionManifest {
     /// Core extension metadata.
@@ -157,8 +160,18 @@ impl EntryPoints {
         };
 
         let script_path = Path::new(script);
+
+        // Security: Reject absolute paths in entry points. Entry points must be
+        // relative to the extension source directory to prevent executing arbitrary
+        // binaries outside the extension.
         let resolved_script = if script_path.is_absolute() {
-            script_path.to_path_buf()
+            tracing::warn!(
+                "Extension entry_point uses absolute path {:?} — forcing relative resolution",
+                script
+            );
+            // Strip the leading / and resolve relative to source_dir
+            let relative = script.trim_start_matches('/').trim_start_matches('\\');
+            source_dir.join(relative)
         } else {
             source_dir.join(script_path)
         };
@@ -178,6 +191,13 @@ pub struct Provides {
     /// MCP server names provided.
     #[serde(default)]
     pub mcp: Vec<String>,
+    /// Path to an `mcp.json` file relative to the extension source directory.
+    ///
+    /// When set, the repo manager reads MCP server definitions from this file,
+    /// resolves runtime paths (e.g., Python venv, repo root), and writes the
+    /// resolved configuration into each tool that supports MCP.
+    #[serde(default)]
+    pub mcp_config: Option<String>,
     /// Content types this extension manages.
     #[serde(default)]
     pub content_types: Vec<String>,
@@ -488,7 +508,7 @@ content_types = []
     #[test]
     fn test_from_path_reads_file() {
         let dir = tempfile::TempDir::new().unwrap();
-        let file_path = dir.path().join("extension.toml");
+        let file_path = dir.path().join(crate::MANIFEST_FILENAME);
         std::fs::write(&file_path, VAULTSPEC_TOML).unwrap();
 
         let manifest = ExtensionManifest::from_path(&file_path).unwrap();
@@ -499,7 +519,7 @@ content_types = []
     #[test]
     fn test_from_path_not_found() {
         let err =
-            ExtensionManifest::from_path(Path::new("/nonexistent/extension.toml")).unwrap_err();
+            ExtensionManifest::from_path(Path::new("/nonexistent/repo_extension.toml")).unwrap_err();
         assert!(matches!(err, Error::ManifestNotFound(_)));
     }
 
@@ -607,5 +627,39 @@ version = "1.0.0"
         let resolved = ep.resolve(Path::new("/py"), Path::new("/ext"));
         assert!(resolved.cli.is_none());
         assert!(resolved.mcp.is_none());
+    }
+
+    #[test]
+    fn test_parse_provides_with_mcp_config() {
+        let toml = r#"
+[extension]
+name = "mcp-ext"
+version = "1.0.0"
+
+[provides]
+mcp = ["my-server"]
+mcp_config = "mcp.json"
+content_types = []
+"#;
+        let manifest = ExtensionManifest::from_toml(toml).unwrap();
+        let provides = manifest.provides.unwrap();
+        assert_eq!(provides.mcp, vec!["my-server"]);
+        assert_eq!(provides.mcp_config.as_deref(), Some("mcp.json"));
+    }
+
+    #[test]
+    fn test_parse_provides_without_mcp_config() {
+        let toml = r#"
+[extension]
+name = "no-mcp-ext"
+version = "1.0.0"
+
+[provides]
+mcp = ["server"]
+content_types = ["rules"]
+"#;
+        let manifest = ExtensionManifest::from_toml(toml).unwrap();
+        let provides = manifest.provides.unwrap();
+        assert!(provides.mcp_config.is_none());
     }
 }

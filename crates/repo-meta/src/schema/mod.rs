@@ -7,10 +7,15 @@
 //! - `.repository/rules/*.toml` - Rule definitions
 //! - `.repository/presets/*.toml` - Preset definitions
 
+pub mod mcp;
 pub mod preset;
 pub mod rule;
 pub mod tool;
 
+pub use mcp::{
+    McpConfigEmbedding, McpConfigSpec, McpEnvSyntax, McpFieldMappings, McpScope, McpServerConfig,
+    McpSyncResult, McpTransport, McpTransportConfig, McpTypeValues, McpUserPath, McpVerifyResult,
+};
 pub use preset::{PresetDefinition, PresetMeta, PresetRequires, PresetRules};
 pub use rule::{RuleContent, RuleDefinition, RuleExamples, RuleMeta, RuleTargets, Severity};
 pub use tool::{

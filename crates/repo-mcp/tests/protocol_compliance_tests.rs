@@ -10,8 +10,19 @@ use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
+/// Create a temp dir with a valid repository structure needed for server initialization.
+fn setup_repo_structure(temp: &TempDir) {
+    fs::create_dir_all(temp.path().join(".repository")).unwrap();
+    fs::write(
+        temp.path().join(".repository/config.toml"),
+        "tools = []\n\n[core]\nmode = \"standard\"\n",
+    )
+    .unwrap();
+}
+
 /// Create an initialized server with a temp directory as root.
 async fn setup_server(temp: &TempDir) -> RepoMcpServer {
+    setup_repo_structure(temp);
     let mut server = RepoMcpServer::new(PathBuf::from(temp.path()));
     server.initialize().await.unwrap();
     server
@@ -466,6 +477,8 @@ async fn test_resources_list_returns_all_defined_resources() {
 async fn test_tool_call_repo_init_creates_repo() {
     let temp = TempDir::new().unwrap();
     let server = setup_server(&temp).await;
+    // Remove .repository so repo_init can create it fresh
+    fs::remove_dir_all(temp.path().join(".repository")).unwrap();
     // Create minimal .git so mode detection works
     fs::create_dir_all(temp.path().join(".git")).unwrap();
 
@@ -620,14 +633,14 @@ async fn test_tool_call_not_implemented_returns_is_error() {
     let server = setup_server(&temp).await;
     create_test_repo(&temp);
 
-    // git_push is explicitly not implemented
+    // extension_install is explicitly not implemented
     let request = serde_json::to_string(&json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "tools/call",
         "params": {
-            "name": "git_push",
-            "arguments": {}
+            "name": "extension_install",
+            "arguments": { "source": "https://example.com/ext.git" }
         }
     }))
     .unwrap();
@@ -674,6 +687,126 @@ async fn test_resource_read_config_returns_valid_content() {
     assert!(
         text.contains("mode"),
         "Config content should contain mode setting"
+    );
+}
+
+// ==========================================================================
+// Extension Handlers Return NotImplemented
+// ==========================================================================
+
+#[tokio::test]
+async fn test_mcp_extension_install_not_implemented() {
+    let temp = TempDir::new().unwrap();
+    let server = setup_server(&temp).await;
+    create_test_repo(&temp);
+
+    let request = serde_json::to_string(&json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "extension_install",
+            "arguments": { "source": "https://example.com/ext.git" }
+        }
+    }))
+    .unwrap();
+
+    let response: Value =
+        serde_json::from_str(&server.handle_message(&request).await.unwrap()).unwrap();
+
+    // Extension handlers return NotImplemented, which surfaces as is_error=true
+    let result = &response["result"];
+    assert_eq!(
+        result["is_error"], true,
+        "extension_install should return is_error=true (not implemented)"
+    );
+    let text = result["content"][0]["text"].as_str().unwrap();
+    assert!(
+        text.contains("not implemented"),
+        "Error text should mention 'not implemented', got: {}",
+        text
+    );
+}
+
+#[tokio::test]
+async fn test_mcp_extension_handlers_return_not_implemented() {
+    let temp = TempDir::new().unwrap();
+    let server = setup_server(&temp).await;
+    create_test_repo(&temp);
+
+    // All extension mutation operations should return is_error=true
+    let extension_tools = vec![
+        ("extension_install", json!({ "source": "test" })),
+        ("extension_add", json!({ "name": "test" })),
+        ("extension_init", json!({ "name": "test" })),
+        ("extension_remove", json!({ "name": "test" })),
+    ];
+
+    for (tool_name, args) in extension_tools {
+        let request = serde_json::to_string(&json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {
+                "name": tool_name,
+                "arguments": args
+            }
+        }))
+        .unwrap();
+
+        let response: Value =
+            serde_json::from_str(&server.handle_message(&request).await.unwrap()).unwrap();
+
+        let result = &response["result"];
+        assert_eq!(
+            result["is_error"], true,
+            "{} should return is_error=true (not implemented)",
+            tool_name
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_mcp_extension_list_succeeds() {
+    let temp = TempDir::new().unwrap();
+    let server = setup_server(&temp).await;
+    create_test_repo(&temp);
+
+    let request = serde_json::to_string(&json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "extension_list",
+            "arguments": {}
+        }
+    }))
+    .unwrap();
+
+    let response: Value =
+        serde_json::from_str(&server.handle_message(&request).await.unwrap()).unwrap();
+
+    // extension_list IS a valid operation -- it should succeed
+    assert!(
+        response.get("result").is_some(),
+        "extension_list should return a result, not an error"
+    );
+    let result = &response["result"];
+    assert!(
+        result.get("is_error").is_none() || result["is_error"] == false,
+        "extension_list should NOT return is_error=true"
+    );
+
+    // Parse the inner content to verify it returns known extensions
+    let content = result["content"][0]["text"].as_str().unwrap();
+    let inner: Value = serde_json::from_str(content).unwrap();
+    assert!(
+        inner.get("known").is_some(),
+        "extension_list should return known extensions"
+    );
+    assert_eq!(
+        inner["installed_count"], 0,
+        "No extensions should be installed"
     );
 }
 

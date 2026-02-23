@@ -1,7 +1,7 @@
 //! tests/security_audit_tests.rs
-
-// These tests are intended to audit the `repo-fs` crate for security vulnerabilities.
-// The focus is on path traversal, symlink attacks, and race conditions.
+//!
+//! Security audit tests for the `repo-fs` crate.
+//! Focus: path traversal, symlink attacks, UNC/network path handling, race conditions.
 
 use repo_fs::NormalizedPath;
 use rstest::rstest;
@@ -25,6 +25,138 @@ mod path_normalization_security {
     fn test_path_traversal_sanitization(#[case] input: &str, #[case] expected: &str) {
         let normalized = NormalizedPath::new(input);
         assert_eq!(normalized.as_str(), expected);
+    }
+}
+
+#[cfg(test)]
+mod unc_network_path_security {
+    use super::*;
+
+    #[test]
+    fn test_unc_forward_slash_rejected() {
+        // //server/share should be rewritten to /server/share (local absolute)
+        let path = NormalizedPath::new("//server/share/path");
+        assert_eq!(path.as_str(), "/server/share/path");
+        assert!(!path.is_network_path());
+    }
+
+    #[test]
+    fn test_unc_backslash_rejected() {
+        // \\server\share should be rewritten to /server/share after normalization
+        let path = NormalizedPath::new("\\\\server\\share\\path");
+        assert_eq!(path.as_str(), "/server/share/path");
+        assert!(!path.is_network_path());
+    }
+
+    #[test]
+    fn test_unc_via_join_rejected() {
+        // Even if a UNC path is produced via join, it should be rewritten
+        let base = NormalizedPath::new("/");
+        let joined = base.join("/server/share");
+        assert!(!joined.is_network_path());
+    }
+
+    #[test]
+    fn test_triple_slash_not_treated_as_unc() {
+        // ///path should be treated as absolute, not UNC
+        let path = NormalizedPath::new("///some/path");
+        assert_eq!(path.as_str(), "/some/path");
+    }
+
+    #[test]
+    fn test_smb_url_normalized_away() {
+        // smb:// gets normalized by NormalizedPath (// inside the scheme gets cleaned).
+        // This is acceptable: smb:// is not a valid filesystem path on Unix/Windows,
+        // so NormalizedPath should not attempt to preserve it.
+        let path = NormalizedPath::new("smb://server/share");
+        // After normalization, the scheme:// gets collapsed, so this won't match
+        // is_network_path(). The important thing is it doesn't become a routeable path.
+        assert!(!path.as_str().starts_with("//"), "Must not become a UNC path");
+    }
+
+    #[test]
+    fn test_nfs_url_normalized_away() {
+        let path = NormalizedPath::new("nfs://server/export");
+        assert!(!path.as_str().starts_with("//"), "Must not become a UNC path");
+    }
+
+    #[test]
+    fn test_regular_absolute_path_not_network() {
+        let path = NormalizedPath::new("/home/user/project");
+        assert!(!path.is_network_path());
+    }
+
+    #[test]
+    fn test_regular_relative_path_not_network() {
+        let path = NormalizedPath::new("src/main.rs");
+        assert!(!path.is_network_path());
+    }
+
+    #[test]
+    fn test_unc_with_traversal() {
+        // //server/../etc/passwd should be rewritten and cleaned
+        let path = NormalizedPath::new("//server/../etc/passwd");
+        // After UNC detection -> //etc/passwd would become /etc/passwd
+        // But since clean() processes .. first, //server/../etc/passwd -> //etc/passwd -> /etc/passwd
+        assert!(!path.as_str().starts_with("//"));
+    }
+}
+
+#[cfg(test)]
+mod validate_path_identifier_tests {
+    use repo_fs::validate_path_identifier;
+
+    #[test]
+    fn test_valid_identifiers() {
+        assert!(validate_path_identifier("my-rule", "Rule ID").is_ok());
+        assert!(validate_path_identifier("rule_123", "Rule ID").is_ok());
+        assert!(validate_path_identifier("UPPER-case", "Rule ID").is_ok());
+        assert!(validate_path_identifier("file.ext", "Rule ID").is_ok());
+    }
+
+    #[test]
+    fn test_empty_rejected() {
+        assert!(validate_path_identifier("", "Rule ID").is_err());
+    }
+
+    #[test]
+    fn test_path_separators_rejected() {
+        assert!(validate_path_identifier("a/b", "Rule ID").is_err());
+        assert!(validate_path_identifier("a\\b", "Rule ID").is_err());
+    }
+
+    #[test]
+    fn test_traversal_rejected() {
+        assert!(validate_path_identifier("..", "Rule ID").is_err());
+        assert!(validate_path_identifier("a..b", "Rule ID").is_err());
+        assert!(validate_path_identifier("../../etc/passwd", "Rule ID").is_err());
+    }
+
+    #[test]
+    fn test_null_byte_rejected() {
+        assert!(validate_path_identifier("rule\0id", "Rule ID").is_err());
+    }
+
+    #[test]
+    fn test_leading_dash_rejected() {
+        assert!(validate_path_identifier("-delete", "Branch name").is_err());
+        assert!(validate_path_identifier("--force", "Branch name").is_err());
+    }
+
+    #[test]
+    fn test_excessive_length_rejected() {
+        let long = "a".repeat(256);
+        assert!(validate_path_identifier(&long, "Rule ID").is_err());
+
+        let ok = "a".repeat(255);
+        assert!(validate_path_identifier(&ok, "Rule ID").is_ok());
+    }
+
+    #[test]
+    fn test_special_chars_rejected() {
+        assert!(validate_path_identifier("rule id", "Rule ID").is_err());
+        assert!(validate_path_identifier("rule@id", "Rule ID").is_err());
+        assert!(validate_path_identifier("rule#id", "Rule ID").is_err());
     }
 }
 
@@ -89,7 +221,7 @@ mod io_security {
         let work_dir = jail_path.join("workdir");
         std::fs::create_dir(&work_dir).unwrap();
 
-        // Construct a path that attempts traversal: workdir/../outside.txt
+        // Construct a path that attempts traversal: workdir/../escape.txt
         // NormalizedPath should normalize this so it does NOT escape
         let traversal_path = work_dir.join("../escape.txt");
         let normalized = NormalizedPath::new(&traversal_path);
@@ -145,7 +277,9 @@ mod io_security {
     }
 
     #[test]
-    fn test_write_atomic_replaces_symlink_at_destination() {
+    fn test_write_atomic_rejects_symlink_at_destination() {
+        // Symlinks at the destination file are rejected by contains_symlink(),
+        // which checks all components including the leaf.
         let jail = setup_jail();
         let jail_path = jail.path();
 
@@ -157,25 +291,23 @@ mod io_security {
         let symlink_as_file_path = jail_path.join("symlink_file.txt");
         std::os::unix::fs::symlink(&external_file_path, &symlink_as_file_path).unwrap();
 
-        // Attempt to write to the symlink path
+        // Attempt to write to the symlink path — should be rejected
         let normalized_path = NormalizedPath::new(&symlink_as_file_path);
-        let content = "overwriting content";
+        let result = io::write_text(&normalized_path, "overwriting content");
 
-        let result = io::write_text(&normalized_path, content);
-        assert!(result.is_ok(), "Write should succeed");
-
-        // Assert that the symlink itself was replaced by a regular file
         assert!(
-            !symlink_as_file_path.is_symlink(),
-            "Symlink should have been replaced"
-        );
-        assert!(
-            symlink_as_file_path.is_file(),
-            "A new regular file should exist"
+            result.is_err(),
+            "Write to a symlink destination should be rejected"
         );
 
         // Assert that the original external file is untouched
         let external_content = fs::read_to_string(&external_file_path).unwrap();
         assert_eq!(external_content, "safe content");
+
+        // Assert symlink still exists (not replaced)
+        assert!(
+            symlink_as_file_path.is_symlink(),
+            "Symlink should still exist (not replaced)"
+        );
     }
 }

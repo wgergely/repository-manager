@@ -1,3 +1,7 @@
+<!-- Golden file: CLAUDE.md format for Claude Code -->
+<!-- Format source: Claude Code documentation (Markdown with natural language) -->
+<!-- Last validated: 2026-02-22 -->
+<!-- WARNING: Do not regenerate from code. Edit manually from spec. -->
 <!-- repo:block:coding-standards -->
 # Coding Standards
 

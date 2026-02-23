@@ -91,6 +91,24 @@ pub fn remove_worktree_and_branch(repo: &Repository, name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Check that the working tree has no uncommitted changes.
+///
+/// Returns `Err(Error::DirtyWorkingTree)` if there are modified or deleted
+/// tracked files. This should be called before force-checkout operations
+/// to prevent silently destroying local changes.
+fn guard_clean_worktree(repo: &Repository) -> Result<()> {
+    let statuses = repo.statuses(None)?;
+    let dominated = git2::Status::WT_MODIFIED
+        | git2::Status::WT_DELETED
+        | git2::Status::WT_RENAMED
+        | git2::Status::WT_TYPECHANGE;
+
+    if statuses.iter().any(|e| e.status().intersects(dominated)) {
+        return Err(Error::DirtyWorkingTree);
+    }
+    Ok(())
+}
+
 /// Get the current branch name from a repository.
 ///
 /// Returns the branch name if HEAD points to a branch, or `None` if HEAD is detached.
@@ -194,6 +212,9 @@ pub fn pull(
     }
 
     if merge_analysis.is_fast_forward() {
+        let co_repo = checkout_repo.unwrap_or(repo);
+        guard_clean_worktree(co_repo)?;
+
         let refname = format!("refs/heads/{}", branch_name);
         let mut reference = repo.find_reference(&refname)?;
         reference.set_target(
@@ -201,7 +222,6 @@ pub fn pull(
             &format!("pull: fast-forward to {}", fetch_commit.id()),
         )?;
 
-        let co_repo = checkout_repo.unwrap_or(repo);
         co_repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
         return Ok(());
     }
@@ -245,6 +265,9 @@ pub fn merge(
     }
 
     if merge_analysis.is_fast_forward() {
+        let co_repo = merge_repo.unwrap_or(repo);
+        guard_clean_worktree(co_repo)?;
+
         let current_branch = current_branch_fn()?;
         let refname = format!("refs/heads/{}", current_branch);
         let mut reference = repo.find_reference(&refname)?;
@@ -253,7 +276,6 @@ pub fn merge(
             &format!("merge {}: fast-forward", source),
         )?;
 
-        let co_repo = merge_repo.unwrap_or(repo);
         co_repo.checkout_head(Some(git2::build::CheckoutBuilder::default().force()))?;
         return Ok(());
     }

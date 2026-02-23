@@ -10,15 +10,13 @@ use std::thread;
 use tempfile::tempdir;
 
 #[test]
-#[ignore = "known TOCTOU race: concurrent load-modify-save causes data loss (last-writer-wins) — see audit"]
-fn concurrent_ledger_saves_preserve_file_integrity() {
-    // Verify that concurrent saves produce a structurally valid ledger file,
-    // even though the current load-then-save pattern means one writer's
-    // changes will overwrite the other's (last-writer-wins).
+fn concurrent_ledger_modify_preserves_all_intents() {
+    // Verify that Ledger::modify() resolves the TOCTOU race condition:
+    // concurrent modifications under exclusive lock preserve all intents.
     let dir = tempdir().unwrap();
     let path = dir.path().join("ledger.toml");
 
-    // Create initial ledger with a seed intent so we can detect overwrites
+    // Create initial ledger with a seed intent
     let mut ledger = Ledger::new();
     ledger.add_intent(Intent::new("rule:seed".to_string(), json!({})));
     ledger.save(&path).unwrap();
@@ -29,36 +27,32 @@ fn concurrent_ledger_saves_preserve_file_integrity() {
     let b1 = barrier.clone();
     let b2 = barrier.clone();
 
-    // Two threads do load-modify-save concurrently.
-    // Because load() and save() use separate locks, this is a TOCTOU race:
-    // both threads read the same state, each adds one intent, and whichever
-    // writes last overwrites the other's addition.
+    // Two threads use Ledger::modify() concurrently.
+    // The exclusive lock serializes the operations, so both intents are preserved.
     let t1 = thread::spawn(move || {
         b1.wait();
-        let mut ledger = Ledger::load(&path1).unwrap();
-        ledger.add_intent(Intent::new("rule:thread1".to_string(), json!({})));
-        ledger.save(&path1).unwrap();
+        Ledger::modify(&path1, |ledger| {
+            ledger.add_intent(Intent::new("rule:thread1".to_string(), json!({})));
+        })
+        .unwrap();
     });
 
     let t2 = thread::spawn(move || {
         b2.wait();
-        let mut ledger = Ledger::load(&path2).unwrap();
-        ledger.add_intent(Intent::new("rule:thread2".to_string(), json!({})));
-        ledger.save(&path2).unwrap();
+        Ledger::modify(&path2, |ledger| {
+            ledger.add_intent(Intent::new("rule:thread2".to_string(), json!({})));
+        })
+        .unwrap();
     });
 
     t1.join().unwrap();
     t2.join().unwrap();
 
-    // The file must be structurally valid (no corruption from concurrent writes)
+    // The file must be structurally valid
     let final_ledger = Ledger::load(&path).unwrap();
 
-    // The seed intent should still be present (both threads loaded it)
+    // All three intents must be present (seed + thread1 + thread2)
     let has_seed = final_ledger.intents().iter().any(|i| i.id == "rule:seed");
-    assert!(has_seed, "Seed intent should survive concurrent writes");
-
-    // Due to last-writer-wins, exactly one of the two thread intents will be present,
-    // NOT both. The final ledger has 2 intents (seed + one thread), not 3.
     let has_t1 = final_ledger
         .intents()
         .iter()
@@ -68,20 +62,22 @@ fn concurrent_ledger_saves_preserve_file_integrity() {
         .iter()
         .any(|i| i.id == "rule:thread2");
 
-    // At least one thread's intent must be present
-    assert!(
-        has_t1 || has_t2,
-        "At least one thread's intent must be present in final ledger"
+    assert!(has_seed, "Seed intent must be preserved");
+    assert!(has_t1, "Thread 1's intent must be preserved");
+    assert!(has_t2, "Thread 2's intent must be preserved");
+    assert_eq!(
+        final_ledger.intents().len(),
+        3,
+        "All 3 intents must be present (seed + thread1 + thread2)"
     );
 
-    // The file must parse as valid TOML with correct structure
+    // Verify structural integrity
     let raw = std::fs::read_to_string(&path).unwrap();
     assert!(
         raw.contains("version = \"1.0\""),
         "Ledger file must contain version field"
     );
 
-    // Verify each intent in the final ledger has valid fields
     for intent in final_ledger.intents() {
         assert!(!intent.id.is_empty(), "Intent ID must not be empty");
         assert!(!intent.uuid.is_nil(), "Intent UUID must not be nil");

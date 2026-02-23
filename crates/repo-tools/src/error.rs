@@ -20,4 +20,19 @@ pub enum Error {
 
     #[error("Sync failed for {tool}: {message}")]
     SyncFailed { tool: String, message: String },
+
+    #[error("MCP config error for {tool}: {message}")]
+    McpConfig { tool: String, message: String },
+
+    #[error("MCP scope {scope} not supported by {tool}")]
+    McpScopeNotSupported { tool: String, scope: String },
+
+    #[error("Tool {tool} does not support MCP")]
+    McpNotSupported { tool: String },
+
+    #[error("Invalid MCP server name: {message}")]
+    McpInvalidServerName { message: String },
+
+    #[error("Home directory not found")]
+    HomeDirNotFound,
 }

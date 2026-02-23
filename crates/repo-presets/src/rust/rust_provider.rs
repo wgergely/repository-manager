@@ -82,10 +82,9 @@ impl PresetProvider for RustProvider {
     }
 
     async fn apply(&self, _context: &Context) -> Result<ApplyReport> {
-        // This is a detection-only provider
-        Ok(ApplyReport::success(vec![
-            "Rust environment provider is detection-only.".to_string(),
-            "No actions taken. Use rustup to manage Rust installations.".to_string(),
+        Ok(ApplyReport::detection_only(vec![
+            "Rust environment detected. This provider does not perform setup.".to_string(),
+            "Manage Rust installations with rustup.".to_string(),
         ]))
     }
 }
@@ -185,13 +184,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_apply_returns_detection_only_message() {
+    async fn test_apply_returns_detection_only() {
         let temp = TempDir::new().unwrap();
         let context = make_test_context(&temp);
         let provider = RustProvider::new();
 
         let report = provider.apply(&context).await.unwrap();
-        assert!(report.success);
-        assert!(report.actions_taken[0].contains("detection-only"));
+        assert!(
+            report.is_detection_only(),
+            "RustProvider.apply() must return DetectionOnly status, got: {:?}",
+            report.status
+        );
+        assert!(
+            !report.is_success(),
+            "RustProvider.apply() must NOT be Success — it does no real work"
+        );
+        assert!(
+            !report.is_failure(),
+            "RustProvider.apply() must NOT be Failed — detection itself succeeds"
+        );
     }
 }

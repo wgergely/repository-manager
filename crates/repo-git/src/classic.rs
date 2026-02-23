@@ -51,7 +51,10 @@ impl LayoutProvider for ClassicLayout {
 
     fn list_worktrees(&self) -> Result<Vec<WorktreeInfo>> {
         // Classic layout only has one "worktree" - the repo itself
-        let branch = self.current_branch().unwrap_or_else(|_| "unknown".into());
+        let branch = self.current_branch().unwrap_or_else(|e| {
+            tracing::warn!(error = %e, "Failed to determine current branch, falling back to \"unknown\"");
+            "unknown".into()
+        });
         Ok(vec![WorktreeInfo {
             name: "main".into(),
             path: self.root.clone(),
@@ -79,7 +82,7 @@ impl LayoutProvider for ClassicLayout {
     }
 
     fn current_branch(&self) -> Result<String> {
-        let repo = Repository::open(self.git_dir.to_native())?;
+        let repo = Repository::open(self.root.to_native())?;
         crate::helpers::get_current_branch(&repo)
             .map(|opt| opt.unwrap_or_else(|| "HEAD".to_string()))
     }

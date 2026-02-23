@@ -15,4 +15,4 @@ pub use constants::RepoPath;
 pub use error::{Error, Result};
 pub use io::RobustnessConfig;
 pub use layout::{LayoutMode, WorkspaceLayout};
-pub use path::NormalizedPath;
+pub use path::{NormalizedPath, validate_path_identifier};

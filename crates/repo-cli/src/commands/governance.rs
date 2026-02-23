@@ -151,6 +151,12 @@ pub fn run_rules_import(path: &Path, file: &str) -> Result<()> {
     );
 
     for (id, rule_content) in &rules {
+        // Validate rule ID to prevent path traversal
+        if let Err(e) = repo_core::validate_rule_id(id) {
+            println!("   {} {} (skipped: {})", "!".red(), id, e);
+            continue;
+        }
+
         let rule_path = rules_dir.join(format!("{}.md", id));
         fs::write(&rule_path, rule_content)?;
         println!("   {} {}", "+".green(), id);

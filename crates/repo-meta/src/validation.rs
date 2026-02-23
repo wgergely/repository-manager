@@ -10,13 +10,19 @@ pub struct KnownToolSlugs {
 impl KnownToolSlugs {
     pub fn with_builtins() -> Self {
         let known = [
+            "aider",
+            "amazonq",
+            "antigravity",
             "claude",
-            "claude-desktop",
+            "claude_desktop",
+            "cline",
+            "copilot",
             "cursor",
+            "gemini",
+            "jetbrains",
+            "roo",
             "vscode",
             "windsurf",
-            "gemini-cli",
-            "antigravity",
             "zed",
         ]
         .into_iter()

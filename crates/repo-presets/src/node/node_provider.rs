@@ -122,9 +122,9 @@ impl PresetProvider for NodeProvider {
     }
 
     async fn apply(&self, _context: &Context) -> Result<ApplyReport> {
-        // This is a detection-only provider
-        Ok(ApplyReport::success(vec![
-            "Node environment detection complete. This provider is detection-only.".to_string(),
+        Ok(ApplyReport::detection_only(vec![
+            "Node environment detected. This provider does not perform setup.".to_string(),
+            "Install dependencies manually with npm/yarn/pnpm.".to_string(),
         ]))
     }
 }
@@ -256,12 +256,18 @@ mod tests {
         let context = make_test_context(&temp);
 
         let report = provider.apply(&context).await.unwrap();
-        assert!(report.success);
         assert!(
-            report
-                .actions_taken
-                .iter()
-                .any(|a| a.contains("detection-only"))
+            report.is_detection_only(),
+            "NodeProvider.apply() must return DetectionOnly status, got: {:?}",
+            report.status
+        );
+        assert!(
+            !report.is_success(),
+            "NodeProvider.apply() must NOT be Success — it does no real work"
+        );
+        assert!(
+            !report.is_failure(),
+            "NodeProvider.apply() must NOT be Failed — detection itself succeeds"
         );
     }
 }

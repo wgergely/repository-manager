@@ -73,7 +73,7 @@ pub fn write_atomic(path: &NormalizedPath, content: &[u8], config: RobustnessCon
     let native_path = path.to_native();
 
     // Security: Reject paths containing symlinks to prevent escape attacks
-    if contains_symlink(&native_path).unwrap_or(false) {
+    if contains_symlink(&native_path).unwrap_or(true) {
         return Err(Error::SymlinkInPath {
             path: native_path.clone(),
         });
@@ -93,6 +93,17 @@ pub fn write_atomic(path: &NormalizedPath, content: &[u8], config: RobustnessCon
         .open(&lock_path)
         .map_err(|e| Error::io(&lock_path, e))?;
 
+    // Compute temp file path up front so we can clean up on final failure
+    let temp_name = format!(
+        ".{}.{}.tmp",
+        native_path
+            .file_name()
+            .map(|n| n.to_string_lossy())
+            .unwrap_or_default(),
+        std::process::id()
+    );
+    let temp_path = native_path.with_file_name(&temp_name);
+
     // Define the operation to perform with retry support
     // We wrap the whole locking + write + rename sequence
     let op = || -> std::result::Result<(), backoff::Error<Error>> {
@@ -107,21 +118,6 @@ pub fn write_atomic(path: &NormalizedPath, content: &[u8], config: RobustnessCon
         // Guard to ensure we unlock even if we panic (though try_lock_exclusive releases on close)
         // Explicit unlock is not strictly needed if we drop the file, but good for clarity.
         // We will hold this lock until the end of the closure.
-
-        // 2. Write to temp file
-        // Generate temp file path in same directory (ensures same filesystem)
-        // We keep the PID to avoid collisions within the locked region if different threads used different temp files?
-        // Actually, since we hold the .lock, we are the only one writing TO THIS DESTINATION.
-        // But to be extra safe against stale temp files, we use a random/pid name.
-        let temp_name = format!(
-            ".{}.{}.tmp",
-            native_path
-                .file_name()
-                .map(|n| n.to_string_lossy())
-                .unwrap_or_default(),
-            std::process::id()
-        );
-        let temp_path = native_path.with_file_name(&temp_name);
 
         let mut temp_file = OpenOptions::new()
             .write(true)
@@ -150,8 +146,11 @@ pub fn write_atomic(path: &NormalizedPath, content: &[u8], config: RobustnessCon
         fs::rename(&temp_path, &native_path)
             .map_err(|e| backoff::Error::transient(Error::io(&native_path, e)))?;
 
-        // 4. Release lock
-        let _ = lock_file.unlock();
+        // 4. Release lock (advisory locks are also released on fd close,
+        // so an explicit unlock failure is non-critical but worth logging)
+        if let Err(e) = lock_file.unlock() {
+            tracing::warn!("Failed to release lock for {}: {}", native_path.display(), e);
+        }
 
         Ok(())
     };
@@ -162,23 +161,30 @@ pub fn write_atomic(path: &NormalizedPath, content: &[u8], config: RobustnessCon
         ..ExponentialBackoff::default()
     };
 
-    // Run the operation
-    backoff::retry(backoff_policy, op).map_err(|e| match e {
+    // Run the operation; clean up temp file on final failure
+    let result = backoff::retry(backoff_policy, op).map_err(|e| match e {
         backoff::Error::Permanent(err) | backoff::Error::Transient { err, .. } => err,
-    })
+    });
+
+    if result.is_err() {
+        // Best-effort cleanup of orphaned temp file
+        let _ = fs::remove_file(&temp_path);
+    }
+
+    // Best-effort cleanup of lock file after successful write
+    // Lock files are no longer needed once the atomic rename completes
+    let _ = fs::remove_file(&lock_path);
+
+    result
 }
 
 /// Read text content from a file.
-///
-/// TODO: PLACEHOLDER - replace with ManagedBlockEditor
 pub fn read_text(path: &NormalizedPath) -> Result<String> {
     let native_path = path.to_native();
     fs::read_to_string(&native_path).map_err(|e| Error::io(&native_path, e))
 }
 
 /// Write text content to a file atomically.
-///
-/// TODO: PLACEHOLDER - replace with ManagedBlockEditor
 pub fn write_text(path: &NormalizedPath, content: &str) -> Result<()> {
     write_atomic(path, content.as_bytes(), RobustnessConfig::default())
 }

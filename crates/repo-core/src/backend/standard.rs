@@ -93,9 +93,10 @@ impl ModeBackend for StandardBackend {
     }
 
     fn create_branch(&self, name: &str, base: Option<&str>) -> Result<()> {
+        // Use "--" to separate branch names from git flags (defense-in-depth)
         let args = match base {
-            Some(base_branch) => vec!["branch", name, base_branch],
-            None => vec!["branch", name],
+            Some(base_branch) => vec!["branch", "--", name, base_branch],
+            None => vec!["branch", "--", name],
         };
 
         self.git_command(&args)?;
@@ -111,8 +112,8 @@ impl ModeBackend for StandardBackend {
             });
         }
 
-        // Use -D to force delete even if not merged
-        self.git_command(&["branch", "-d", name])?;
+        // Use "--" to separate branch names from git flags (defense-in-depth)
+        self.git_command(&["branch", "-d", "--", name])?;
         Ok(())
     }
 
@@ -155,7 +156,7 @@ impl ModeBackend for StandardBackend {
             }));
         }
 
-        self.git_command(&["branch", "-m", old_name, new_name])?;
+        self.git_command(&["branch", "-m", "--", old_name, new_name])?;
         Ok(())
     }
 }
@@ -163,20 +164,13 @@ impl ModeBackend for StandardBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    use repo_test_utils::git::fake_git_dir;
     use tempfile::TempDir;
-
-    fn setup_git_repo() -> TempDir {
-        let dir = TempDir::new().unwrap();
-        fs::create_dir(dir.path().join(".git")).unwrap();
-        fs::write(dir.path().join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
-        fs::create_dir_all(dir.path().join(".git/refs/heads")).unwrap();
-        dir
-    }
 
     #[test]
     fn test_root() {
-        let temp = setup_git_repo();
+        let temp = TempDir::new().unwrap();
+        fake_git_dir(temp.path());
         let root = NormalizedPath::new(temp.path());
         let backend = StandardBackend::new(root.clone()).unwrap();
 

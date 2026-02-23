@@ -36,13 +36,38 @@ pub async fn read_resource(root: &Path, uri: &str) -> Result<ResourceContent> {
     }
 }
 
+/// Maximum file size for resource reads (10 MB)
+const MAX_RESOURCE_FILE_SIZE: u64 = 10 * 1024 * 1024;
+
+/// Read a file with a size limit to prevent OOM from maliciously large files.
+fn read_file_bounded(path: &std::path::Path) -> std::result::Result<String, std::io::Error> {
+    let metadata = std::fs::metadata(path)?;
+    if metadata.len() > MAX_RESOURCE_FILE_SIZE {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!(
+                "File too large ({} bytes, limit is {} bytes)",
+                metadata.len(),
+                MAX_RESOURCE_FILE_SIZE
+            ),
+        ));
+    }
+    std::fs::read_to_string(path)
+}
+
 /// Read repository configuration from .repository/config.toml
 async fn read_config(root: &Path) -> Result<ResourceContent> {
     let config_path = root.join(".repository/config.toml");
-    let text = std::fs::read_to_string(&config_path).unwrap_or_else(|e| {
-        warn!("Failed to read config at {}: {}", config_path.display(), e);
-        "# No configuration found\ntools = []\n\n[core]\nmode = \"worktrees\"\n".to_string()
-    });
+    let text = match read_file_bounded(&config_path) {
+        Ok(content) => content,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            "# No configuration found\ntools = []\n\n[core]\nmode = \"worktrees\"\n".to_string()
+        }
+        Err(e) => {
+            warn!("Failed to read config at {}: {}", config_path.display(), e);
+            format!("# Error reading configuration: {}\n", e)
+        }
+    };
 
     Ok(ResourceContent {
         uri: "repo://config".to_string(),
@@ -54,10 +79,16 @@ async fn read_config(root: &Path) -> Result<ResourceContent> {
 /// Read repository state from .repository/ledger.toml
 async fn read_state(root: &Path) -> Result<ResourceContent> {
     let ledger_path = root.join(".repository/ledger.toml");
-    let text = std::fs::read_to_string(&ledger_path).unwrap_or_else(|e| {
-        warn!("Failed to read ledger at {}: {}", ledger_path.display(), e);
-        "# No ledger found - run 'repo sync' to create\n".to_string()
-    });
+    let text = match read_file_bounded(&ledger_path) {
+        Ok(content) => content,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            "# No ledger found - run 'repo sync' to create\n".to_string()
+        }
+        Err(e) => {
+            warn!("Failed to read ledger at {}: {}", ledger_path.display(), e);
+            format!("# Error reading ledger: {}\n", e)
+        }
+    };
 
     Ok(ResourceContent {
         uri: "repo://state".to_string(),
@@ -65,6 +96,9 @@ async fn read_state(root: &Path) -> Result<ResourceContent> {
         text,
     })
 }
+
+/// Maximum number of rule files to read
+const MAX_RULE_FILES: usize = 500;
 
 /// Read aggregated rules from .repository/rules/*.md
 async fn read_rules(root: &Path) -> Result<ResourceContent> {
@@ -79,6 +113,17 @@ async fn read_rules(root: &Path) -> Result<ResourceContent> {
 
         entries.sort_by_key(|e| e.file_name());
 
+        if entries.len() > MAX_RULE_FILES {
+            warn!(
+                "Rules directory contains {} files, limiting to {}",
+                entries.len(),
+                MAX_RULE_FILES
+            );
+            entries.truncate(MAX_RULE_FILES);
+        }
+
+        let mut total_size: u64 = 0;
+
         for entry in entries {
             let rule_name = entry
                 .path()
@@ -86,8 +131,13 @@ async fn read_rules(root: &Path) -> Result<ResourceContent> {
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_default();
 
-            match std::fs::read_to_string(entry.path()) {
+            match read_file_bounded(&entry.path()) {
                 Ok(rule_content) => {
+                    total_size += rule_content.len() as u64;
+                    if total_size > MAX_RESOURCE_FILE_SIZE {
+                        content.push_str("\n_... truncated (total size limit reached)_\n");
+                        break;
+                    }
                     content.push_str(&format!("## {}\n\n", rule_name));
                     content.push_str(&rule_content);
                     content.push_str("\n\n---\n\n");

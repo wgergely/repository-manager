@@ -24,6 +24,9 @@ pub struct InitConfig {
 /// Initializes a repository with the specified mode, tools, and presets.
 /// If name is not ".", creates a new folder with the sanitized name.
 pub fn run_init(cwd: &Path, config: InitConfig) -> Result<PathBuf> {
+    // Normalize mode early so all downstream usage (printing, config writing) is canonical
+    let normalized_mode = normalize_mode(&config.mode)?;
+
     // Determine target path
     let target_path = if config.name == "." {
         cwd.to_path_buf()
@@ -46,7 +49,7 @@ pub fn run_init(cwd: &Path, config: InitConfig) -> Result<PathBuf> {
     println!(
         "{} Initializing repository in {} mode...",
         "=>".blue().bold(),
-        config.mode.cyan()
+        normalized_mode.cyan()
     );
 
     if !config.tools.is_empty() {
@@ -61,7 +64,7 @@ pub fn run_init(cwd: &Path, config: InitConfig) -> Result<PathBuf> {
 
     init_repository(
         &target_path,
-        &config.mode,
+        &normalized_mode,
         &config.tools,
         &config.presets,
         &config.extensions,
@@ -94,6 +97,21 @@ pub fn run_init(cwd: &Path, config: InitConfig) -> Result<PathBuf> {
     println!("   Run {} to see available tools", "repo list-tools".cyan());
 
     Ok(target_path)
+}
+
+/// Normalize a mode string to its canonical form.
+///
+/// Accepts aliases like "worktree" and returns the canonical form "worktrees".
+/// Returns an error for unrecognized mode strings.
+fn normalize_mode(mode: &str) -> Result<String> {
+    match mode {
+        "standard" => Ok("standard".to_string()),
+        "worktree" | "worktrees" => Ok("worktrees".to_string()),
+        _ => Err(CliError::user(format!(
+            "Invalid mode '{}'. Must be 'standard' or 'worktrees'.",
+            mode
+        ))),
+    }
 }
 
 /// Sanitize a project name to a valid folder name
@@ -144,21 +162,15 @@ pub fn init_repository(
     presets: &[String],
     extensions: &[String],
 ) -> Result<()> {
-    // Validate mode (accept both "worktree" and "worktrees")
-    let is_worktree_mode = mode == "worktree" || mode == "worktrees";
-    if mode != "standard" && !is_worktree_mode {
-        return Err(CliError::user(format!(
-            "Invalid mode '{}'. Must be 'standard' or 'worktree'.",
-            mode
-        )));
-    }
+    // Validate and normalize mode to canonical form
+    let canonical_mode = normalize_mode(mode)?;
 
     // Create .repository directory
     let repo_dir = path.join(".repository");
     std::fs::create_dir_all(&repo_dir)?;
 
     // Generate and write config.toml
-    let config_content = generate_config(mode, tools, presets, extensions);
+    let config_content = generate_config(&canonical_mode, tools, presets, extensions);
     let config_path = repo_dir.join("config.toml");
     std::fs::write(&config_path, config_content)?;
 
@@ -169,7 +181,7 @@ pub fn init_repository(
     }
 
     // For worktree mode, create main/ directory
-    if is_worktree_mode {
+    if canonical_mode == "worktrees" {
         let main_dir = path.join("main");
         if !main_dir.exists() {
             std::fs::create_dir_all(&main_dir)?;
@@ -191,6 +203,26 @@ pub fn init_repository(
 /// [presets."env:python"]
 /// version = "3.12"
 /// ```
+/// Escape a string for safe inclusion in a TOML quoted value.
+///
+/// Prevents injection of newlines, quotes, or backslashes that could break
+/// the TOML structure or inject arbitrary configuration sections.
+fn escape_toml_value(s: &str) -> String {
+    let mut escaped = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '"' => escaped.push_str("\\\""),
+            '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            c if c.is_control() => {} // Strip other control characters
+            c => escaped.push(c),
+        }
+    }
+    escaped
+}
+
 pub fn generate_config(
     mode: &str,
     tools: &[String],
@@ -202,19 +234,22 @@ pub fn generate_config(
     let mut config = String::new();
 
     // tools array at top level (before [core] section)
-    let tools_arr: Vec<String> = tools.iter().map(|t| format!("\"{}\"", t)).collect();
+    let tools_arr: Vec<String> = tools
+        .iter()
+        .map(|t| format!("\"{}\"", escape_toml_value(t)))
+        .collect();
     config.push_str(&format!("tools = [{}]\n", tools_arr.join(", ")));
 
     // [core] section
     config.push('\n');
     config.push_str("[core]\n");
-    config.push_str(&format!("mode = \"{}\"\n", mode));
+    config.push_str(&format!("mode = \"{}\"\n", escape_toml_value(mode)));
 
     // [presets] section with each preset as a table
     if !presets.is_empty() {
         for preset in presets {
             config.push('\n');
-            config.push_str(&format!("[presets.\"{}\"]\n", preset));
+            config.push_str(&format!("[presets.\"{}\"]\n", escape_toml_value(preset)));
         }
     }
 
@@ -223,15 +258,19 @@ pub fn generate_config(
         let registry = ExtensionRegistry::with_known();
         for ext in extensions {
             config.push('\n');
+            let escaped_ext = escape_toml_value(ext);
             if let Some(entry) = registry.get(ext) {
                 // Known extension: use registry source
-                config.push_str(&format!("[extensions.\"{}\"]\n", ext));
-                config.push_str(&format!("source = \"{}\"\n", entry.source));
+                config.push_str(&format!("[extensions.\"{}\"]\n", escaped_ext));
+                config.push_str(&format!(
+                    "source = \"{}\"\n",
+                    escape_toml_value(&entry.source)
+                ));
                 config.push_str("ref = \"main\"\n");
             } else {
                 // Custom extension: treat the value as a source URL
-                config.push_str(&format!("[extensions.\"{}\"]\n", ext));
-                config.push_str(&format!("source = \"{}\"\n", ext));
+                config.push_str(&format!("[extensions.\"{}\"]\n", escaped_ext));
+                config.push_str(&format!("source = \"{}\"\n", escaped_ext));
                 config.push_str("ref = \"main\"\n");
             }
         }
@@ -445,8 +484,8 @@ mod tests {
         // Test with both tools and presets
         let tools = vec!["eslint".to_string(), "prettier".to_string()];
         let presets = vec!["typescript".to_string()];
-        let config = generate_config("worktree", &tools, &presets, &[]);
-        assert!(config.contains("[core]\nmode = \"worktree\"\n"));
+        let config = generate_config("worktrees", &tools, &presets, &[]);
+        assert!(config.contains("[core]\nmode = \"worktrees\"\n"));
         assert!(config.contains("\"eslint\""));
         assert!(config.contains("\"prettier\""));
         assert!(config.contains("[presets.\"typescript\"]"));

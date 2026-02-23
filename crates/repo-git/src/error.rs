@@ -47,4 +47,7 @@ pub enum Error {
 
     #[error("Pull failed: {message}")]
     PullFailed { message: String },
+
+    #[error("Working tree has uncommitted changes. Commit or stash your changes first.")]
+    DirtyWorkingTree,
 }

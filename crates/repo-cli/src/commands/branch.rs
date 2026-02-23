@@ -280,56 +280,14 @@ pub fn run_branch_list(path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use repo_test_utils::git::real_git_repo_with_commit;
     use std::fs;
     use std::process::Command;
     use tempfile::TempDir;
 
-    /// Set up a minimal git repository for testing.
     fn setup_git_repo() -> TempDir {
         let dir = TempDir::new().unwrap();
-
-        // Initialize a real git repo
-        let output = Command::new("git")
-            .args(["init"])
-            .current_dir(dir.path())
-            .output()
-            .expect("Failed to run git init");
-
-        if !output.status.success() {
-            panic!(
-                "git init failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
-
-        // Configure git user for commits
-        Command::new("git")
-            .args(["config", "user.email", "test@test.com"])
-            .current_dir(dir.path())
-            .output()
-            .expect("Failed to configure git email");
-
-        Command::new("git")
-            .args(["config", "user.name", "Test User"])
-            .current_dir(dir.path())
-            .output()
-            .expect("Failed to configure git name");
-
-        // Create an initial commit so we have a HEAD
-        fs::write(dir.path().join("README.md"), "# Test").unwrap();
-
-        Command::new("git")
-            .args(["add", "."])
-            .current_dir(dir.path())
-            .output()
-            .expect("Failed to git add");
-
-        Command::new("git")
-            .args(["commit", "-m", "Initial commit"])
-            .current_dir(dir.path())
-            .output()
-            .expect("Failed to git commit");
-
+        real_git_repo_with_commit(dir.path());
         dir
     }
 
@@ -338,11 +296,11 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path();
 
-        // No config file - should default to worktrees mode (per spec)
+        // No config file and no filesystem markers - defaults to Standard
         let root = NormalizedPath::new(path);
         let mode = detect_mode(&root).unwrap();
 
-        assert_eq!(mode, Mode::Worktrees);
+        assert_eq!(mode, Mode::Standard);
     }
 
     #[test]
