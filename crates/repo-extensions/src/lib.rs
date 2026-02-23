@@ -7,6 +7,7 @@
 pub mod config;
 pub mod dependency;
 pub mod error;
+pub mod installer;
 pub mod lock;
 pub mod manifest;
 pub mod mcp;
@@ -22,6 +23,7 @@ pub const MANIFEST_FILENAME: &str = "repo_extension.toml";
 pub use config::ExtensionConfig;
 pub use dependency::{DependencyGraph, DependencyNode, NodeKind};
 pub use error::Error;
+pub use installer::{check_binary_on_path, query_python_version, run_install};
 pub use lock::{LOCK_FILENAME, LockFile, LockedExtension};
 pub use manifest::{EntryPoints, ExtensionManifest, Provides, ResolvedCommand, ResolvedEntryPoints};
 pub use mcp::{ResolveContext, merge_mcp_configs, resolve_mcp_config};

@@ -71,6 +71,19 @@ pub enum Error {
     /// Failed to parse or write the lock file.
     #[error("lock file error: {0}")]
     LockFileParse(String),
+
+    /// The extension's install command failed.
+    #[error("install failed for '{name}': command '{command}' exited with {exit_code:?}\n{stderr}")]
+    InstallFailed {
+        name: String,
+        command: String,
+        exit_code: Option<i32>,
+        stderr: String,
+    },
+
+    /// A required binary was not found on PATH.
+    #[error("install requires '{tool}' but it was not found on PATH{hint}")]
+    PackageManagerNotFound { tool: String, hint: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
