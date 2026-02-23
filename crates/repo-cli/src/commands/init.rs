@@ -223,6 +223,28 @@ fn escape_toml_value(s: &str) -> String {
     escaped
 }
 
+/// Derive a short extension name from a source URL.
+///
+/// Strips trailing `.git`, takes the last path segment, and lowercases it.
+/// Falls back to the input string if no valid segment is found.
+///
+/// # Examples
+/// ```text
+/// "https://github.com/org/my-ext.git" → "my-ext"
+/// "https://example.com/ext"            → "ext"
+/// "/local/path/to/extension"           → "extension"
+/// "bare-name"                          → "bare-name"
+/// ```
+fn extension_name_from_url(url: &str) -> String {
+    let trimmed = url
+        .trim_end_matches('/')
+        .trim_end_matches(".git");
+    match trimmed.rsplit('/').next() {
+        Some(segment) if !segment.is_empty() => segment.to_ascii_lowercase(),
+        _ => url.to_string(),
+    }
+}
+
 pub fn generate_config(
     mode: &str,
     tools: &[String],
@@ -268,8 +290,14 @@ pub fn generate_config(
                 ));
                 config.push_str("ref = \"main\"\n");
             } else {
-                // Custom extension: treat the value as a source URL
-                config.push_str(&format!("[extensions.\"{}\"]\n", escaped_ext));
+                // Custom extension: derive a short name from the URL for the
+                // TOML table key, falling back to the full URL if no repo-like
+                // segment can be extracted.
+                let ext_name = extension_name_from_url(ext);
+                config.push_str(&format!(
+                    "[extensions.\"{}\"]\n",
+                    escape_toml_value(&ext_name)
+                ));
                 config.push_str(&format!("source = \"{}\"\n", escaped_ext));
                 config.push_str("ref = \"main\"\n");
             }
@@ -497,11 +525,74 @@ mod tests {
         assert!(config.contains("source = \"https://github.com/vaultspec/vaultspec.git\""));
         assert!(config.contains("ref = \"main\""));
 
-        // Test with custom extension URL
+        // Test with custom extension URL — name is derived from URL
         let extensions = vec!["https://github.com/custom/ext.git".to_string()];
         let config = generate_config("standard", &[], &[], &extensions);
+        assert!(
+            config.contains("[extensions.\"ext\"]"),
+            "Custom URL should derive table key from URL, got:\n{}",
+            config
+        );
         assert!(config.contains("source = \"https://github.com/custom/ext.git\""));
         assert!(config.contains("ref = \"main\""));
+    }
+
+    #[test]
+    fn test_generated_config_round_trips_through_manifest() {
+        use repo_extensions::ExtensionConfig;
+
+        // Generate config with a known extension
+        let extensions = vec!["vaultspec".to_string()];
+        let config_toml = generate_config("standard", &["cursor".to_string()], &[], &extensions);
+
+        // Parse it through the core Manifest (how sync reads it)
+        let manifest: repo_core::config::Manifest =
+            toml::from_str(&config_toml).expect("generated config must parse as Manifest");
+
+        assert!(manifest.extensions.contains_key("vaultspec"));
+
+        // Now ensure the extension section deserializes into ExtensionConfig
+        let ext_value = &manifest.extensions["vaultspec"];
+        let ext_config: ExtensionConfig = serde_json::from_value(ext_value.clone())
+            .expect("extension section must deserialize into ExtensionConfig");
+
+        assert_eq!(
+            ext_config.source,
+            "https://github.com/vaultspec/vaultspec.git"
+        );
+        assert_eq!(
+            ext_config.ref_pin.as_deref(),
+            Some("main"),
+            "ref field must map to ref_pin via serde rename"
+        );
+    }
+
+    #[test]
+    fn test_generated_config_custom_url_round_trips() {
+        use repo_extensions::ExtensionConfig;
+
+        let extensions = vec!["https://github.com/custom/my-extension.git".to_string()];
+        let config_toml = generate_config("standard", &[], &[], &extensions);
+
+        let manifest: repo_core::config::Manifest =
+            toml::from_str(&config_toml).expect("generated config must parse as Manifest");
+
+        // Derived key should be "my-extension"
+        assert!(
+            manifest.extensions.contains_key("my-extension"),
+            "extension key should be derived from URL, keys: {:?}",
+            manifest.extensions.keys().collect::<Vec<_>>()
+        );
+
+        let ext_value = &manifest.extensions["my-extension"];
+        let ext_config: ExtensionConfig = serde_json::from_value(ext_value.clone())
+            .expect("custom extension section must deserialize into ExtensionConfig");
+
+        assert_eq!(
+            ext_config.source,
+            "https://github.com/custom/my-extension.git"
+        );
+        assert_eq!(ext_config.ref_pin.as_deref(), Some("main"));
     }
 
     #[test]
@@ -627,5 +718,42 @@ mod tests {
         let project_path = result.unwrap();
         assert_eq!(project_path.file_name().unwrap(), "empty-project");
         assert!(project_path.join(".repository").exists());
+    }
+
+    #[test]
+    fn test_extension_name_from_url_git_suffix() {
+        assert_eq!(
+            extension_name_from_url("https://github.com/org/my-ext.git"),
+            "my-ext"
+        );
+    }
+
+    #[test]
+    fn test_extension_name_from_url_no_git_suffix() {
+        assert_eq!(
+            extension_name_from_url("https://example.com/ext"),
+            "ext"
+        );
+    }
+
+    #[test]
+    fn test_extension_name_from_url_trailing_slash() {
+        assert_eq!(
+            extension_name_from_url("https://github.com/org/my-ext.git/"),
+            "my-ext"
+        );
+    }
+
+    #[test]
+    fn test_extension_name_from_url_bare_name() {
+        assert_eq!(extension_name_from_url("bare-name"), "bare-name");
+    }
+
+    #[test]
+    fn test_extension_name_from_url_local_path() {
+        assert_eq!(
+            extension_name_from_url("/local/path/to/Extension"),
+            "extension"
+        );
     }
 }

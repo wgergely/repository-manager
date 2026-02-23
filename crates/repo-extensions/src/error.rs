@@ -30,6 +30,10 @@ pub enum Error {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// Invalid extension source.
+    #[error("invalid source for extension '{name}': {reason}")]
+    InvalidSource { name: String, reason: String },
+
     /// Extension not found in registry.
     #[error("unknown extension: {0}")]
     UnknownExtension(String),
