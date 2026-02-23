@@ -72,6 +72,10 @@ pub enum Error {
     #[error("lock file error: {0}")]
     LockFileParse(String),
 
+    /// Unknown package manager value in manifest.
+    #[error("unknown package_manager '{value}'; known values: uv, pip, npm, yarn, pnpm, cargo, bun")]
+    InvalidPackageManager { value: String },
+
     /// The extension's install command failed.
     #[error("install failed for '{name}': command '{command}' exited with {exit_code:?}\n{stderr}")]
     InstallFailed {
@@ -84,6 +88,18 @@ pub enum Error {
     /// A required binary was not found on PATH.
     #[error("install requires '{tool}' but it was not found on PATH{hint}")]
     PackageManagerNotFound { tool: String, hint: String },
+
+    /// Invalid packages declaration.
+    #[error("invalid packages declaration: {reason}")]
+    InvalidPackages { reason: String },
+
+    /// Invalid venv_path in manifest (absolute path or path escaping extension dir).
+    #[error("invalid venv_path '{path}': must be a relative path within the extension directory")]
+    InvalidVenvPath { path: String },
+
+    /// Extension is not installed (not found in the lock file).
+    #[error("extension '{0}' is not installed")]
+    ExtensionNotInstalled(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

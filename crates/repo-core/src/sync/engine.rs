@@ -533,6 +533,8 @@ impl SyncEngine {
         }
 
         let extensions_dir = self.root.join(".repository/extensions");
+        let lock_path = self.root.join(".repository").join(repo_extensions::LOCK_FILENAME);
+        let lock_file = repo_extensions::LockFile::load(lock_path.as_ref()).unwrap_or_default();
         let mut mcp_configs: Vec<Value> = Vec::new();
 
         for ext_name in manifest.extensions.keys() {
@@ -568,10 +570,11 @@ impl SyncEngine {
             };
 
             // Build resolve context for this extension
+            let locked_venv_path = lock_file.get(ext_name).and_then(|e| e.venv_path.as_deref());
             let ctx = ResolveContext {
                 root: self.root.as_ref().to_string_lossy().to_string(),
                 extension_source: ext_source_dir.as_ref().to_string_lossy().to_string(),
-                python_path: self.find_extension_python(&ext_source_dir),
+                python_path: self.find_extension_python(&ext_source_dir, locked_venv_path),
             };
 
             // Resolve MCP config if declared
@@ -609,8 +612,27 @@ impl SyncEngine {
     }
 
     /// Try to find the Python interpreter in an extension's virtual environment.
-    fn find_extension_python(&self, ext_source_dir: &NormalizedPath) -> Option<String> {
-        // Check common venv locations
+    ///
+    /// If `venv_path` is provided (from the lock file), that path is checked first.
+    /// Falls back to hardcoded candidate locations.
+    fn find_extension_python(
+        &self,
+        ext_source_dir: &NormalizedPath,
+        venv_path: Option<&str>,
+    ) -> Option<String> {
+        // Check lock-file-declared venv path first (ADR-010 §10.4)
+        if let Some(vp) = venv_path {
+            #[cfg(windows)]
+            let python_bin = ext_source_dir.join(vp).join("Scripts/python.exe");
+            #[cfg(not(windows))]
+            let python_bin = ext_source_dir.join(vp).join("bin/python");
+
+            if python_bin.exists() {
+                return Some(python_bin.as_ref().to_string_lossy().to_string());
+            }
+        }
+
+        // Fall back to common venv locations
         let candidates = [
             ext_source_dir.join(".venv/bin/python"),
             ext_source_dir.join("venv/bin/python"),

@@ -53,6 +53,18 @@ pub struct LockedExtension {
     /// Resolved Python version if runtime_type is "python".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub python_version: Option<String>,
+    /// Package manager used to install this extension (e.g., "uv", "npm").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub package_manager: Option<String>,
+    /// PEP 508 package specifiers that were declared for this extension.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub packages: Vec<String>,
+    /// Resolved venv path relative to the extension source directory.
+    ///
+    /// When set, `SyncEngine` uses this path instead of the default
+    /// `.repository/extensions/{name}/.venv/` location to find the Python binary.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub venv_path: Option<String>,
 }
 
 impl LockFile {
@@ -149,6 +161,9 @@ mod tests {
             resolved_ref: Some("abc1234".to_string()),
             runtime_type: Some("python".to_string()),
             python_version: Some("3.13.1".to_string()),
+            package_manager: None,
+            packages: vec![],
+            venv_path: None,
         });
 
         assert_eq!(lock.len(), 1);
@@ -167,6 +182,9 @@ mod tests {
             resolved_ref: None,
             runtime_type: None,
             python_version: None,
+            package_manager: None,
+            packages: vec![],
+            venv_path: None,
         });
         lock.upsert(LockedExtension {
             name: "ext".to_string(),
@@ -175,6 +193,9 @@ mod tests {
             resolved_ref: None,
             runtime_type: None,
             python_version: None,
+            package_manager: None,
+            packages: vec![],
+            venv_path: None,
         });
 
         assert_eq!(lock.len(), 1);
@@ -191,6 +212,9 @@ mod tests {
             resolved_ref: None,
             runtime_type: None,
             python_version: None,
+            package_manager: None,
+            packages: vec![],
+            venv_path: None,
         });
 
         assert!(lock.remove("ext"));
@@ -208,6 +232,9 @@ mod tests {
             resolved_ref: None,
             runtime_type: None,
             python_version: None,
+            package_manager: None,
+            packages: vec![],
+            venv_path: None,
         });
         lock.upsert(LockedExtension {
             name: "alpha".to_string(),
@@ -216,6 +243,9 @@ mod tests {
             resolved_ref: None,
             runtime_type: None,
             python_version: None,
+            package_manager: None,
+            packages: vec![],
+            venv_path: None,
         });
 
         assert_eq!(lock.extensions[0].name, "alpha");
@@ -232,6 +262,9 @@ mod tests {
             resolved_ref: Some("abc1234".to_string()),
             runtime_type: Some("python".to_string()),
             python_version: Some("3.13.1".to_string()),
+            package_manager: None,
+            packages: vec![],
+            venv_path: None,
         });
 
         let toml_str = lock.to_toml().unwrap();
@@ -255,6 +288,9 @@ mod tests {
             resolved_ref: None,
             runtime_type: None,
             python_version: None,
+            package_manager: None,
+            packages: vec![],
+            venv_path: None,
         });
 
         lock.save(&path).unwrap();
@@ -283,6 +319,9 @@ mod tests {
             resolved_ref: None,
             runtime_type: None,
             python_version: None,
+            package_manager: None,
+            packages: vec![],
+            venv_path: None,
         });
 
         let toml_str = lock.to_toml().unwrap();

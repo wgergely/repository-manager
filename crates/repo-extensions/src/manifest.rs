@@ -90,6 +90,9 @@ pub struct Requirements {
 pub struct PythonRequirement {
     /// Version constraint string (e.g., ">=3.13").
     pub version: String,
+    /// PEP 508 package specifiers to install (e.g., `["httpx>=0.27"]`).
+    #[serde(default)]
+    pub packages: Vec<String>,
 }
 
 /// Runtime configuration for the extension.
@@ -98,6 +101,15 @@ pub struct RuntimeConfig {
     /// Runtime type (e.g., "python", "node").
     #[serde(rename = "type")]
     pub runtime_type: String,
+    /// Package manager required by this extension (e.g., "uv", "npm").
+    #[serde(default)]
+    pub package_manager: Option<String>,
+    /// Path to the virtual environment, relative to the extension source directory.
+    ///
+    /// When set, overrides the default `.repository/extensions/{name}/.venv/` location.
+    /// Must be a relative path with no `..` components.
+    #[serde(default)]
+    pub venv_path: Option<String>,
     /// Install command to set up the extension.
     #[serde(default)]
     pub install: Option<String>,
@@ -275,6 +287,49 @@ impl ExtensionManifest {
             }
         }
 
+        // Validate package_manager value (if declared)
+        const KNOWN_PACKAGE_MANAGERS: &[&str] =
+            &["uv", "pip", "npm", "yarn", "pnpm", "cargo", "bun"];
+        if let Some(ref rt) = self.runtime {
+            if let Some(ref pm) = rt.package_manager {
+                if !KNOWN_PACKAGE_MANAGERS.contains(&pm.as_str()) {
+                    return Err(Error::InvalidPackageManager { value: pm.clone() });
+                }
+            }
+        }
+
+        // Validate packages entries (if declared): non-empty, no shell metacharacters
+        if let Some(ref requires) = self.requires {
+            if let Some(ref req) = requires.python {
+                const SHELL_META: &[char] = &[';', '&', '|', '`', '$', '(', ')'];
+                for pkg in &req.packages {
+                    if pkg.is_empty() {
+                        return Err(Error::InvalidPackages {
+                            reason: "empty specifier".to_string(),
+                        });
+                    }
+                    if pkg.chars().any(|c| SHELL_META.contains(&c)) {
+                        return Err(Error::InvalidPackages {
+                            reason: format!("shell metacharacter in package specifier: {:?}", pkg),
+                        });
+                    }
+                }
+            }
+        }
+
+        // Validate venv_path confinement (if declared): must be relative, no .. components
+        if let Some(ref rt) = self.runtime {
+            if let Some(ref vp) = rt.venv_path {
+                let path = std::path::Path::new(vp);
+                if path.is_absolute() {
+                    return Err(Error::InvalidVenvPath { path: vp.clone() });
+                }
+                if path.components().any(|c| c == std::path::Component::ParentDir) {
+                    return Err(Error::InvalidVenvPath { path: vp.clone() });
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -335,6 +390,7 @@ version = ">=3.13"
 
 [runtime]
 type = "python"
+package_manager = "uv"
 install = "pip install -e '.[dev]'"
 
 [entry_points]
@@ -368,6 +424,7 @@ agents_md = "AGENTS.md"
 
         let runtime = manifest.runtime.unwrap();
         assert_eq!(runtime.runtime_type, "python");
+        assert_eq!(runtime.package_manager.as_deref(), Some("uv"));
         assert_eq!(runtime.install.as_deref(), Some("pip install -e '.[dev]'"));
 
         let entry_points = manifest.entry_points.unwrap();
@@ -807,5 +864,231 @@ type = "rust"
         let manifest = ExtensionManifest::from_toml(toml).unwrap();
         let deps = manifest.implicit_preset_dependencies();
         assert_eq!(deps, vec!["env:rust"]);
+    }
+
+    // --- package_manager validation (Phase 2 / ADR-008) ---
+
+    #[test]
+    fn test_invalid_package_manager_rejected() {
+        let toml = r#"
+[extension]
+name = "bad-pm"
+version = "1.0.0"
+
+[runtime]
+type = "python"
+package_manager = "poetry"
+"#;
+        let err = ExtensionManifest::from_toml(toml).unwrap_err();
+        assert!(
+            matches!(err, Error::InvalidPackageManager { ref value } if value == "poetry"),
+            "expected InvalidPackageManager, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_known_package_managers_accepted() {
+        for pm in &["uv", "pip", "npm", "yarn", "pnpm", "cargo", "bun"] {
+            let toml = format!(
+                r#"
+[extension]
+name = "ext"
+version = "1.0.0"
+
+[runtime]
+type = "python"
+package_manager = "{pm}"
+"#
+            );
+            let manifest = ExtensionManifest::from_toml(&toml)
+                .unwrap_or_else(|e| panic!("expected {pm} to be accepted, got: {e:?}"));
+            assert_eq!(
+                manifest.runtime.unwrap().package_manager.as_deref(),
+                Some(*pm)
+            );
+        }
+    }
+
+    #[test]
+    fn test_package_manager_field_round_trips() {
+        let toml = r#"
+[extension]
+name = "uv-ext"
+version = "1.0.0"
+
+[runtime]
+type = "python"
+package_manager = "uv"
+install = "uv sync"
+"#;
+        let manifest = ExtensionManifest::from_toml(toml).unwrap();
+        assert_eq!(
+            manifest.runtime.as_ref().unwrap().package_manager.as_deref(),
+            Some("uv")
+        );
+
+        let serialized = manifest.to_toml().unwrap();
+        let reparsed = ExtensionManifest::from_toml(&serialized).unwrap();
+        assert_eq!(
+            reparsed.runtime.as_ref().unwrap().package_manager.as_deref(),
+            Some("uv")
+        );
+    }
+
+    // --- packages validation (Phase 3 / ADR-009) ---
+
+    #[test]
+    fn test_packages_metacharacter_rejected() {
+        let toml = r#"
+[extension]
+name = "bad-pkg"
+version = "1.0.0"
+
+[requires.python]
+version = ">=3.12"
+packages = ["httpx; rm -rf /"]
+"#;
+        let err = ExtensionManifest::from_toml(toml).unwrap_err();
+        assert!(
+            matches!(err, Error::InvalidPackages { .. }),
+            "Expected InvalidPackages, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_packages_empty_string_rejected() {
+        let toml = r#"
+[extension]
+name = "bad-pkg"
+version = "1.0.0"
+
+[requires.python]
+version = ">=3.12"
+packages = [""]
+"#;
+        let err = ExtensionManifest::from_toml(toml).unwrap_err();
+        assert!(
+            matches!(err, Error::InvalidPackages { ref reason } if reason.contains("empty")),
+            "Expected InvalidPackages with 'empty' reason, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_packages_valid_accepted() {
+        let toml = r#"
+[extension]
+name = "good-pkg"
+version = "1.0.0"
+
+[requires.python]
+version = ">=3.12"
+packages = ["httpx>=0.27", "pydantic>=2.0,<3.0"]
+"#;
+        let manifest = ExtensionManifest::from_toml(toml).unwrap();
+        let packages = &manifest.requires.unwrap().python.unwrap().packages;
+        assert_eq!(packages, &["httpx>=0.27", "pydantic>=2.0,<3.0"]);
+    }
+
+    #[test]
+    fn test_packages_default_empty_when_omitted() {
+        let toml = r#"
+[extension]
+name = "no-pkg"
+version = "1.0.0"
+
+[requires.python]
+version = ">=3.12"
+"#;
+        let manifest = ExtensionManifest::from_toml(toml).unwrap();
+        let packages = &manifest.requires.unwrap().python.unwrap().packages;
+        assert!(packages.is_empty());
+    }
+
+    // --- venv_path validation (Phase 4 / ADR-010) ---
+
+    #[test]
+    fn test_venv_path_absolute_rejected() {
+        let toml = r#"
+[extension]
+name = "test"
+version = "1.0.0"
+
+[runtime]
+type = "python"
+venv_path = "/absolute/path"
+"#;
+        let err = ExtensionManifest::from_toml(toml).unwrap_err();
+        assert!(
+            matches!(err, Error::InvalidVenvPath { .. }),
+            "expected InvalidVenvPath, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_venv_path_parent_dir_rejected() {
+        let toml = r#"
+[extension]
+name = "test"
+version = "1.0.0"
+
+[runtime]
+type = "python"
+venv_path = "../escape"
+"#;
+        let err = ExtensionManifest::from_toml(toml).unwrap_err();
+        assert!(
+            matches!(err, Error::InvalidVenvPath { .. }),
+            "expected InvalidVenvPath, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_venv_path_valid_relative_accepted() {
+        let toml = r#"
+[extension]
+name = "test"
+version = "1.0.0"
+
+[runtime]
+type = "python"
+venv_path = ".venv"
+"#;
+        let manifest = ExtensionManifest::from_toml(toml).unwrap();
+        assert_eq!(
+            manifest.runtime.unwrap().venv_path.as_deref(),
+            Some(".venv")
+        );
+    }
+
+    #[test]
+    fn test_venv_path_nested_relative_accepted() {
+        let toml = r#"
+[extension]
+name = "test"
+version = "1.0.0"
+
+[runtime]
+type = "python"
+venv_path = ".vaultspec/.venv"
+"#;
+        let manifest = ExtensionManifest::from_toml(toml).unwrap();
+        assert_eq!(
+            manifest.runtime.unwrap().venv_path.as_deref(),
+            Some(".vaultspec/.venv")
+        );
+    }
+
+    #[test]
+    fn test_venv_path_default_none_when_omitted() {
+        let toml = r#"
+[extension]
+name = "test"
+version = "1.0.0"
+
+[runtime]
+type = "python"
+"#;
+        let manifest = ExtensionManifest::from_toml(toml).unwrap();
+        assert!(manifest.runtime.unwrap().venv_path.is_none());
     }
 }

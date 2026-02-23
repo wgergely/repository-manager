@@ -182,6 +182,25 @@ fn run_python_version_cmd(cmd: &str) -> Result<String> {
     })
 }
 
+/// Synthesize a pip install command from a packages list.
+///
+/// Returns `None` if `packages` is empty.
+/// Uses `uv pip install` when `package_manager` is `Some("uv")`,
+/// otherwise falls back to `pip install`.
+pub fn synthesize_install_command(
+    packages: &[String],
+    package_manager: Option<&str>,
+) -> Option<String> {
+    if packages.is_empty() {
+        return None;
+    }
+    let pkg_list = packages.join(" ");
+    match package_manager {
+        Some("uv") => Some(format!("uv pip install {}", pkg_list)),
+        _ => Some(format!("pip install {}", pkg_list)),
+    }
+}
+
 /// Parse `"Python 3.13.1\n"` → `"3.13.1"`.
 fn parse_python_version(output: &str) -> Option<String> {
     let trimmed = output.trim();
@@ -263,6 +282,9 @@ mod tests {
             resolved_ref: None,
             runtime_type: Some("python".to_string()),
             python_version: Some("3.13.1".to_string()),
+            package_manager: None,
+            packages: vec![],
+            venv_path: None,
         });
         lock.save(&lock_path).unwrap();
 
@@ -271,5 +293,35 @@ mod tests {
         let entry = loaded.get("vaultspec").unwrap();
         assert_eq!(entry.version, "0.1.0");
         assert_eq!(entry.python_version.as_deref(), Some("3.13.1"));
+    }
+
+    #[test]
+    fn test_synthesize_uv_command() {
+        let packages = vec!["httpx>=0.27".to_string()];
+        let cmd = synthesize_install_command(&packages, Some("uv")).unwrap();
+        assert_eq!(cmd, "uv pip install httpx>=0.27");
+    }
+
+    #[test]
+    fn test_synthesize_pip_fallback() {
+        let packages = vec!["httpx>=0.27".to_string(), "pydantic>=2.0".to_string()];
+        let cmd = synthesize_install_command(&packages, None).unwrap();
+        assert_eq!(cmd, "pip install httpx>=0.27 pydantic>=2.0");
+    }
+
+    #[test]
+    fn test_synthesize_pip_explicit() {
+        let packages = vec!["requests".to_string()];
+        let cmd = synthesize_install_command(&packages, Some("pip")).unwrap();
+        assert_eq!(cmd, "pip install requests");
+    }
+
+    #[test]
+    fn test_packages_empty_no_command() {
+        let result = synthesize_install_command(&[], Some("uv"));
+        assert!(result.is_none());
+
+        let result = synthesize_install_command(&[], None);
+        assert!(result.is_none());
     }
 }
