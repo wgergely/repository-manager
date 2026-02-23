@@ -3,6 +3,7 @@
 //! Supports multiple worktree layout styles through a unified interface.
 
 pub mod classic;
+pub mod commits;
 pub mod container;
 pub mod error;
 pub mod helpers;
@@ -11,6 +12,7 @@ pub mod naming;
 pub mod provider;
 
 pub use classic::ClassicLayout;
+pub use commits::{CommitInfo, list_recent_commits};
 pub use container::ContainerLayout;
 pub use error::{Error, Result};
 pub use helpers::{

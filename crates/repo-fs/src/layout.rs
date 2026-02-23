@@ -12,6 +12,8 @@ pub enum LayoutMode {
     InRepoWorktrees,
     /// Classic single-checkout git repository
     Classic,
+    /// Worktree collection where `main/` contains a full `.git/` directory
+    LinkedWorktrees,
 }
 
 impl std::fmt::Display for LayoutMode {
@@ -20,6 +22,7 @@ impl std::fmt::Display for LayoutMode {
             Self::Container => write!(f, "Container"),
             Self::InRepoWorktrees => write!(f, "InRepoWorktrees"),
             Self::Classic => write!(f, "Classic"),
+            Self::LinkedWorktrees => write!(f, "LinkedWorktrees"),
         }
     }
 }
@@ -66,7 +69,13 @@ impl WorkspaceLayout {
         let has_main = dir.join(RepoPath::MainWorktree).is_dir();
         let has_worktrees = dir.join(RepoPath::WorktreesDir).is_dir();
 
-        let mode = if has_gt && has_main {
+        let main_git_dir = dir.join(RepoPath::MainWorktree).join(RepoPath::GitDir);
+        let has_main_git_dir = main_git_dir.is_dir();
+
+        let mode = if has_main_git_dir && !has_gt && !has_git {
+            // LinkedWorktrees: parent has main/.git/ directory but no .gt or .git of its own
+            Some(LayoutMode::LinkedWorktrees)
+        } else if has_gt && has_main {
             // Container layout: .gt/ + main/
             Some(LayoutMode::Container)
         } else if has_git && has_worktrees {
@@ -93,6 +102,7 @@ impl WorkspaceLayout {
             LayoutMode::InRepoWorktrees | LayoutMode::Classic => {
                 self.root.join(RepoPath::GitDir.as_str())
             }
+            LayoutMode::LinkedWorktrees => self.root.join(RepoPath::MainWorktree.as_str()),
         }
     }
 
@@ -128,6 +138,18 @@ impl WorkspaceLayout {
                 if !self.root.join(RepoPath::GitDir.as_str()).exists() {
                     return Err(Error::LayoutValidation {
                         message: "Not a git repository.".into(),
+                    });
+                }
+            }
+            LayoutMode::LinkedWorktrees => {
+                let main_git = self.root
+                    .join(RepoPath::MainWorktree.as_str())
+                    .join(RepoPath::GitDir.as_str());
+                if !main_git.is_dir() {
+                    return Err(Error::LayoutValidation {
+                        message: format!(
+                            "Worktree collection missing main/.git/ directory.",
+                        ),
                     });
                 }
             }

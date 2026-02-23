@@ -55,7 +55,18 @@
       "mcp__rust-quality__cargo-check",
       "Bash(git status:*)",
       "Bash(git merge:*)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "WebFetch(domain:news.ycombinator.com)",
+      "Bash(git -C \"Y:/code/repository-manager-worktrees/main\" tag --list)",
+      "Bash(git -C \"Y:/code/repository-manager-worktrees/main\" log --oneline -10)",
+      "WebFetch(domain:lib.rs)",
+      "Bash(cmd /c \"mkdir Y:\\\\code\\\\repository-manager-worktrees\\\\main\\\\docs\\\\decisions 2>nul & echo done\")",
+      "Bash(cmd /c \"mkdir \"\"Y:\\\\code\\\\repository-manager-worktrees\\\\main\\\\docs\\\\decisions\"\" && echo created\")",
+      "Bash(powershell -Command:*)",
+      "Bash(Out-File -FilePath 'Y:\\\\code\\\\repository-manager-worktrees\\\\main\\\\docs\\\\decisions\\\\0001-git2-vendored-feature.md' -Encoding utf8)",
+      "Bash(Write-Host 'written')",
+      "Bash(\")",
+      "Bash(test:*)"
     ]
   }
 }

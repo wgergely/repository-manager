@@ -1,63 +1,52 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "tests/integration"]
+members = ["crates/*"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
 repository = "https://github.com/user/repository-manager"
+license = "MIT"
 
 [workspace.dependencies]
-# Serialization
-serde = { version = "1.0", features = ["derive"] }
-toml = "0.8"
-serde_json = "1.0"
-serde_yaml = "0.9"
-
-# Format-preserving editors
-toml_edit = "0.23"
-
-# Diffing
-similar = "2.7"
-
-# File operations
-dirs = "5.0"
-fs2 = "0.4"
-tempfile = "3.14"
-dunce = "1.0"
-backoff = "0.4.0"
-
-# Git
-git2 = "0.20"
-
-# Date/Time
-chrono = { version = "0.4", features = ["serde"] }
-
+assert_fs = "1.1"
 # Async
 async-trait = "0.1"
-tokio = { version = "1.42", features = ["rt", "process", "fs"] }
-
-# Utilities
-uuid = { version = "1.11", features = ["v4", "serde"] }
-sha2 = "0.10"
-regex = "1.11"
-
-# Versioning
-semver = { version = "1.0", features = ["serde"] }
-
-# Error handling
-thiserror = "2.0"
-
+backoff = "0.4.0"
+# Date/Time
+chrono = { version = "0.4", features = ["serde"] }
+criterion = "0.5"
+# File operations
+dirs = "5.0"
+dunce = "1.0"
+fs2 = "0.4"
+# Git
+git2 = "0.20"
 # Testing
 insta = { version = "1.41", features = ["yaml"] }
-proptest = "1.5"
-rstest = "0.23"
-pretty_assertions = "1.4"
-assert_fs = "1.1"
 predicates = "3.1"
-criterion = "0.5"
-
+pretty_assertions = "1.4"
+proptest = "1.5"
+regex = "1.11"
+rstest = "0.23"
+# Versioning
+semver = { version = "1.0", features = ["serde"] }
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+sha2 = "0.10"
+# Diffing
+similar = "2.7"
+tempfile = "3.14"
+# Error handling
+thiserror = "2.0"
+tokio = { version = "1.42", features = ["fs", "process", "rt"] }
+toml = "0.8"
+# Format-preserving editors
+toml_edit = "0.23"
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+# Utilities
+uuid = { version = "1.11", features = ["serde", "v4"] }
