@@ -993,26 +993,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "integration-tests"
-version = "0.1.0"
-dependencies = [
- "assert_cmd",
- "git2",
- "predicates",
- "regex",
- "repo-core",
- "repo-fs",
- "repo-git",
- "repo-mcp",
- "repo-meta",
- "repo-presets",
- "repo-tools",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
 name = "is-terminal"
 version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1676,6 +1656,7 @@ name = "repo-git"
 version = "0.1.0"
 dependencies = [
  "assert_fs",
+ "chrono",
  "criterion",
  "git2",
  "predicates",
