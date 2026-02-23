@@ -628,19 +628,19 @@ async fn test_tool_call_rule_add_then_read_rules_resource() {
 }
 
 #[tokio::test]
-async fn test_tool_call_not_implemented_returns_is_error() {
+async fn test_tool_call_unknown_tool_returns_error() {
     let temp = TempDir::new().unwrap();
     let server = setup_server(&temp).await;
     create_test_repo(&temp);
 
-    // extension_install is explicitly not implemented
+    // A truly unknown tool should return an error
     let request = serde_json::to_string(&json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "tools/call",
         "params": {
-            "name": "extension_install",
-            "arguments": { "source": "https://example.com/ext.git" }
+            "name": "completely_unknown_tool",
+            "arguments": {}
         }
     }))
     .unwrap();
@@ -648,11 +648,11 @@ async fn test_tool_call_not_implemented_returns_is_error() {
     let response: Value =
         serde_json::from_str(&server.handle_message(&request).await.unwrap()).unwrap();
 
-    // Not-implemented tools return as tool errors, not JSON-RPC errors
+    // Unknown tools should return an error
     let result = &response["result"];
     assert_eq!(
         result["is_error"], true,
-        "Not-implemented tool should return is_error=true"
+        "Unknown tool should return is_error=true"
     );
 }
 
@@ -691,22 +691,23 @@ async fn test_resource_read_config_returns_valid_content() {
 }
 
 // ==========================================================================
-// Extension Handlers Return NotImplemented
+// Extension Handlers Are Functional
 // ==========================================================================
 
 #[tokio::test]
-async fn test_mcp_extension_install_not_implemented() {
+async fn test_mcp_extension_install_validates_source() {
     let temp = TempDir::new().unwrap();
     let server = setup_server(&temp).await;
     create_test_repo(&temp);
 
+    // Non-existent local path should return success=false (not an error)
     let request = serde_json::to_string(&json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "tools/call",
         "params": {
             "name": "extension_install",
-            "arguments": { "source": "https://example.com/ext.git" }
+            "arguments": { "source": "/nonexistent/path" }
         }
     }))
     .unwrap();
@@ -714,29 +715,22 @@ async fn test_mcp_extension_install_not_implemented() {
     let response: Value =
         serde_json::from_str(&server.handle_message(&request).await.unwrap()).unwrap();
 
-    // Extension handlers return NotImplemented, which surfaces as is_error=true
     let result = &response["result"];
-    assert_eq!(
-        result["is_error"], true,
-        "extension_install should return is_error=true (not implemented)"
-    );
-    let text = result["content"][0]["text"].as_str().unwrap();
+    // Should be a successful tool call (no is_error) with success=false in content
     assert!(
-        text.contains("not implemented"),
-        "Error text should mention 'not implemented', got: {}",
-        text
+        result.get("is_error").is_none() || result["is_error"] == false,
+        "extension_install with nonexistent path should not return is_error=true"
     );
 }
 
 #[tokio::test]
-async fn test_mcp_extension_handlers_return_not_implemented() {
+async fn test_mcp_extension_handlers_return_results() {
     let temp = TempDir::new().unwrap();
     let server = setup_server(&temp).await;
     create_test_repo(&temp);
 
-    // All extension mutation operations should return is_error=true
+    // Extension handlers should now return results (not NotImplemented errors)
     let extension_tools = vec![
-        ("extension_install", json!({ "source": "test" })),
         ("extension_add", json!({ "name": "test" })),
         ("extension_init", json!({ "name": "test" })),
         ("extension_remove", json!({ "name": "test" })),
@@ -758,9 +752,9 @@ async fn test_mcp_extension_handlers_return_not_implemented() {
             serde_json::from_str(&server.handle_message(&request).await.unwrap()).unwrap();
 
         let result = &response["result"];
-        assert_eq!(
-            result["is_error"], true,
-            "{} should return is_error=true (not implemented)",
+        assert!(
+            result.get("is_error").is_none() || result["is_error"] == false,
+            "{} should no longer return is_error=true (it is now implemented)",
             tool_name
         );
     }

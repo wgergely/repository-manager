@@ -47,6 +47,30 @@ pub enum Error {
         path: PathBuf,
         reason: String,
     },
+
+    /// Dependency cycle detected in the extension/preset graph.
+    #[error("dependency cycle detected among: {}", participants.join(", "))]
+    DependencyCycle {
+        participants: Vec<String>,
+    },
+
+    /// Failed to parse a version constraint string.
+    #[error("invalid version constraint '{constraint}': {reason}")]
+    VersionConstraintParse {
+        constraint: String,
+        reason: String,
+    },
+
+    /// A version constraint was not satisfied.
+    #[error("version constraint not satisfied: {constraint} (have {actual})")]
+    VersionConstraintNotSatisfied {
+        constraint: String,
+        actual: String,
+    },
+
+    /// Failed to parse or write the lock file.
+    #[error("lock file error: {0}")]
+    LockFileParse(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

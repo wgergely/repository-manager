@@ -267,7 +267,56 @@ impl ExtensionManifest {
             version: self.extension.version.clone(),
             source: e,
         })?;
+
+        // Validate that Python version constraint is parseable (if declared)
+        if let Some(ref requires) = self.requires {
+            if let Some(ref python_req) = requires.python {
+                crate::version::VersionConstraint::parse(&python_req.version)?;
+            }
+        }
+
         Ok(())
+    }
+
+    /// Check whether a given Python version satisfies this manifest's
+    /// `[requires.python]` constraint.
+    ///
+    /// Returns `Ok(true)` if satisfied or no constraint is declared.
+    /// Returns `Ok(false)` if the constraint is not satisfied.
+    /// Returns `Err` if the constraint string is malformed.
+    pub fn python_version_satisfied(&self, python_version: &str) -> Result<bool> {
+        let constraint_str = match self
+            .requires
+            .as_ref()
+            .and_then(|r| r.python.as_ref())
+        {
+            Some(req) => &req.version,
+            None => return Ok(true), // No constraint declared
+        };
+
+        let constraint = crate::version::VersionConstraint::parse(constraint_str)?;
+        Ok(constraint.satisfies(python_version))
+    }
+
+    /// Return the implicit preset dependencies inferred from this manifest.
+    ///
+    /// For example, an extension with `runtime.type = "python"` implicitly
+    /// depends on the `env:python` preset.
+    pub fn implicit_preset_dependencies(&self) -> Vec<String> {
+        let mut deps = Vec::new();
+
+        if let Some(ref runtime) = self.runtime {
+            deps.push(format!("env:{}", runtime.runtime_type));
+        }
+
+        // Explicit Python requirement also implies env:python (dedup)
+        if self.requires.as_ref().is_some_and(|r| r.python.is_some())
+            && !deps.contains(&"env:python".to_string())
+        {
+            deps.push("env:python".to_string());
+        }
+
+        deps
     }
 }
 
@@ -661,5 +710,102 @@ content_types = ["rules"]
         let manifest = ExtensionManifest::from_toml(toml).unwrap();
         let provides = manifest.provides.unwrap();
         assert!(provides.mcp_config.is_none());
+    }
+
+    // --- Version constraint validation ---
+
+    #[test]
+    fn test_invalid_python_constraint_rejected() {
+        let toml = r#"
+[extension]
+name = "bad-constraint"
+version = "1.0.0"
+
+[requires.python]
+version = ">=abc"
+"#;
+        let err = ExtensionManifest::from_toml(toml).unwrap_err();
+        assert!(
+            matches!(err, Error::VersionConstraintParse { .. }),
+            "Expected VersionConstraintParse, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_valid_python_constraint_accepted() {
+        let toml = r#"
+[extension]
+name = "good-constraint"
+version = "1.0.0"
+
+[requires.python]
+version = ">=3.10,<3.14"
+"#;
+        let manifest = ExtensionManifest::from_toml(toml).unwrap();
+        let req = manifest.requires.unwrap().python.unwrap();
+        assert_eq!(req.version, ">=3.10,<3.14");
+    }
+
+    // --- python_version_satisfied ---
+
+    #[test]
+    fn test_python_version_satisfied_no_constraint() {
+        let toml = r#"
+[extension]
+name = "no-req"
+version = "1.0.0"
+"#;
+        let manifest = ExtensionManifest::from_toml(toml).unwrap();
+        assert!(manifest.python_version_satisfied("3.8.0").unwrap());
+    }
+
+    #[test]
+    fn test_python_version_satisfied_passes() {
+        let manifest = ExtensionManifest::from_toml(VAULTSPEC_TOML).unwrap();
+        // VAULTSPEC_TOML requires >=3.13
+        assert!(manifest.python_version_satisfied("3.13.0").unwrap());
+        assert!(manifest.python_version_satisfied("3.14.0").unwrap());
+    }
+
+    #[test]
+    fn test_python_version_satisfied_fails() {
+        let manifest = ExtensionManifest::from_toml(VAULTSPEC_TOML).unwrap();
+        // VAULTSPEC_TOML requires >=3.13
+        assert!(!manifest.python_version_satisfied("3.12.0").unwrap());
+    }
+
+    // --- implicit_preset_dependencies ---
+
+    #[test]
+    fn test_implicit_deps_python_runtime() {
+        let manifest = ExtensionManifest::from_toml(VAULTSPEC_TOML).unwrap();
+        let deps = manifest.implicit_preset_dependencies();
+        assert!(deps.contains(&"env:python".to_string()));
+    }
+
+    #[test]
+    fn test_implicit_deps_no_runtime() {
+        let toml = r#"
+[extension]
+name = "minimal"
+version = "1.0.0"
+"#;
+        let manifest = ExtensionManifest::from_toml(toml).unwrap();
+        assert!(manifest.implicit_preset_dependencies().is_empty());
+    }
+
+    #[test]
+    fn test_implicit_deps_rust_runtime() {
+        let toml = r#"
+[extension]
+name = "rust-ext"
+version = "1.0.0"
+
+[runtime]
+type = "rust"
+"#;
+        let manifest = ExtensionManifest::from_toml(toml).unwrap();
+        let deps = manifest.implicit_preset_dependencies();
+        assert_eq!(deps, vec!["env:rust"]);
     }
 }

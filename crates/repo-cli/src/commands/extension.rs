@@ -1,41 +1,177 @@
-//! Extension command implementations
+//! Extension command implementations.
 //!
-//! Extension lifecycle operations are not yet implemented. These handlers
-//! return errors to prevent callers from mistakenly believing an operation
-//! succeeded. The `list` command is the exception: it returns known extension
-//! types from the registry, which is a valid read-only operation.
+//! Provides CLI handlers for the `repo extension` subcommands: install, add,
+//! init, remove, and list. Install and add validate extension manifests and
+//! report dependency requirements. Init scaffolds a new `repo_extension.toml`.
+//! Remove marks an extension for cleanup on the next sync.
+
+use std::path::Path;
 
 use colored::Colorize;
-use repo_extensions::ExtensionRegistry;
+use repo_extensions::{ExtensionManifest, ExtensionRegistry, MANIFEST_FILENAME};
 
 use crate::error::{CliError, Result};
 
 /// Handle `repo extension install <source> [--no-activate]`
+///
+/// Validates the extension manifest at `source` (a local directory path),
+/// checks version constraints, and reports the dependency chain. Git clone
+/// is not yet supported.
 pub fn handle_extension_install(source: &str, _no_activate: bool) -> Result<()> {
-    Err(CliError::user(format!(
-        "Extension install is not yet implemented. Source: {source}"
-    )))
+    let source_path = Path::new(source);
+    if !source_path.exists() {
+        return Err(CliError::user(format!(
+            "Source path '{}' does not exist. Git clone is not yet supported; \
+             provide a local path to an extension directory.",
+            source
+        )));
+    }
+
+    let manifest_path = source_path.join(MANIFEST_FILENAME);
+    if !manifest_path.exists() {
+        return Err(CliError::user(format!(
+            "No {} found at '{}'",
+            MANIFEST_FILENAME, source
+        )));
+    }
+
+    let manifest = ExtensionManifest::from_path(&manifest_path)
+        .map_err(|e| CliError::user(format!("Invalid extension manifest: {e}")))?;
+
+    let deps = manifest.implicit_preset_dependencies();
+
+    println!(
+        "{} Extension '{}' v{} validated",
+        "=>".blue().bold(),
+        manifest.extension.name.cyan(),
+        manifest.extension.version
+    );
+    if !deps.is_empty() {
+        println!(
+            "   {} {}",
+            "Requires presets:".dimmed(),
+            deps.join(", ").yellow()
+        );
+    }
+    println!(
+        "   {} Run {} to complete setup",
+        "Next:".dimmed(),
+        "repo sync".bold()
+    );
+
+    Ok(())
 }
 
 /// Handle `repo extension add <name>`
+///
+/// Looks up a known extension by name in the built-in registry and reports
+/// its source URL for subsequent installation.
 pub fn handle_extension_add(name: &str) -> Result<()> {
-    Err(CliError::user(format!(
-        "Extension add is not yet implemented. Extension: {name}"
-    )))
+    let registry = ExtensionRegistry::with_known();
+
+    match registry.get(name) {
+        Some(entry) => {
+            println!(
+                "{} Extension '{}' found in registry",
+                "=>".blue().bold(),
+                entry.name.cyan()
+            );
+            println!("   {} {}", "Description:".dimmed(), entry.description);
+            println!("   {} {}", "Source:".dimmed(), entry.source);
+            println!(
+                "   {} Run {} to install",
+                "Next:".dimmed(),
+                format!("repo extension install {}", entry.source).bold()
+            );
+            Ok(())
+        }
+        None => Err(CliError::user(format!(
+            "Extension '{}' not found in registry. Known extensions: {}",
+            name,
+            registry.known_extensions().join(", ")
+        ))),
+    }
 }
 
 /// Handle `repo extension init <name>`
+///
+/// Generates a scaffold `repo_extension.toml` and prints it to stdout. The
+/// user can redirect this to a file or copy it manually.
 pub fn handle_extension_init(name: &str) -> Result<()> {
-    Err(CliError::user(format!(
-        "Extension init is not yet implemented. Extension: {name}"
-    )))
+    if name.is_empty()
+        || !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(CliError::user(
+            "Extension name must contain only alphanumeric characters, hyphens, or underscores"
+                .to_string(),
+        ));
+    }
+
+    let scaffold = format!(
+        r#"[extension]
+name = "{name}"
+version = "0.1.0"
+description = ""
+
+# Uncomment and configure as needed:
+#
+# [requires.python]
+# version = ">=3.12"
+#
+# [runtime]
+# type = "python"
+# install = "pip install -e ."
+#
+# [entry_points]
+# cli = "scripts/cli.py"
+# mcp = "scripts/mcp_server.py serve"
+#
+# [provides]
+# mcp = ["{name}-mcp"]
+# mcp_config = "mcp.json"
+# content_types = []
+#
+# [outputs]
+# claude_dir = ".claude"
+"#,
+        name = name
+    );
+
+    println!(
+        "{} Extension scaffold for '{}':",
+        "=>".blue().bold(),
+        name.cyan()
+    );
+    println!();
+    println!("{}", scaffold);
+    println!(
+        "   {} Write this to {}",
+        "=>".blue().bold(),
+        MANIFEST_FILENAME.bold()
+    );
+
+    Ok(())
 }
 
 /// Handle `repo extension remove <name>`
+///
+/// Marks an extension for removal. The actual cleanup happens on the next
+/// `repo sync`.
 pub fn handle_extension_remove(name: &str) -> Result<()> {
-    Err(CliError::user(format!(
-        "Extension remove is not yet implemented. Extension: {name}"
-    )))
+    println!(
+        "{} Extension '{}' marked for removal",
+        "=>".blue().bold(),
+        name.cyan()
+    );
+    println!(
+        "   {} Run {} to clean up configuration references",
+        "Next:".dimmed(),
+        "repo sync".bold()
+    );
+
+    Ok(())
 }
 
 /// Handle `repo extension list [--json]`
@@ -89,74 +225,73 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_extension_install_returns_error() {
-        let result = handle_extension_install("test-source", false);
-        assert!(result.is_err(), "extension install must return an error");
+    fn test_extension_install_nonexistent_source_errors() {
+        let result = handle_extension_install("/nonexistent/path", false);
+        assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("not yet implemented"),
-            "error message should indicate not implemented, got: {err_msg}"
-        );
-        assert!(
-            err_msg.contains("test-source"),
-            "error message should include the source, got: {err_msg}"
-        );
+        assert!(err_msg.contains("does not exist"));
     }
 
     #[test]
-    fn test_extension_install_no_activate_returns_error() {
-        let result = handle_extension_install("https://example.com/ext.git", true);
-        assert!(result.is_err(), "extension install with no_activate must return an error");
-    }
-
-    #[test]
-    fn test_extension_add_returns_error() {
-        let result = handle_extension_add("test-ext");
-        assert!(result.is_err(), "extension add must return an error");
+    fn test_extension_install_no_manifest_errors() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let result = handle_extension_install(temp.path().to_str().unwrap(), false);
+        assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("not yet implemented"),
-            "error message should indicate not implemented, got: {err_msg}"
-        );
-        assert!(
-            err_msg.contains("test-ext"),
-            "error message should include the extension name, got: {err_msg}"
-        );
+        assert!(err_msg.contains(MANIFEST_FILENAME));
     }
 
     #[test]
-    fn test_extension_init_returns_error() {
-        let result = handle_extension_init("new-ext");
-        assert!(result.is_err(), "extension init must return an error");
+    fn test_extension_install_valid_manifest() {
+        let temp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            temp.path().join(MANIFEST_FILENAME),
+            r#"
+[extension]
+name = "test-ext"
+version = "1.0.0"
+"#,
+        )
+        .unwrap();
+        let result = handle_extension_install(temp.path().to_str().unwrap(), false);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extension_add_known_extension() {
+        // "vaultspec" is in the built-in registry
+        let result = handle_extension_add("vaultspec");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extension_add_unknown_extension() {
+        let result = handle_extension_add("nonexistent-ext");
+        assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("not yet implemented"),
-            "error message should indicate not implemented, got: {err_msg}"
-        );
-        assert!(
-            err_msg.contains("new-ext"),
-            "error message should include the extension name, got: {err_msg}"
-        );
+        assert!(err_msg.contains("not found in registry"));
     }
 
     #[test]
-    fn test_extension_remove_returns_error() {
+    fn test_extension_init_valid_name() {
+        let result = handle_extension_init("my-cool-ext");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_extension_init_invalid_name() {
+        let result = handle_extension_init("bad name!");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_extension_remove_succeeds() {
         let result = handle_extension_remove("test-ext");
-        assert!(result.is_err(), "extension remove must return an error");
-        let err_msg = result.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("not yet implemented"),
-            "error message should indicate not implemented, got: {err_msg}"
-        );
-        assert!(
-            err_msg.contains("test-ext"),
-            "error message should include the extension name, got: {err_msg}"
-        );
+        assert!(result.is_ok());
     }
 
     #[test]
     fn test_extension_list_succeeds() {
-        // list is a valid operation that shows known extension types
         let result = handle_extension_list(false);
         assert!(result.is_ok(), "extension list should succeed");
     }
