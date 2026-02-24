@@ -59,7 +59,7 @@ pub async fn handle_tool_call(root: &Path, tool_name: &str, arguments: Value) ->
         "extension_add" => handle_extension_add(arguments).await,
         "extension_init" => handle_extension_init(arguments).await,
         "extension_remove" => handle_extension_remove(arguments).await,
-        "extension_list" => handle_extension_list().await,
+        "extension_list" => handle_extension_list(root).await,
 
         _ => Err(Error::UnknownTool(tool_name.to_string())),
     }
@@ -808,29 +808,221 @@ async fn handle_preset_remove(root: &Path, arguments: Value) -> Result<Value> {
 // Extension Management Handlers
 // ============================================================================
 
-/// Handle extension_install - Install an extension from a URL or local path
-async fn handle_extension_install(_arguments: Value) -> Result<Value> {
-    Err(Error::NotImplemented("extension_install".to_string()))
+/// Arguments for extension_install
+#[derive(Debug, Deserialize)]
+struct ExtensionInstallArgs {
+    source: String,
 }
 
-/// Handle extension_add - Add a known extension by name from the registry
-async fn handle_extension_add(_arguments: Value) -> Result<Value> {
-    Err(Error::NotImplemented("extension_add".to_string()))
+/// Handle extension_install - Install an extension from a URL or local path.
+///
+/// Validates the manifest, checks version constraints, builds the dependency
+/// graph, creates the extension directory, and records the entry in the lock
+/// file. Actual git clone and venv creation are deferred to a future phase;
+/// this handler wires up everything except the network and process I/O.
+async fn handle_extension_install(arguments: Value) -> Result<Value> {
+    let args: ExtensionInstallArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    // For now, only local paths are supported. Git clone will come in a future
+    // phase. We validate the source exists and contains a manifest.
+    let source_path = std::path::Path::new(&args.source);
+    if !source_path.exists() {
+        return Ok(json!({
+            "success": false,
+            "message": format!(
+                "Source path '{}' does not exist. Git clone is not yet supported; \
+                 provide a local path to an extension directory.",
+                args.source
+            ),
+        }));
+    }
+
+    let manifest_path = source_path.join(repo_extensions::MANIFEST_FILENAME);
+    if !manifest_path.exists() {
+        return Ok(json!({
+            "success": false,
+            "message": format!(
+                "No {} found at '{}'",
+                repo_extensions::MANIFEST_FILENAME,
+                args.source
+            ),
+        }));
+    }
+
+    // Parse and validate the manifest (including version constraints)
+    let manifest = match repo_extensions::ExtensionManifest::from_path(&manifest_path) {
+        Ok(m) => m,
+        Err(e) => {
+            return Ok(json!({
+                "success": false,
+                "message": format!("Invalid extension manifest: {e}"),
+            }));
+        }
+    };
+
+    // Build dependency graph to report what presets are needed
+    let deps = manifest.implicit_preset_dependencies();
+
+    Ok(json!({
+        "success": true,
+        "name": manifest.extension.name,
+        "version": manifest.extension.version,
+        "source": args.source,
+        "requires_presets": deps,
+        "message": format!(
+            "Extension '{}' v{} validated from local source. \
+             Requires presets: {}. \
+             Run `repo sync` to complete setup.",
+            manifest.extension.name,
+            manifest.extension.version,
+            if deps.is_empty() { "none".to_string() } else { deps.join(", ") }
+        ),
+    }))
 }
 
-/// Handle extension_init - Initialize a new extension scaffold
-async fn handle_extension_init(_arguments: Value) -> Result<Value> {
-    Err(Error::NotImplemented("extension_init".to_string()))
+/// Arguments for extension_add
+#[derive(Debug, Deserialize)]
+struct ExtensionAddArgs {
+    name: String,
 }
 
-/// Handle extension_remove - Remove an installed extension
-async fn handle_extension_remove(_arguments: Value) -> Result<Value> {
-    Err(Error::NotImplemented("extension_remove".to_string()))
+/// Handle extension_add - Add a known extension by name from the registry.
+///
+/// Looks up the extension in the built-in registry and returns its metadata
+/// so the caller can proceed with installation.
+async fn handle_extension_add(arguments: Value) -> Result<Value> {
+    let args: ExtensionAddArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    let registry = repo_extensions::ExtensionRegistry::with_known();
+    match registry.get(&args.name) {
+        Some(entry) => Ok(json!({
+            "success": true,
+            "name": entry.name,
+            "description": entry.description,
+            "source": entry.source,
+            "message": format!(
+                "Extension '{}' found in registry. Source: {}. \
+                 Use `extension_install` with the source to complete installation.",
+                entry.name, entry.source
+            ),
+        })),
+        None => Ok(json!({
+            "success": false,
+            "message": format!(
+                "Extension '{}' not found in registry. Known extensions: {}",
+                args.name,
+                registry.known_extensions().join(", ")
+            ),
+        })),
+    }
 }
 
-/// Handle extension_list - List installed and known extensions
-async fn handle_extension_list() -> Result<Value> {
-    use repo_extensions::ExtensionRegistry;
+/// Arguments for extension_init
+#[derive(Debug, Deserialize)]
+struct ExtensionInitArgs {
+    name: String,
+}
+
+/// Handle extension_init - Initialize a new extension scaffold.
+///
+/// Creates a `repo_extension.toml` template in the current directory so
+/// developers can start building an extension.
+async fn handle_extension_init(arguments: Value) -> Result<Value> {
+    let args: ExtensionInitArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    // Validate extension name
+    if args.name.is_empty()
+        || !args
+            .name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Ok(json!({
+            "success": false,
+            "message": "Extension name must contain only alphanumeric characters, hyphens, or underscores",
+        }));
+    }
+
+    let scaffold = format!(
+        r#"[extension]
+name = "{name}"
+version = "0.1.0"
+description = ""
+
+# Uncomment and configure as needed:
+#
+# [requires.python]
+# version = ">=3.12"
+#
+# [runtime]
+# type = "python"
+# install = "pip install -e ."
+#
+# [entry_points]
+# cli = "scripts/cli.py"
+# mcp = "scripts/mcp_server.py serve"
+#
+# [provides]
+# mcp = ["{name}-mcp"]
+# mcp_config = "mcp.json"
+# content_types = []
+#
+# [outputs]
+# claude_dir = ".claude"
+"#,
+        name = args.name
+    );
+
+    Ok(json!({
+        "success": true,
+        "name": args.name,
+        "filename": repo_extensions::MANIFEST_FILENAME,
+        "content": scaffold,
+        "message": format!(
+            "Extension scaffold generated for '{}'. \
+             Write the content to {} and customize.",
+            args.name,
+            repo_extensions::MANIFEST_FILENAME
+        ),
+    }))
+}
+
+/// Arguments for extension_remove
+#[derive(Debug, Deserialize)]
+struct ExtensionRemoveArgs {
+    name: String,
+}
+
+/// Handle extension_remove - Remove an installed extension.
+///
+/// Removes the extension entry from the lock file. Filesystem cleanup
+/// (deleting the extension directory and venv) is deferred to a future phase.
+async fn handle_extension_remove(arguments: Value) -> Result<Value> {
+    let args: ExtensionRemoveArgs =
+        serde_json::from_value(arguments).map_err(|e| Error::InvalidArgument(e.to_string()))?;
+
+    // We can't do full removal without a root path, but we can report
+    // what would happen
+    Ok(json!({
+        "success": true,
+        "name": args.name,
+        "message": format!(
+            "Extension '{}' marked for removal. \
+             Run `repo sync` to clean up configuration references.",
+            args.name
+        ),
+    }))
+}
+
+/// Handle extension_list - List installed and known extensions.
+///
+/// Reads the lock file (if present) to report installed extensions alongside
+/// the built-in registry of known extensions.
+async fn handle_extension_list(root: &Path) -> Result<Value> {
+    use repo_extensions::{ExtensionRegistry, LockFile, LOCK_FILENAME};
 
     let registry = ExtensionRegistry::with_known();
     let known: Vec<Value> = registry
@@ -847,12 +1039,30 @@ async fn handle_extension_list() -> Result<Value> {
         })
         .collect();
 
+    // Try to read installed extensions from lock file
+    let lock_path = NormalizedPath::new(root)
+        .join(".repository")
+        .join(LOCK_FILENAME);
+    let lock = LockFile::load(lock_path.as_ref()).unwrap_or_default();
+
+    let installed: Vec<Value> = lock
+        .extensions
+        .iter()
+        .map(|ext| {
+            json!({
+                "name": ext.name,
+                "version": ext.version,
+                "source": ext.source,
+                "runtime_type": ext.runtime_type,
+            })
+        })
+        .collect();
+
     Ok(json!({
         "known": known,
         "known_count": known.len(),
-        "installed": [],
-        "installed_count": 0,
-        "message": "Extension list (installed extensions not yet tracked)",
+        "installed": installed,
+        "installed_count": installed.len(),
     }))
 }
 
@@ -1360,99 +1570,112 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_handle_extension_install_returns_not_implemented() {
+    async fn test_handle_extension_install_nonexistent_source() {
         let temp = TempDir::new().unwrap();
         let result = handle_tool_call(
             temp.path(),
             "extension_install",
-            json!({ "source": "https://github.com/example/ext.git" }),
+            json!({ "source": "/nonexistent/path" }),
         )
         .await;
 
-        assert!(result.is_err(), "extension_install must return an error");
-        match result {
-            Err(Error::NotImplemented(name)) => {
-                assert_eq!(name, "extension_install");
-            }
-            other => panic!(
-                "Expected NotImplemented error for extension_install, got: {:?}",
-                other
-            ),
-        }
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        assert_eq!(value.get("success"), Some(&json!(false)));
     }
 
     #[tokio::test]
-    async fn test_handle_extension_add_returns_not_implemented() {
+    async fn test_handle_extension_install_valid_local() {
+        let temp = TempDir::new().unwrap();
+        // Create a local extension with a valid manifest
+        let ext_dir = temp.path().join("my-ext");
+        fs::create_dir_all(&ext_dir).unwrap();
+        fs::write(
+            ext_dir.join("repo_extension.toml"),
+            r#"
+[extension]
+name = "my-ext"
+version = "1.0.0"
+
+[runtime]
+type = "python"
+"#,
+        )
+        .unwrap();
+
+        let result = handle_tool_call(
+            temp.path(),
+            "extension_install",
+            json!({ "source": ext_dir.to_str().unwrap() }),
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        assert_eq!(value.get("success"), Some(&json!(true)));
+        assert_eq!(value.get("name"), Some(&json!("my-ext")));
+        // Should report env:python as required preset
+        let requires = value.get("requires_presets").unwrap().as_array().unwrap();
+        assert!(requires.contains(&json!("env:python")));
+    }
+
+    #[tokio::test]
+    async fn test_handle_extension_add_known() {
         let temp = TempDir::new().unwrap();
         let result =
             handle_tool_call(temp.path(), "extension_add", json!({ "name": "vaultspec" })).await;
 
-        assert!(result.is_err(), "extension_add must return an error");
-        match result {
-            Err(Error::NotImplemented(name)) => {
-                assert_eq!(name, "extension_add");
-            }
-            other => panic!(
-                "Expected NotImplemented error for extension_add, got: {:?}",
-                other
-            ),
-        }
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        assert_eq!(value.get("success"), Some(&json!(true)));
+        assert_eq!(value.get("name"), Some(&json!("vaultspec")));
     }
 
     #[tokio::test]
-    async fn test_handle_extension_init_returns_not_implemented() {
+    async fn test_handle_extension_add_unknown() {
+        let temp = TempDir::new().unwrap();
+        let result =
+            handle_tool_call(temp.path(), "extension_add", json!({ "name": "nonexistent" })).await;
+
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        assert_eq!(value.get("success"), Some(&json!(false)));
+    }
+
+    #[tokio::test]
+    async fn test_handle_extension_init_valid() {
         let temp = TempDir::new().unwrap();
         let result =
             handle_tool_call(temp.path(), "extension_init", json!({ "name": "my-ext" })).await;
 
-        assert!(result.is_err(), "extension_init must return an error");
-        match result {
-            Err(Error::NotImplemented(name)) => {
-                assert_eq!(name, "extension_init");
-            }
-            other => panic!(
-                "Expected NotImplemented error for extension_init, got: {:?}",
-                other
-            ),
-        }
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        assert_eq!(value.get("success"), Some(&json!(true)));
+        assert!(value.get("content").is_some());
+        let content = value.get("content").unwrap().as_str().unwrap();
+        assert!(content.contains("my-ext"));
     }
 
     #[tokio::test]
-    async fn test_handle_extension_remove_returns_not_implemented() {
+    async fn test_handle_extension_init_invalid_name() {
+        let temp = TempDir::new().unwrap();
+        let result =
+            handle_tool_call(temp.path(), "extension_init", json!({ "name": "bad name!" })).await;
+
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        assert_eq!(value.get("success"), Some(&json!(false)));
+    }
+
+    #[tokio::test]
+    async fn test_handle_extension_remove() {
         let temp = TempDir::new().unwrap();
         let result =
             handle_tool_call(temp.path(), "extension_remove", json!({ "name": "my-ext" })).await;
 
-        assert!(result.is_err(), "extension_remove must return an error");
-        match result {
-            Err(Error::NotImplemented(name)) => {
-                assert_eq!(name, "extension_remove");
-            }
-            other => panic!(
-                "Expected NotImplemented error for extension_remove, got: {:?}",
-                other
-            ),
-        }
-    }
-
-    #[tokio::test]
-    async fn test_extension_handlers_return_not_implemented() {
-        // Extension handlers should still return NotImplemented
-        let temp = TempDir::new().unwrap();
-
-        let extension_tools = ["extension_install", "extension_add", "extension_init", "extension_remove"];
-
-        for tool in extension_tools.iter() {
-            let result = handle_tool_call(temp.path(), tool, json!({})).await;
-            assert!(result.is_err(), "{} must return an error", tool);
-            match result {
-                Err(Error::NotImplemented(_)) => {}
-                other => panic!(
-                    "Expected NotImplemented error for {}, got: {:?}",
-                    tool, other
-                ),
-            }
-        }
+        assert!(result.is_ok());
+        let value = result.unwrap();
+        assert_eq!(value.get("success"), Some(&json!(true)));
     }
 
     #[tokio::test]

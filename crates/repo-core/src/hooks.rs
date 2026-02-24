@@ -29,6 +29,8 @@ pub enum HookEvent {
     PreSync,
     /// After sync runs
     PostSync,
+    /// After an extension is successfully installed
+    PostExtensionInstall,
 }
 
 impl fmt::Display for HookEvent {
@@ -40,6 +42,7 @@ impl fmt::Display for HookEvent {
             Self::PostBranchDelete => write!(f, "post-branch-delete"),
             Self::PreSync => write!(f, "pre-sync"),
             Self::PostSync => write!(f, "post-sync"),
+            Self::PostExtensionInstall => write!(f, "post-extension-install"),
         }
     }
 }
@@ -54,6 +57,7 @@ impl HookEvent {
             "post-branch-delete" => Some(Self::PostBranchDelete),
             "pre-sync" => Some(Self::PreSync),
             "post-sync" => Some(Self::PostSync),
+            "post-extension-install" => Some(Self::PostExtensionInstall),
             _ => None,
         }
     }
@@ -67,6 +71,7 @@ impl HookEvent {
             "post-branch-delete",
             "pre-sync",
             "post-sync",
+            "post-extension-install",
         ]
     }
 }
@@ -107,6 +112,25 @@ impl HookContext {
     pub fn for_sync() -> Self {
         let mut vars = HashMap::new();
         vars.insert("HOOK_EVENT_TYPE".to_string(), "sync".to_string());
+        Self { vars }
+    }
+
+    /// Create context for a post-extension-install event
+    pub fn for_extension_install(
+        name: &str,
+        version: &str,
+        source: &str,
+        extension_dir: &Path,
+        venv_path: Option<&Path>,
+    ) -> Self {
+        let mut vars = HashMap::new();
+        vars.insert("EXTENSION_NAME".to_string(), name.to_string());
+        vars.insert("EXTENSION_VERSION".to_string(), version.to_string());
+        vars.insert("EXTENSION_SOURCE".to_string(), source.to_string());
+        vars.insert("EXTENSION_DIR".to_string(), extension_dir.display().to_string());
+        if let Some(venv) = venv_path {
+            vars.insert("EXTENSION_VENV".to_string(), venv.display().to_string());
+        }
         Self { vars }
     }
 }
@@ -398,16 +422,18 @@ args = ["install"]
         assert_eq!(hook.args, vec!["install"]);
     }
 
-    /// Verify HookEvent has exactly 6 variants (pre/post for branch-create,
-    /// branch-delete, sync). This catches unwired events being added without
-    /// updating all_names() and the rest of the matching infrastructure.
+    /// Verify HookEvent has exactly 7 variants (pre/post for branch-create,
+    /// branch-delete, sync, and post-extension-install). This catches unwired
+    /// events being added without updating all_names() and the rest of the
+    /// matching infrastructure.
     #[test]
     fn test_hook_event_enum_has_no_agent_events() {
         let names = HookEvent::all_names();
         assert_eq!(
             names.len(),
-            6,
-            "Expected exactly 6 hook events (pre/post for branch-create, branch-delete, sync), \
+            7,
+            "Expected exactly 7 hook events (pre/post for branch-create, branch-delete, sync, \
+             plus post-extension-install), \
              found {}. If you added a new event, make sure it is wired to a call site.",
             names.len()
         );
@@ -420,6 +446,7 @@ args = ["install"]
             "post-branch-delete",
             "pre-sync",
             "post-sync",
+            "post-extension-install",
         ];
         for name in &expected {
             assert!(
@@ -521,6 +548,55 @@ args = ["install"]
             !marker_path.exists(),
             "Marker file should NOT exist — the hook must not fire for a non-matching event"
         );
+    }
+
+    #[test]
+    fn test_hook_context_for_extension_install() {
+        let dir = Path::new("/extensions/vaultspec");
+        let venv = Path::new("/extensions/vaultspec/.venv");
+
+        // With venv_path provided
+        let ctx = HookContext::for_extension_install(
+            "vaultspec",
+            "1.2.3",
+            "./vaultspec",
+            dir,
+            Some(venv),
+        );
+        assert_eq!(ctx.vars["EXTENSION_NAME"], "vaultspec");
+        assert_eq!(ctx.vars["EXTENSION_VERSION"], "1.2.3");
+        assert_eq!(ctx.vars["EXTENSION_SOURCE"], "./vaultspec");
+        assert_eq!(ctx.vars["EXTENSION_DIR"], "/extensions/vaultspec");
+        assert_eq!(ctx.vars["EXTENSION_VENV"], "/extensions/vaultspec/.venv");
+        assert_eq!(ctx.vars.len(), 5);
+
+        // Without venv_path — EXTENSION_VENV must not be set
+        let ctx_no_venv = HookContext::for_extension_install(
+            "vaultspec",
+            "1.2.3",
+            "./vaultspec",
+            dir,
+            None,
+        );
+        assert!(!ctx_no_venv.vars.contains_key("EXTENSION_VENV"));
+        assert_eq!(ctx_no_venv.vars.len(), 4);
+    }
+
+    /// Verify PostExtensionInstall serializes to "post-extension-install" via serde
+    #[test]
+    fn test_post_extension_install_event_serializes_correctly() {
+        let json = serde_json::to_string(&HookEvent::PostExtensionInstall).unwrap();
+        assert_eq!(json, "\"post-extension-install\"");
+        // Also verify Display
+        assert_eq!(HookEvent::PostExtensionInstall.to_string(), "post-extension-install");
+        // And round-trip parse
+        assert_eq!(
+            HookEvent::parse("post-extension-install"),
+            Some(HookEvent::PostExtensionInstall)
+        );
+        // Verify JSON deserialization round-trip
+        let parsed: HookEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, HookEvent::PostExtensionInstall);
     }
 
     /// Verify that run_hooks returns an error when a hook script exits with

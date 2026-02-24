@@ -13,7 +13,10 @@ use crate::backend::{ModeBackend, StandardBackend, WorktreeBackend};
 use crate::config::Manifest;
 use crate::ledger::{Ledger, ProjectionKind};
 use crate::mode::Mode;
-use repo_extensions::{ExtensionManifest, ResolveContext, merge_mcp_configs, resolve_mcp_config};
+use repo_extensions::{
+    ExtensionManifest, LockedExtension, ResolveContext, merge_mcp_configs, resolve_mcp_config,
+    run_install, synthesize_install_command,
+};
 use repo_fs::NormalizedPath;
 
 use super::check::{CheckReport, CheckStatus, DriftItem};
@@ -392,6 +395,14 @@ impl SyncEngine {
         };
         let tool_names = &manifest.tools;
 
+        // Auto-install missing extensions before tool/rule sync (ADR-005 §5.6)
+        if !options.dry_run {
+            let auto_installed = self.auto_install_missing_extensions(&manifest, &mut report);
+            for name in auto_installed {
+                report = report.with_action(format!("Auto-installed extension '{}'", name));
+            }
+        }
+
         // Resolve MCP server configs from extensions
         let mcp_servers = self.resolve_extension_mcp_configs(&manifest, &mut report);
 
@@ -533,6 +544,8 @@ impl SyncEngine {
         }
 
         let extensions_dir = self.root.join(".repository/extensions");
+        let lock_path = self.root.join(".repository").join(repo_extensions::LOCK_FILENAME);
+        let lock_file = repo_extensions::LockFile::load(lock_path.as_ref()).unwrap_or_default();
         let mut mcp_configs: Vec<Value> = Vec::new();
 
         for ext_name in manifest.extensions.keys() {
@@ -568,10 +581,11 @@ impl SyncEngine {
             };
 
             // Build resolve context for this extension
+            let locked_venv_path = lock_file.get(ext_name).and_then(|e| e.venv_path.as_deref());
             let ctx = ResolveContext {
                 root: self.root.as_ref().to_string_lossy().to_string(),
                 extension_source: ext_source_dir.as_ref().to_string_lossy().to_string(),
-                python_path: self.find_extension_python(&ext_source_dir),
+                python_path: self.find_extension_python(&ext_source_dir, locked_venv_path),
             };
 
             // Resolve MCP config if declared
@@ -608,9 +622,183 @@ impl SyncEngine {
         }
     }
 
+    /// Auto-install extensions declared in the manifest that are not in the lock file.
+    ///
+    /// For each extension in `manifest.extensions` that is absent from the lock file:
+    /// 1. Reads the `source` field from the extension's config table.
+    /// 2. Validates a `repo_extension.toml` exists at that source path.
+    /// 3. Runs the install command (if any) via `run_install`.
+    /// 4. Upserts a `LockedExtension` entry and saves the lock file.
+    ///
+    /// Returns the names of extensions that were successfully auto-installed.
+    /// Errors are non-fatal: they are pushed into `report.errors` and the method
+    /// continues with the remaining extensions.
+    fn auto_install_missing_extensions(
+        &self,
+        manifest: &crate::config::Manifest,
+        report: &mut SyncReport,
+    ) -> Vec<String> {
+        if manifest.extensions.is_empty() {
+            return Vec::new();
+        }
+
+        let lock_path = self.root.join(".repository").join(repo_extensions::LOCK_FILENAME);
+        let mut lock_file =
+            repo_extensions::LockFile::load(lock_path.as_ref()).unwrap_or_default();
+
+        let mut installed_names: Vec<String> = Vec::new();
+
+        for (ext_name, ext_config) in &manifest.extensions {
+            // Skip extensions already recorded in the lock file
+            if lock_file.get(ext_name).is_some() {
+                continue;
+            }
+
+            // Read the `source` field from the extension's config table
+            let source = match ext_config.get("source").and_then(|v| v.as_str()) {
+                Some(s) => s.to_string(),
+                None => {
+                    tracing::warn!(
+                        "Extension '{}' is missing 'source' field in config.toml — skipping auto-install",
+                        ext_name
+                    );
+                    report.errors.push(format!(
+                        "Extension '{}': missing 'source' field, cannot auto-install",
+                        ext_name
+                    ));
+                    continue;
+                }
+            };
+
+            let source_path = std::path::Path::new(&source);
+            if !source_path.exists() {
+                tracing::warn!(
+                    "Extension '{}' source path '{}' does not exist — skipping auto-install",
+                    ext_name,
+                    source
+                );
+                report.errors.push(format!(
+                    "Extension '{}': source path '{}' does not exist, cannot auto-install",
+                    ext_name, source
+                ));
+                continue;
+            }
+
+            let manifest_path = source_path.join(repo_extensions::MANIFEST_FILENAME);
+            let ext_manifest = match ExtensionManifest::from_path(&manifest_path) {
+                Ok(m) => m,
+                Err(e) => {
+                    tracing::warn!(
+                        "Extension '{}': failed to read repo_extension.toml: {}",
+                        ext_name,
+                        e
+                    );
+                    report.errors.push(format!(
+                        "Extension '{}': failed to read repo_extension.toml: {}",
+                        ext_name, e
+                    ));
+                    continue;
+                }
+            };
+
+            let name = &ext_manifest.extension.name;
+            let version = &ext_manifest.extension.version;
+
+            // Determine effective install command
+            let package_manager = ext_manifest
+                .runtime
+                .as_ref()
+                .and_then(|r| r.package_manager.as_deref());
+            let explicit_install = ext_manifest
+                .runtime
+                .as_ref()
+                .and_then(|r| r.install.as_deref());
+            let packages = ext_manifest
+                .requires
+                .as_ref()
+                .and_then(|r| r.python.as_ref())
+                .map(|p| p.packages.as_slice())
+                .unwrap_or(&[]);
+            let synthesized = synthesize_install_command(packages, package_manager);
+
+            let effective_install = match (explicit_install, &synthesized) {
+                (Some(cmd), _) => Some(cmd.to_string()),
+                (None, Some(cmd)) => Some(cmd.clone()),
+                (None, None) => None,
+            };
+
+            // Run install command if present
+            if let Some(ref install_cmd) = effective_install {
+                tracing::info!(
+                    "Auto-installing extension '{}': running '{}'",
+                    name,
+                    install_cmd
+                );
+                if let Err(e) = run_install(
+                    name,
+                    version,
+                    install_cmd,
+                    source_path,
+                    self.root.as_ref(),
+                ) {
+                    report.errors.push(format!(
+                        "Extension '{}': install command failed: {}",
+                        name, e
+                    ));
+                    continue;
+                }
+            }
+
+            // Upsert lock file entry
+            let venv_path = ext_manifest.runtime.as_ref().and_then(|r| r.venv_path.clone());
+            lock_file.upsert(LockedExtension {
+                name: name.clone(),
+                version: version.clone(),
+                source: source.clone(),
+                resolved_ref: None,
+                runtime_type: ext_manifest.runtime.as_ref().map(|r| r.runtime_type.clone()),
+                python_version: None,
+                package_manager: package_manager.map(|s| s.to_string()),
+                packages: packages.to_vec(),
+                venv_path,
+            });
+
+            if let Err(e) = lock_file.save(lock_path.as_ref()) {
+                report.errors.push(format!(
+                    "Extension '{}': failed to save lock file: {}",
+                    name, e
+                ));
+                continue;
+            }
+
+            installed_names.push(name.clone());
+        }
+
+        installed_names
+    }
+
     /// Try to find the Python interpreter in an extension's virtual environment.
-    fn find_extension_python(&self, ext_source_dir: &NormalizedPath) -> Option<String> {
-        // Check common venv locations
+    ///
+    /// If `venv_path` is provided (from the lock file), that path is checked first.
+    /// Falls back to hardcoded candidate locations.
+    fn find_extension_python(
+        &self,
+        ext_source_dir: &NormalizedPath,
+        venv_path: Option<&str>,
+    ) -> Option<String> {
+        // Check lock-file-declared venv path first (ADR-010 §10.4)
+        if let Some(vp) = venv_path {
+            #[cfg(windows)]
+            let python_bin = ext_source_dir.join(vp).join("Scripts/python.exe");
+            #[cfg(not(windows))]
+            let python_bin = ext_source_dir.join(vp).join("bin/python");
+
+            if python_bin.exists() {
+                return Some(python_bin.as_ref().to_string_lossy().to_string());
+            }
+        }
+
+        // Fall back to common venv locations
         let candidates = [
             ext_source_dir.join(".venv/bin/python"),
             ext_source_dir.join("venv/bin/python"),
@@ -762,5 +950,80 @@ mod tests {
         assert!(report.success);
         assert_eq!(report.actions.len(), 1);
         assert_eq!(report.actions[0], "Created file");
+    }
+
+    /// Verify that `sync()` auto-installs an extension declared in config.toml
+    /// that is absent from the lock file, and records it in the lock file.
+    #[test]
+    fn test_sync_auto_installs_missing_extension() {
+        use std::io::Write;
+
+        // --- set up a minimal extension source dir ---
+        let ext_dir = tempdir().unwrap();
+        std::fs::write(
+            ext_dir.path().join("repo_extension.toml"),
+            r#"
+[extension]
+name = "test-auto-ext"
+version = "1.2.3"
+"#,
+        )
+        .unwrap();
+
+        // --- set up a repo root with .git and .repository/config.toml ---
+        let repo_dir = tempdir().unwrap();
+        // Minimal fake .git to satisfy layout validation
+        fs::create_dir(repo_dir.path().join(".git")).unwrap();
+        fs::write(repo_dir.path().join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
+        fs::create_dir_all(repo_dir.path().join(".git/refs/heads")).unwrap();
+        fs::write(repo_dir.path().join(".git/refs/heads/main"), "").unwrap();
+
+        let repository_dir = repo_dir.path().join(".repository");
+        fs::create_dir_all(&repository_dir).unwrap();
+
+        // Use the raw OS path so it works on Windows too
+        let ext_source = ext_dir.path().to_string_lossy().into_owned();
+        // Escape backslashes for TOML string value
+        let ext_source_toml = ext_source.replace('\\', "\\\\");
+        let config_content = format!(
+            "[core]\nmode = \"standard\"\n\n[extensions.\"test-auto-ext\"]\nsource = \"{}\"\n",
+            ext_source_toml
+        );
+        let mut config_file = fs::File::create(repository_dir.join("config.toml")).unwrap();
+        config_file.write_all(config_content.as_bytes()).unwrap();
+
+        // Lock file does NOT exist yet (extension is missing)
+
+        // --- run sync ---
+        let root = NormalizedPath::new(repo_dir.path());
+        let engine = SyncEngine::new(root, crate::mode::Mode::Standard).unwrap();
+        let report = engine.sync().unwrap();
+
+        // --- verify the action was recorded ---
+        assert!(
+            report.actions.iter().any(|a| a.contains("Auto-installed extension 'test-auto-ext'")),
+            "expected auto-install action, got: {:?}",
+            report.actions
+        );
+
+        // --- verify the lock file was written ---
+        let lock_path = repo_dir.path().join(".repository").join("extensions.lock");
+        assert!(lock_path.exists(), "extensions.lock should have been created");
+
+        let lock = repo_extensions::LockFile::load(&lock_path).unwrap();
+        let entry = lock.get("test-auto-ext").expect("test-auto-ext should be in lock");
+        assert_eq!(entry.version, "1.2.3");
+
+        // --- run sync again — extension already locked, no duplicate install ---
+        let report2 = engine.sync().unwrap();
+        let auto_install_count = report2
+            .actions
+            .iter()
+            .filter(|a| a.contains("Auto-installed extension 'test-auto-ext'"))
+            .count();
+        assert_eq!(
+            auto_install_count, 0,
+            "second sync should not re-install already-locked extension"
+        );
     }
 }

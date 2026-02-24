@@ -80,21 +80,18 @@ pub fn run_init(cwd: &Path, config: InitConfig) -> Result<PathBuf> {
 
     // Post-init guidance
     println!();
-    if !config.tools.is_empty() {
+    println!(
+        "{} Done. Run {} to generate tool configuration files.",
+        "=>".green().bold(),
+        "repo sync".cyan()
+    );
+    if config.tools.is_empty() {
         println!(
-            "{} Next step: run {} to generate tool configurations",
-            "=>".blue().bold(),
-            "repo sync".cyan()
+            "   No tools selected yet — run {} to add one first.",
+            "repo add-tool <name>".cyan()
         );
-    } else {
-        println!(
-            "{} Next step: run {} to add a tool, then {} to generate configs",
-            "=>".blue().bold(),
-            "repo add-tool <name>".cyan(),
-            "repo sync".cyan()
-        );
+        println!("   Run {} to see available tools", "repo list-tools".cyan());
     }
-    println!("   Run {} to see available tools", "repo list-tools".cyan());
 
     Ok(target_path)
 }

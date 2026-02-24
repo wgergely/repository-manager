@@ -498,3 +498,74 @@ mode = "standard"
         report.actions
     );
 }
+
+#[test]
+fn test_sync_core_value_proposition() {
+    // GAP-004 / Roadmap Phase 0.4: The single most important integration test.
+    //
+    // Verifies the full pipeline:
+    //   .repository/config.toml  →  repo sync  →  .cursorrules, CLAUDE.md, .vscode/settings.json
+    //
+    // This test runs a real (non-dry-run) sync and asserts that the expected
+    // tool config files are actually written to disk.
+    let temp = setup_git_repo();
+    let root = NormalizedPath::new(temp.path());
+
+    let repo_dir = temp.path().join(".repository");
+    fs::create_dir_all(&repo_dir).unwrap();
+
+    let config_content = r#"
+tools = ["cursor", "claude", "vscode"]
+
+[core]
+mode = "standard"
+"#;
+    fs::write(repo_dir.join("config.toml"), config_content).unwrap();
+
+    let engine = SyncEngine::new(root, Mode::Standard).unwrap();
+    let report = engine.sync().unwrap();
+
+    assert!(
+        report.success,
+        "Sync should succeed. Actions: {:?}",
+        report.actions
+    );
+
+    // .cursorrules must exist
+    let cursorrules = temp.path().join(".cursorrules");
+    assert!(
+        cursorrules.exists(),
+        ".cursorrules should be created by sync"
+    );
+
+    // CLAUDE.md must exist
+    let claude_md = temp.path().join("CLAUDE.md");
+    assert!(
+        claude_md.exists(),
+        "CLAUDE.md should be created by sync"
+    );
+
+    // .vscode/settings.json must exist
+    let vscode_settings = temp.path().join(".vscode").join("settings.json");
+    assert!(
+        vscode_settings.exists(),
+        ".vscode/settings.json should be created by sync"
+    );
+
+    // Ledger must record intents for all three tools
+    let ledger_path = engine.ledger_path();
+    assert!(ledger_path.exists(), "Ledger should be written after sync");
+    let ledger_content = fs::read_to_string(&ledger_path).unwrap();
+    assert!(
+        ledger_content.contains("cursor"),
+        "Ledger should record cursor intent"
+    );
+    assert!(
+        ledger_content.contains("claude"),
+        "Ledger should record claude intent"
+    );
+    assert!(
+        ledger_content.contains("vscode"),
+        "Ledger should record vscode intent"
+    );
+}

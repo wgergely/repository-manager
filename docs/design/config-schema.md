@@ -39,6 +39,20 @@ mode = "worktrees"
 # Preset configurations keyed by "type:name"
 "env:python" = { version = "3.12" }
 "rust" = {}
+
+[extensions."vaultspec"]
+source = "https://github.com/vaultspec/vaultspec.git"
+ref = "v0.1.0"
+
+[[hooks]]
+event = "post-branch-create"
+command = "npm"
+args = ["install"]
+
+[[hooks]]
+event = "pre-sync"
+command = "sh"
+args = ["-c", "echo 'Running pre-sync hook'"]
 ```
 
 ### Manifest Fields
@@ -48,9 +62,56 @@ mode = "worktrees"
 | `tools` | `string[]` | No | `[]` | List of tool slugs to enable (e.g., `"claude"`, `"vscode"`) |
 | `rules` | `string[]` | No | `[]` | List of rule IDs to apply |
 | `core.mode` | `string` | No | `"worktrees"` | Workspace mode: `"standard"` or `"worktrees"` |
-| `presets.<key>` | `table` | No | - | Preset configurations keyed by `"type:name"` |
+| `presets.<key>` | `table` | No | - | Preset configurations keyed by `"type:name"` (e.g., `"env:python"`) |
+| `extensions.<name>` | `table` | No | - | Extension configuration tables keyed by extension name |
+| `hooks` | `HookConfig[]` | No | `[]` | Lifecycle hooks executed on repository events |
 
 > **Note:** The `tools` and `rules` arrays must appear before any `[section]` headers in the TOML file, since they are top-level keys.
+
+### `[extensions.<name>]` Fields
+
+Extension tables are free-form; the keys depend on the extension. Common fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `source` | `string` | Git URL or local path to the extension |
+| `ref` | `string` | Git tag, branch, or commit SHA to pin |
+
+### `[[hooks]]` Fields
+
+Each `[[hooks]]` entry is a `HookConfig`:
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `event` | `string` | Yes | - | Event that triggers the hook (see below) |
+| `command` | `string` | Yes | - | Executable to run |
+| `args` | `string[]` | No | `[]` | Arguments passed to the command |
+| `working_dir` | `string` | No | repo root | Working directory override (must be inside the repo root) |
+
+**Valid `event` values:**
+
+| Event | Fires when... |
+|-------|---------------|
+| `pre-branch-create` | Before a branch/worktree is created |
+| `post-branch-create` | After a branch/worktree is created |
+| `pre-branch-delete` | Before a branch/worktree is deleted |
+| `post-branch-delete` | After a branch/worktree is deleted |
+| `pre-sync` | Before `repo sync` runs |
+| `post-sync` | After `repo sync` runs |
+| `post-extension-install` | After an extension is successfully installed |
+
+**Context variables available in `args` via `${VAR_NAME}` substitution:**
+
+| Variable | Available in events |
+|----------|---------------------|
+| `BRANCH_NAME` | `pre/post-branch-create`, `pre/post-branch-delete` |
+| `WORKTREE_PATH` | `pre/post-branch-create`, `pre/post-branch-delete` |
+| `HOOK_EVENT_TYPE` | `pre-sync`, `post-sync` |
+| `EXTENSION_NAME` | `post-extension-install` |
+| `EXTENSION_VERSION` | `post-extension-install` |
+| `EXTENSION_SOURCE` | `post-extension-install` |
+| `EXTENSION_DIR` | `post-extension-install` |
+| `EXTENSION_VENV` | `post-extension-install` (only if a venv was created) |
 
 ## 2. Tool Registration
 
@@ -253,6 +314,46 @@ pub struct Manifest {
     /// List of rule IDs to apply
     #[serde(default)]
     pub rules: Vec<String>,
+
+    /// Extension configurations keyed by extension name
+    /// e.g., "vaultspec" -> { source, ref, ... }
+    #[serde(default)]
+    pub extensions: HashMap<String, serde_json::Value>,
+
+    /// Lifecycle hooks (declared as [[hooks]] in TOML)
+    #[serde(default)]
+    pub hooks: Vec<HookConfig>,
+}
+```
+
+### Hook Configuration (`repo-core::hooks::HookConfig`)
+
+```rust
+/// Events that can trigger hooks
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum HookEvent {
+    PreBranchCreate,
+    PostBranchCreate,
+    PreBranchDelete,
+    PostBranchDelete,
+    PreSync,
+    PostSync,
+    PostExtensionInstall,
+}
+
+/// Configuration for a single hook
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HookConfig {
+    /// The event that triggers this hook
+    pub event: HookEvent,
+    /// The command to execute
+    pub command: String,
+    /// Arguments to pass to the command
+    #[serde(default)]
+    pub args: Vec<String>,
+    /// Working directory override (defaults to repository root)
+    pub working_dir: Option<PathBuf>,
 }
 ```
 
