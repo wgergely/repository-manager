@@ -129,23 +129,25 @@ impl DependencyGraph {
     ///
     /// Returns `Error::DependencyCycle` if the graph contains a cycle.
     pub fn topological_sort(&self) -> Result<Vec<DependencyNode>> {
-        // Compute in-degree for each node
-        let mut in_degree: HashMap<&str, usize> = HashMap::new();
+        // Count out-degree (number of dependencies) for each node.
+        // Edges point from dependent to dependency (A -> B means A depends on B),
+        // so out-degree = number of things a node depends on.
+        // Nodes with out-degree 0 have no dependencies and can be placed first.
+        let mut out_degree: HashMap<&str, usize> = HashMap::new();
         for id in self.nodes.keys() {
-            in_degree.entry(id.as_str()).or_insert(0);
+            out_degree.entry(id.as_str()).or_insert(0);
         }
-        for deps in self.edges.values() {
-            for dep in deps {
-                if self.nodes.contains_key(dep) {
-                    *in_degree.entry(dep.as_str()).or_insert(0) += 1;
-                }
+        for (from, deps) in &self.edges {
+            if self.nodes.contains_key(from.as_str()) {
+                let count = deps.iter().filter(|dep| self.nodes.contains_key(dep.as_str())).count();
+                *out_degree.entry(from.as_str()).or_insert(0) += count;
             }
         }
 
-        // Seed the queue with zero-in-degree nodes (sorted for determinism)
-        let mut queue: Vec<&str> = in_degree
+        // Seed the queue with zero-out-degree nodes (sorted for determinism)
+        let mut queue: Vec<&str> = out_degree
             .iter()
-            .filter(|(_, &deg)| deg == 0)
+            .filter(|&(_, &deg)| deg == 0)
             .map(|(&id, _)| id)
             .collect();
         queue.sort();
@@ -153,18 +155,16 @@ impl DependencyGraph {
         let mut result = Vec::with_capacity(self.nodes.len());
 
         while let Some(current) = queue.pop() {
-            // Re-sort remaining to maintain deterministic order after each pop
-            // (we pop the last element, so sort ascending and pop = largest first,
-            // but we want alphabetical so we sort descending to pop smallest)
-            // Actually, let's use a simpler approach:
             if let Some(node) = self.nodes.get(current) {
                 result.push(node.clone());
             }
 
-            // For each node that depends on `current`, decrement its in-degree
+            // For each node that depends on `current`, decrement its out-degree.
+            // When a node's out-degree reaches 0, all its dependencies have been
+            // scheduled, so it can be added to the queue.
             for (from, deps) in &self.edges {
                 if deps.contains(current) {
-                    if let Some(deg) = in_degree.get_mut(from.as_str()) {
+                    if let Some(deg) = out_degree.get_mut(from.as_str()) {
                         *deg = deg.saturating_sub(1);
                         if *deg == 0 {
                             queue.push(from.as_str());

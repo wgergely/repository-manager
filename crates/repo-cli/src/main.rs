@@ -285,6 +285,7 @@ fn cmd_extension(action: ExtensionAction) -> Result<()> {
         } => commands::extension::handle_extension_install(&source, no_activate),
         ExtensionAction::Add { name } => commands::extension::handle_extension_add(&name),
         ExtensionAction::Init { name } => commands::extension::handle_extension_init(&name),
+        ExtensionAction::Reinit { name } => commands::extension::handle_extension_reinit(&name),
         ExtensionAction::Remove { name } => commands::extension::handle_extension_remove(&name),
         ExtensionAction::List { json } => commands::extension::handle_extension_list(json),
     }

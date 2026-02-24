@@ -10,6 +10,10 @@ pub enum CliError {
     #[error(transparent)]
     Core(#[from] repo_core::Error),
 
+    /// Error from repo-extensions
+    #[error(transparent)]
+    Extensions(#[from] repo_extensions::Error),
+
     /// Error from repo-fs
     #[error(transparent)]
     Fs(#[from] repo_fs::Error),

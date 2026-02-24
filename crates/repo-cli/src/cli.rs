@@ -420,6 +420,12 @@ pub enum ExtensionAction {
         name: String,
     },
 
+    /// Re-fire post-install hooks for an already-installed extension
+    Reinit {
+        /// Name of the installed extension
+        name: String,
+    },
+
     /// Remove an installed extension
     Remove {
         /// Name of the extension to remove

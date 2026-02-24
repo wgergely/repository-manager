@@ -8,15 +8,36 @@
 use std::path::Path;
 
 use colored::Colorize;
-use repo_extensions::{ExtensionManifest, ExtensionRegistry, MANIFEST_FILENAME};
+use repo_core::config::Manifest;
+use repo_core::{HookConfig, HookContext, HookEvent, run_hooks};
+use repo_extensions::{
+    ExtensionManifest, ExtensionRegistry, LockFile, LockedExtension, MANIFEST_FILENAME,
+    LOCK_FILENAME, check_binary_on_path, query_python_version, run_install,
+    synthesize_install_command,
+};
 
 use crate::error::{CliError, Result};
 
+/// Load hooks from `.repository/config.toml` at `repo_root`.
+fn load_hooks(repo_root: &Path) -> Vec<HookConfig> {
+    let config_path = repo_root.join(".repository").join("config.toml");
+    if !config_path.exists() {
+        return Vec::new();
+    }
+    let content = match std::fs::read_to_string(&config_path) {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+    match Manifest::parse(&content) {
+        Ok(m) => m.hooks,
+        Err(_) => Vec::new(),
+    }
+}
+
 /// Handle `repo extension install <source> [--no-activate]`
 ///
-/// Validates the extension manifest at `source` (a local directory path),
-/// checks version constraints, and reports the dependency chain. Git clone
-/// is not yet supported.
+/// Validates the extension manifest, checks runtime constraints, runs the
+/// install command, writes the lock file, and fires post-extension-install hooks.
 pub fn handle_extension_install(source: &str, _no_activate: bool) -> Result<()> {
     let source_path = Path::new(source);
     if !source_path.exists() {
@@ -38,26 +59,112 @@ pub fn handle_extension_install(source: &str, _no_activate: bool) -> Result<()> 
     let manifest = ExtensionManifest::from_path(&manifest_path)
         .map_err(|e| CliError::user(format!("Invalid extension manifest: {e}")))?;
 
-    let deps = manifest.implicit_preset_dependencies();
+    let name = &manifest.extension.name;
+    let version = &manifest.extension.version;
 
-    println!(
-        "{} Extension '{}' v{} validated",
-        "=>".blue().bold(),
-        manifest.extension.name.cyan(),
-        manifest.extension.version
-    );
-    if !deps.is_empty() {
-        println!(
-            "   {} {}",
-            "Requires presets:".dimmed(),
-            deps.join(", ").yellow()
-        );
+    // Step 1: Check Python version constraint (if declared)
+    let mut python_version: Option<String> = None;
+    if manifest.requires.as_ref().and_then(|r| r.python.as_ref()).is_some() {
+        let pv = query_python_version(None)
+            .map_err(|e| CliError::user(format!("Cannot determine Python version: {e}")))?;
+        if !manifest.python_version_satisfied(&pv)
+            .map_err(|e| CliError::user(format!("Version constraint error: {e}")))? {
+            let constraint = &manifest.requires.as_ref().unwrap().python.as_ref().unwrap().version;
+            return Err(CliError::user(format!(
+                "Python {} does not satisfy constraint '{}' for extension '{}'",
+                pv, constraint, name
+            )));
+        }
+        python_version = Some(pv);
     }
-    println!(
-        "   {} Run {} to complete setup",
-        "Next:".dimmed(),
-        "repo sync".bold()
+
+    // Step 2: Check package_manager binary (if declared)
+    let package_manager = manifest.runtime.as_ref().and_then(|r| r.package_manager.as_deref());
+    if let Some(tool) = package_manager {
+        check_binary_on_path(tool)
+            .map_err(|e| CliError::user(e.to_string()))?;
+    }
+
+    // Step 3: Determine effective install command
+    let explicit_install = manifest.runtime.as_ref().and_then(|r| r.install.as_deref());
+    let packages = manifest.requires.as_ref()
+        .and_then(|r| r.python.as_ref())
+        .map(|p| p.packages.as_slice())
+        .unwrap_or(&[]);
+    let synthesized = synthesize_install_command(packages, package_manager);
+
+    let effective_install = match (explicit_install, &synthesized) {
+        (Some(cmd), Some(_)) => {
+            // ADR-009 §9.2: explicit install wins; packages treated as documentation only
+            eprintln!(
+                "{} Both [runtime].install and [requires.python].packages are set; \
+                 using explicit install command, packages list is documentation only.",
+                "warning:".yellow().bold()
+            );
+            Some(cmd.to_string())
+        }
+        (Some(cmd), None) => Some(cmd.to_string()),
+        (None, Some(cmd)) => Some(cmd.clone()),
+        (None, None) => None,
+    };
+
+    // Step 4: Run install command
+    if let Some(ref install_cmd) = effective_install {
+        println!(
+            "{} Running install for '{}': {}",
+            "=>".blue().bold(),
+            name.cyan(),
+            install_cmd.dimmed()
+        );
+        // repo_root resolved below; for the env var we use cwd or source_path as fallback
+        let rr = std::env::current_dir().unwrap_or_else(|_| source_path.to_path_buf());
+        run_install(name, version, install_cmd, source_path, &rr)?;
+    }
+
+    // Step 5: Load or create lock file
+    let repo_root = std::env::current_dir().unwrap_or_else(|_| source_path.to_path_buf());
+    let lock_path = repo_root.join(".repository").join(LOCK_FILENAME);
+    let mut lock_file = LockFile::load(&lock_path)?;
+
+    // Step 6: Upsert lock entry
+    let venv_path = manifest.runtime.as_ref().and_then(|r| r.venv_path.clone());
+    lock_file.upsert(LockedExtension {
+        name: name.clone(),
+        version: version.clone(),
+        source: source.to_string(),
+        resolved_ref: None,
+        runtime_type: manifest.runtime.as_ref().map(|r| r.runtime_type.clone()),
+        python_version,
+        package_manager: package_manager.map(|s| s.to_string()),
+        packages: packages.to_vec(),
+        venv_path: venv_path.clone(),
+    });
+
+    // Step 7: Save lock file
+    lock_file.save(&lock_path)?;
+
+    // Step 8: Fire post-extension-install hooks
+    let venv_abs = venv_path.as_ref().map(|vp| source_path.join(vp));
+    let hook_ctx = HookContext::for_extension_install(
+        name,
+        version,
+        source,
+        source_path,
+        venv_abs.as_deref(),
     );
+    let hooks = load_hooks(&repo_root);
+    run_hooks(&hooks, HookEvent::PostExtensionInstall, &hook_ctx, &repo_root)?;
+
+    // Step 9: Print success
+    println!(
+        "{} Installed '{}' v{}",
+        "=>".green().bold(),
+        name.cyan(),
+        version
+    );
+    if effective_install.is_some() {
+        println!("   {} Lock file updated at {}", "=>".dimmed(), lock_path.display());
+    }
 
     Ok(())
 }
@@ -155,6 +262,43 @@ description = ""
     Ok(())
 }
 
+/// Handle `repo extension reinit <name>`
+///
+/// Re-fires `post-extension-install` hooks for an already-installed extension.
+/// Reads the extension's lock entry to reconstruct the hook context.
+pub fn handle_extension_reinit(name: &str) -> Result<()> {
+    let repo_root = std::env::current_dir()
+        .map_err(|e| CliError::user(format!("Cannot determine current directory: {e}")))?;
+    let lock_path = repo_root.join(".repository").join(LOCK_FILENAME);
+    let lock_file = LockFile::load(&lock_path)?;
+
+    let entry = lock_file.get(name).ok_or_else(|| {
+        CliError::Extensions(repo_extensions::Error::ExtensionNotInstalled(name.to_string()))
+    })?;
+
+    let extension_dir = std::path::PathBuf::from(&entry.source);
+    let venv_abs = entry.venv_path.as_ref().map(|vp| extension_dir.join(vp));
+    let hook_ctx = HookContext::for_extension_install(
+        &entry.name,
+        &entry.version,
+        &entry.source,
+        &extension_dir,
+        venv_abs.as_deref(),
+    );
+
+    let hooks = load_hooks(&repo_root);
+    run_hooks(&hooks, HookEvent::PostExtensionInstall, &hook_ctx, &repo_root)?;
+
+    println!(
+        "{} Re-fired install hooks for '{}' v{}",
+        "=>".green().bold(),
+        entry.name.cyan(),
+        entry.version
+    );
+
+    Ok(())
+}
+
 /// Handle `repo extension remove <name>`
 ///
 /// Marks an extension for removal. The actual cleanup happens on the next
@@ -176,23 +320,35 @@ pub fn handle_extension_remove(name: &str) -> Result<()> {
 
 /// Handle `repo extension list [--json]`
 ///
-/// Lists known extension types from the built-in registry.
-/// No extensions are currently installed; this shows what is available.
+/// Lists known extensions from the built-in registry, enriched with lock file
+/// data (version, runtime, package_manager, installed status) per ADR-008 §8.4.
 pub fn handle_extension_list(json: bool) -> Result<()> {
     let registry = ExtensionRegistry::with_known();
     let names = registry.known_extensions();
+
+    // Load lock file to determine installed status and runtime details
+    let repo_root = std::env::current_dir().unwrap_or_default();
+    let lock_path = repo_root.join(".repository").join(LOCK_FILENAME);
+    let lock_file = LockFile::load(&lock_path).unwrap_or_default();
 
     if json {
         let entries: Vec<serde_json::Value> = names
             .iter()
             .filter_map(|name| {
                 registry.get(name).map(|entry| {
-                    serde_json::json!({
+                    let locked = lock_file.get(name);
+                    let mut obj = serde_json::json!({
                         "name": entry.name,
                         "description": entry.description,
                         "source": entry.source,
-                        "installed": false,
-                    })
+                        "installed": locked.is_some(),
+                    });
+                    if let Some(le) = locked {
+                        obj["version"] = serde_json::json!(le.version);
+                        obj["runtime_type"] = serde_json::json!(le.runtime_type);
+                        obj["package_manager"] = serde_json::json!(le.package_manager);
+                    }
+                    obj
                 })
             })
             .collect();
@@ -203,7 +359,7 @@ pub fn handle_extension_list(json: bool) -> Result<()> {
         );
     } else {
         println!(
-            "{} Known extensions (none currently installed):",
+            "{} Extensions:",
             "=>".blue().bold()
         );
         if names.is_empty() {
@@ -211,7 +367,20 @@ pub fn handle_extension_list(json: bool) -> Result<()> {
         } else {
             for name in &names {
                 if let Some(entry) = registry.get(name) {
-                    println!("   {} - {}", entry.name.cyan(), entry.description.dimmed());
+                    let locked = lock_file.get(name);
+                    let status = if locked.is_some() { "installed" } else { "available" };
+                    let version = locked.map(|l| l.version.as_str()).unwrap_or("-");
+                    let manager = locked
+                        .and_then(|l| l.package_manager.as_deref())
+                        .unwrap_or("\u{2014}");
+                    println!(
+                        "   {} {} {} [{}]  {}",
+                        entry.name.cyan(),
+                        version.dimmed(),
+                        manager.dimmed(),
+                        status,
+                        entry.description.dimmed()
+                    );
                 }
             }
         }

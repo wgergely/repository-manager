@@ -321,7 +321,7 @@ impl ExtensionManifest {
         if let Some(ref rt) = self.runtime {
             if let Some(ref vp) = rt.venv_path {
                 let path = std::path::Path::new(vp);
-                if path.is_absolute() {
+                if path.has_root() {
                     return Err(Error::InvalidVenvPath { path: vp.clone() });
                 }
                 if path.components().any(|c| c == std::path::Component::ParentDir) {
