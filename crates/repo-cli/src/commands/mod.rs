@@ -8,6 +8,7 @@ pub mod git;
 pub mod governance;
 pub mod hooks;
 pub mod init;
+pub mod issue;
 pub mod list;
 pub mod open;
 

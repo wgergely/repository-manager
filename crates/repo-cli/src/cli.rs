@@ -354,6 +354,20 @@ pub enum Commands {
         #[command(subcommand)]
         action: RuleAction,
     },
+
+    /// Assign yourself to an issue and create a branch/worktree
+    ///
+    /// Parses a GitHub or GitLab issue URL, generates a branch name,
+    /// and creates a branch (standard) or worktree (worktrees mode).
+    ///
+    /// Examples:
+    ///   repo issue assign https://github.com/org/repo/issues/42
+    ///   repo i assign https://gitlab.com/org/repo/-/issues/99
+    #[command(alias = "i")]
+    Issue {
+        #[command(subcommand)]
+        action: IssueAction,
+    },
 }
 
 /// Branch management actions
@@ -564,6 +578,19 @@ pub enum RuleAction {
 
     /// List all active rules
     List,
+}
+
+/// Issue management actions
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum IssueAction {
+    /// Assign yourself to an issue and create a branch/worktree
+    ///
+    /// Parses a GitHub or GitLab issue URL, generates a branch name,
+    /// and creates a branch (standard mode) or worktree (worktrees mode).
+    Assign {
+        /// GitHub or GitLab issue URL
+        url: String,
+    },
 }
 
 #[cfg(test)]

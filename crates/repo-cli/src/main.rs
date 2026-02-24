@@ -17,8 +17,8 @@ use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
 use cli::{
-    BranchAction, Cli, Commands, ConfigAction, ExtensionAction, HooksAction, PresetAction,
-    RuleAction, ToolAction,
+    BranchAction, Cli, Commands, ConfigAction, ExtensionAction, HooksAction, IssueAction,
+    PresetAction, RuleAction, ToolAction,
 };
 use error::Result;
 
@@ -103,6 +103,7 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::Tool { action } => cmd_tool(action),
         Commands::Preset { action } => cmd_preset(action),
         Commands::Rule { action } => cmd_rule(action),
+        Commands::Issue { action } => cmd_issue(action),
     }
 }
 
@@ -328,6 +329,13 @@ fn cmd_rule(action: RuleAction) -> Result<()> {
         } => cmd_add_rule(&id, &instruction, tags),
         RuleAction::Remove { id } => cmd_remove_rule(&id),
         RuleAction::List => cmd_list_rules(),
+    }
+}
+
+fn cmd_issue(action: IssueAction) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    match action {
+        IssueAction::Assign { url } => commands::issue::handle_issue_assign(&url, &cwd),
     }
 }
 
