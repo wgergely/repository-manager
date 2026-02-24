@@ -120,23 +120,25 @@ post-install hook leaves the extension in an installed-but-not-initialized state
 
 **Rationale:** Writing the lock file before running hooks means the extension is "installed"
 even if the post-hook fails. This matches the semantics of `PostSync` — the sync has happened
-before hooks run. The user can re-run `repo extension init <name>` (which maps to the
-extension's own initialization command) to retry initialization without re-installing.
+before hooks run. The user can re-run `repo extension reinit <name>` to retry initialization
+without re-installing.
 
-### 11.4 `repo extension init` Is the Re-Hook Path
+### 11.4 `repo extension reinit` Is the Re-Hook Path
 
-**Decision: `repo extension init <name>` re-runs `PostExtensionInstall` hooks for a named extension.**
+**Decision: `repo extension reinit <name>` re-runs `PostExtensionInstall` hooks for a named extension.**
 
 ```
-repo extension init vaultspec
+repo extension reinit vaultspec
   → load config
   → find vaultspec in extensions.lock
   → build HookContext::for_extension_install(...)
   → run_hooks(..., PostExtensionInstall, ...)
 ```
 
-This satisfies the original ADR-002 §2.1 definition of `init` ("Run extension's initialization
-logic") without duplicating the hook execution logic.
+**Why `reinit` and not `init`?** `repo extension init <name>` is reserved for scaffold
+generation — it creates the directory layout and starter files for a new extension (the
+equivalent of `cargo new` for extensions). Re-firing hooks is a distinct lifecycle operation,
+so it uses `reinit` to avoid overloading `init` with two unrelated meanings.
 
 **Rationale:** Decoupling initialization from installation means failed inits can be retried
 cheaply. The hook config owns what "initialize" means for a given extension.
@@ -148,7 +150,7 @@ cheaply. The hook config owns what "initialize" means for a given extension.
 - `HookContext::for_extension_install()` added to `repo-core/src/hooks.rs`
 - Test `test_hook_event_enum_has_no_agent_events` updated: count becomes 7, expected set grows
 - `handle_extension_install()` in `repo-cli` calls `run_hooks()` after lock file write
-- `handle_extension_init()` in `repo-cli` re-fires `PostExtensionInstall` hooks
+- `handle_extension_reinit()` in `repo-cli` re-fires `PostExtensionInstall` hooks
 - `HookEvent::Display` and `HookEvent::parse()` updated for `post-extension-install`
 - Existing repos without `post-extension-install` hooks are unaffected (zero matching hooks
   → `run_hooks` returns empty vec with no side effects)

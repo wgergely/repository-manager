@@ -1,4 +1,20 @@
+use std::fmt;
 use std::path::PathBuf;
+
+/// Newtype wrapper that displays an `Option<String>` as either an empty string
+/// (when `None`) or the contained string (when `Some`). Used for optional hint
+/// messages in error variants.
+struct OptHint<'a>(&'a Option<String>);
+
+impl fmt::Display for OptHint<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(hint) = self.0 {
+            write!(f, "{}", hint)
+        } else {
+            Ok(())
+        }
+    }
+}
 
 /// Errors that can occur in the extension system.
 #[derive(Debug, thiserror::Error)]
@@ -77,17 +93,16 @@ pub enum Error {
     InvalidPackageManager { value: String },
 
     /// The extension's install command failed.
-    #[error("install failed for '{name}': command '{command}' exited with {exit_code:?}\n{stderr}")]
+    #[error("install failed for '{name}': command '{command}' exited with {exit_code:?} — check output above for details")]
     InstallFailed {
         name: String,
         command: String,
         exit_code: Option<i32>,
-        stderr: String,
     },
 
     /// A required binary was not found on PATH.
-    #[error("install requires '{tool}' but it was not found on PATH{hint}")]
-    PackageManagerNotFound { tool: String, hint: String },
+    #[error("install requires '{tool}' but it was not found on PATH{}", OptHint(hint))]
+    PackageManagerNotFound { tool: String, hint: Option<String> },
 
     /// Invalid packages declaration.
     #[error("invalid packages declaration: {reason}")]

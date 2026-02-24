@@ -62,19 +62,27 @@ pub fn handle_extension_install(source: &str, _no_activate: bool) -> Result<()> 
     let name = &manifest.extension.name;
     let version = &manifest.extension.version;
 
-    // Step 1: Check Python version constraint (if declared)
+    // Step 1: Check Python version constraint (if declared); always record interpreter version
+    // for python-runtime extensions regardless of whether a constraint is set.
+    let is_python_runtime = manifest.runtime.as_ref()
+        .map(|r| r.runtime_type.as_str()) == Some("python");
+    let has_python_constraint = manifest.requires.as_ref().and_then(|r| r.python.as_ref()).is_some();
     let mut python_version: Option<String> = None;
-    if manifest.requires.as_ref().and_then(|r| r.python.as_ref()).is_some() {
+    if has_python_constraint {
         let pv = query_python_version(None)
             .map_err(|e| CliError::user(format!("Cannot determine Python version: {e}")))?;
         if !manifest.python_version_satisfied(&pv)
             .map_err(|e| CliError::user(format!("Version constraint error: {e}")))? {
-            let constraint = &manifest.requires.as_ref().unwrap().python.as_ref().unwrap().version;
-            return Err(CliError::user(format!(
-                "Python {} does not satisfy constraint '{}' for extension '{}'",
-                pv, constraint, name
-            )));
+            let constraint = manifest.requires.as_ref().unwrap().python.as_ref().unwrap().version.clone();
+            return Err(CliError::Extensions(repo_extensions::Error::VersionConstraintNotSatisfied {
+                constraint,
+                actual: pv,
+            }));
         }
+        python_version = Some(pv);
+    } else if is_python_runtime {
+        let pv = query_python_version(None)
+            .map_err(|e| CliError::user(format!("Cannot determine Python version: {e}")))?;
         python_version = Some(pv);
     }
 

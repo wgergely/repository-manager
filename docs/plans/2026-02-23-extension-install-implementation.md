@@ -327,9 +327,11 @@ When building the Python binary path:
 ### 4.5 `.python-version` delegation
 
 In the venv creation code (currently in `UvProvider::apply()`):
-- If `[requires.python].version` is a range (contains `,`) → do NOT pass `--python` flag
-- If it is a single bound like `>=3.12` → pass `--python 3.12` (strip operator)
-- If `.python-version` exists in the extension dir → uv picks it up automatically
+- If `[requires.python].version` is a range (contains `,`) → do NOT pass `--python` flag;
+  uv picks up `.python-version` from the working directory or falls back to its own defaults.
+- If it is a single specifier like `>=3.12` → pass the full specifier as-is: `--python >=3.12`;
+  uv accepts PEP 440 version specifiers directly and resolves the best matching interpreter.
+- If `.python-version` exists in the extension dir → uv picks it up automatically (range case)
 
 ### 4.6 Tests
 
@@ -380,10 +382,10 @@ let hook_ctx = HookContext::for_extension_install(...);
 run_hooks(&config.hooks, HookEvent::PostExtensionInstall, &hook_ctx, &repo_root)?;
 ```
 
-### 5.5 Wire `handle_extension_init()` to re-fire hooks
+### 5.5 Wire `handle_extension_reinit()` to re-fire hooks
 
 ```rust
-pub fn handle_extension_init(name: &str, config: &Config, repo_root: &Path) -> Result<()> {
+pub fn handle_extension_reinit(name: &str, config: &Config, repo_root: &Path) -> Result<()> {
     let lock = LockFile::load(&repo_root.join(".repository/extensions.lock"))?;
     let entry = lock.get(name).ok_or(Error::ExtensionNotInstalled(name.to_string()))?;
     let hook_ctx = HookContext::for_extension_install(
@@ -400,7 +402,7 @@ pub fn handle_extension_init(name: &str, config: &Config, repo_root: &Path) -> R
 
 - `test_post_extension_install_hook_fires` — hook with marker file side effect
 - `test_post_extension_install_not_fired_on_failure` — install failure before hook
-- `test_extension_init_refires_hooks`
+- `test_extension_reinit_refires_hooks`
 
 ---
 
@@ -436,5 +438,5 @@ Phase 5 can be started in parallel with 2–4 since the hook infrastructure is i
 - [ ] `venv_path = ".vaultspec/.venv"` is validated and recorded in the lock file
 - [ ] MCP config resolution uses the lock-recorded venv path
 - [ ] `post-extension-install` hooks fire after successful install
-- [ ] `repo extension init <name>` re-fires `post-extension-install` hooks
+- [ ] `repo extension reinit <name>` re-fires `post-extension-install` hooks
 - [ ] All existing tests continue to pass

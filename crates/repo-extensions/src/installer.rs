@@ -36,9 +36,10 @@ fn shell_command(cmd_str: &str) -> Command {
 /// The environment inherits the parent process environment with the additional
 /// variables `REPO_EXTENSION_NAME`, `REPO_EXTENSION_VERSION`, and `REPO_ROOT`.
 ///
-/// Stdout is streamed to the terminal (inherited). Stderr is piped so that it
-/// can be included in [`Error::InstallFailed`] on failure, giving the user an
-/// actionable error message. A non-zero exit code returns [`Error::InstallFailed`].
+/// Stdout and stderr are both inherited (streamed live to the terminal) so that
+/// warnings and progress output are visible during installation. On failure the
+/// error message instructs the user to check the output above. A non-zero exit
+/// code returns [`Error::InstallFailed`].
 pub fn run_install(
     name: &str,
     version: &str,
@@ -53,24 +54,21 @@ pub fn run_install(
         .env("REPO_ROOT", repo_root)
         .stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
-        .stderr(std::process::Stdio::piped());
+        .stderr(std::process::Stdio::inherit());
 
-    let output = cmd
-        .output()
-        .map_err(|e| Error::InstallFailed {
+    let status = cmd
+        .status()
+        .map_err(|_e| Error::InstallFailed {
             name: name.to_string(),
             command: install_cmd.to_string(),
             exit_code: None,
-            stderr: e.to_string(),
         })?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    if !status.success() {
         return Err(Error::InstallFailed {
             name: name.to_string(),
             command: install_cmd.to_string(),
-            exit_code: output.status.code(),
-            stderr,
+            exit_code: status.code(),
         });
     }
 
@@ -106,16 +104,16 @@ pub fn check_binary_on_path(tool: &str) -> Result<PathBuf> {
 
     Err(Error::PackageManagerNotFound {
         tool: tool.to_string(),
-        hint: install_hint(tool).to_string(),
+        hint: install_hint(tool).map(str::to_string),
     })
 }
 
-fn install_hint(tool: &str) -> &'static str {
+fn install_hint(tool: &str) -> Option<&'static str> {
     match tool {
-        "uv" => "\n  Install: curl -LsSf https://astral.sh/uv/install.sh | sh",
-        "npm" => "\n  Install: https://nodejs.org",
-        "cargo" => "\n  Install: https://rustup.rs",
-        _ => "",
+        "uv" => Some("\n  Install: curl -LsSf https://astral.sh/uv/install.sh | sh"),
+        "npm" => Some("\n  Install: https://nodejs.org"),
+        "cargo" => Some("\n  Install: https://rustup.rs"),
+        _ => None,
     }
 }
 
@@ -166,7 +164,7 @@ fn run_python_version_cmd(cmd: &str) -> Result<String> {
         .output()
         .map_err(|e| Error::PackageManagerNotFound {
             tool: cmd.to_string(),
-            hint: e.to_string(),
+            hint: Some(e.to_string()),
         })?;
 
     // Python 2 writes to stderr; Python 3 to stdout. Check both.
@@ -178,7 +176,7 @@ fn run_python_version_cmd(cmd: &str) -> Result<String> {
 
     parse_python_version(&raw).ok_or_else(|| Error::PackageManagerNotFound {
         tool: cmd.to_string(),
-        hint: format!("unexpected output: {}", raw.trim()),
+        hint: Some(format!("unexpected output: {}", raw.trim())),
     })
 }
 
