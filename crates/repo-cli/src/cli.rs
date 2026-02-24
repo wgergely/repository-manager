@@ -354,6 +354,20 @@ pub enum Commands {
         #[command(subcommand)]
         action: RuleAction,
     },
+
+    /// Skills marketplace — discover, search, and install extensions
+    ///
+    /// Browse the built-in extension registry and install skills by name.
+    ///
+    /// Examples:
+    ///   repo skills list
+    ///   repo skills search vault
+    ///   repo skills install vaultspec
+    #[command(alias = "sk")]
+    Skills {
+        #[command(subcommand)]
+        action: SkillsAction,
+    },
 }
 
 /// Branch management actions
@@ -539,6 +553,25 @@ pub enum PresetAction {
 
     /// List available presets
     List,
+}
+
+/// Skills marketplace actions
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum SkillsAction {
+    /// List all available skills
+    List,
+
+    /// Search skills by name or description
+    Search {
+        /// Search query string
+        query: String,
+    },
+
+    /// Install a skill by name
+    Install {
+        /// Name of the skill to install
+        name: String,
+    },
 }
 
 /// Rule management actions

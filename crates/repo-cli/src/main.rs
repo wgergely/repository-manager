@@ -18,7 +18,7 @@ use tracing_subscriber::FmtSubscriber;
 
 use cli::{
     BranchAction, Cli, Commands, ConfigAction, ExtensionAction, HooksAction, PresetAction,
-    RuleAction, ToolAction,
+    RuleAction, SkillsAction, ToolAction,
 };
 use error::Result;
 
@@ -103,6 +103,7 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::Tool { action } => cmd_tool(action),
         Commands::Preset { action } => cmd_preset(action),
         Commands::Rule { action } => cmd_rule(action),
+        Commands::Skills { action } => cmd_skills(action),
     }
 }
 
@@ -316,6 +317,15 @@ fn cmd_preset(action: PresetAction) -> Result<()> {
         PresetAction::Add { name, dry_run } => cmd_add_preset(&name, dry_run),
         PresetAction::Remove { name, dry_run } => cmd_remove_preset(&name, dry_run),
         PresetAction::List => cmd_list_presets(),
+    }
+}
+
+fn cmd_skills(action: SkillsAction) -> Result<()> {
+    let registry = repo_extensions::ExtensionRegistry::with_known();
+    match action {
+        SkillsAction::List => commands::skills::run_skills_list(&registry),
+        SkillsAction::Search { query } => commands::skills::run_skills_search(&registry, &query),
+        SkillsAction::Install { name } => commands::skills::run_skills_install(&registry, &name),
     }
 }
 

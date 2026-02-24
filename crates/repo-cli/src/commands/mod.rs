@@ -12,6 +12,7 @@ pub mod list;
 pub mod open;
 
 pub mod rule;
+pub mod skills;
 pub mod status;
 pub mod sync;
 pub mod tool;
