@@ -1,0 +1,10 @@
+[book]
+title = "Repository Manager"
+description = "Sync AI tool configurations across 14 tools with a single config file"
+authors = []
+language = "en"
+src = "src"
+
+[output.html]
+git-repository-url = "https://github.com/wgergely/repository-manager"
+edit-url-template = "https://github.com/wgergely/repository-manager/edit/main/docs/book/src/{path}"

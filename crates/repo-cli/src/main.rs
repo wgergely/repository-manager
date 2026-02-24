@@ -16,7 +16,10 @@ use colored::Colorize;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-use cli::{BranchAction, Cli, Commands, ConfigAction, ExtensionAction, HooksAction};
+use cli::{
+    BranchAction, Cli, Commands, ConfigAction, ExtensionAction, HooksAction, PresetAction,
+    RuleAction, ToolAction,
+};
 use error::Result;
 
 fn main() {
@@ -97,6 +100,9 @@ fn execute_command(cmd: Commands) -> Result<()> {
         Commands::Hooks { action } => cmd_hooks(action),
         Commands::Extension { action } => cmd_extension(action),
         Commands::Open { worktree, tool } => cmd_open(&worktree, tool.as_deref()),
+        Commands::Tool { action } => cmd_tool(action),
+        Commands::Preset { action } => cmd_preset(action),
+        Commands::Rule { action } => cmd_rule(action),
     }
 }
 
@@ -294,6 +300,35 @@ fn cmd_extension(action: ExtensionAction) -> Result<()> {
 fn cmd_open(worktree: &str, tool: Option<&str>) -> Result<()> {
     let cwd = std::env::current_dir()?;
     commands::open::run_open(&cwd, worktree, tool)
+}
+
+fn cmd_tool(action: ToolAction) -> Result<()> {
+    match action {
+        ToolAction::Add { name, dry_run } => cmd_add_tool(&name, dry_run),
+        ToolAction::Remove { name, dry_run } => cmd_remove_tool(&name, dry_run),
+        ToolAction::List { category } => cmd_list_tools(category.as_deref()),
+        ToolAction::Info { name } => cmd_tool_info(&name),
+    }
+}
+
+fn cmd_preset(action: PresetAction) -> Result<()> {
+    match action {
+        PresetAction::Add { name, dry_run } => cmd_add_preset(&name, dry_run),
+        PresetAction::Remove { name, dry_run } => cmd_remove_preset(&name, dry_run),
+        PresetAction::List => cmd_list_presets(),
+    }
+}
+
+fn cmd_rule(action: RuleAction) -> Result<()> {
+    match action {
+        RuleAction::Add {
+            id,
+            instruction,
+            tags,
+        } => cmd_add_rule(&id, &instruction, tags),
+        RuleAction::Remove { id } => cmd_remove_rule(&id),
+        RuleAction::List => cmd_list_rules(),
+    }
 }
 
 #[cfg(test)]

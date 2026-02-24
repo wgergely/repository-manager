@@ -317,6 +317,43 @@ pub enum Commands {
         #[arg(short, long)]
         tool: Option<String>,
     },
+
+    /// Manage tools (nested form of add-tool, remove-tool, list-tools, tool-info)
+    ///
+    /// Examples:
+    ///   repo tool add claude
+    ///   repo tool remove cursor
+    ///   repo tool list
+    ///   repo tool info claude
+    #[command(alias = "t")]
+    Tool {
+        #[command(subcommand)]
+        action: ToolAction,
+    },
+
+    /// Manage presets (nested form of add-preset, remove-preset, list-presets)
+    ///
+    /// Examples:
+    ///   repo preset add typescript
+    ///   repo preset remove typescript
+    ///   repo preset list
+    #[command(alias = "p")]
+    Preset {
+        #[command(subcommand)]
+        action: PresetAction,
+    },
+
+    /// Manage rules (nested form of add-rule, remove-rule, list-rules)
+    ///
+    /// Examples:
+    ///   repo rule add python-style --instruction "Use snake_case"
+    ///   repo rule remove python-style
+    ///   repo rule list
+    #[command(alias = "r")]
+    Rule {
+        #[command(subcommand)]
+        action: RuleAction,
+    },
 }
 
 /// Branch management actions
@@ -438,6 +475,95 @@ pub enum ExtensionAction {
         #[arg(long)]
         json: bool,
     },
+}
+
+/// Tool management actions
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum ToolAction {
+    /// Add a tool to the repository
+    Add {
+        /// Name of the tool (use 'repo tool list' to see options)
+        name: String,
+
+        /// Preview changes without applying them
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Remove a tool from the repository
+    Remove {
+        /// Name of the tool to remove
+        name: String,
+
+        /// Preview changes without applying them
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// List available tools
+    List {
+        /// Filter by category (ide, cli-agent, autonomous, copilot)
+        #[arg(short, long)]
+        category: Option<String>,
+    },
+
+    /// Show detailed information about a tool
+    Info {
+        /// Tool name (e.g., "claude", "cursor", "vscode")
+        name: String,
+    },
+}
+
+/// Preset management actions
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum PresetAction {
+    /// Add a preset to the repository
+    Add {
+        /// Name of the preset to add
+        name: String,
+
+        /// Preview changes without applying them
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Remove a preset from the repository
+    Remove {
+        /// Name of the preset to remove
+        name: String,
+
+        /// Preview changes without applying them
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// List available presets
+    List,
+}
+
+/// Rule management actions
+#[derive(Subcommand, Debug, Clone, PartialEq, Eq)]
+pub enum RuleAction {
+    /// Add a rule to the repository
+    Add {
+        /// Rule identifier (e.g., "python-style")
+        id: String,
+        /// Rule instruction text
+        #[arg(short, long)]
+        instruction: String,
+        /// Optional tags
+        #[arg(short, long)]
+        tags: Vec<String>,
+    },
+
+    /// Remove a rule from the repository
+    Remove {
+        /// Rule ID to remove
+        id: String,
+    },
+
+    /// List all active rules
+    List,
 }
 
 #[cfg(test)]
